@@ -42,7 +42,7 @@ def spread(n, first=FIRST, last=LAST):
 
 # Strength is the demo's one big moment and lands mid-demo; the extra boat and dog come early,
 # so the idle layer is seen; the rest spread over the whole demo.
-PINNED = {"net_strength": [8.0], "fleet": [3.0], "dog_count": [4.0], "dog_strength": [12.0],
+PINNED = {"net_strength": [8.0], "fleet": [2.0, 6.0], "dog_count": [4.0], "dog_strength": [12.0],
           "boat_volley": [10.0]}
 
 
@@ -173,6 +173,11 @@ def main():
     log = run()
     last, got, total = summary(config, log)
     print(f"final: {got}/{total} levels, last at {last:.1f} min")
+    # The boats against the net, minute by minute: the box (Waiting) should not run away.
+    for smp in log["samples"][::12]:
+        r = smp["rates"]
+        print(f"  {smp['t'] / 60:5.1f} min  catch {r.get('catch', 0):4.2f}/s  ferry {r.get('ferry', 0):4.2f}/s"
+              f"  waiting {smp['pools'].get('box', 0):6.0f}")
     json.dump(prices, open(path, "w", encoding="utf8"), indent=1)
     for n in config["nodes"]:
         print(f"  {n['id']:14} {prices[n['id']][0]:>7g} x{prices[n['id']][1]:.2f}  "

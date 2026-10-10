@@ -328,12 +328,12 @@
    "name": "Width",
    "ranks": 6,
    "cost": [
-    120.0,
-    195.6,
-    318.8,
-    519.7,
-    847.1,
-    1380.8
+    140.0,
+    288.4,
+    594.1,
+    1223.9,
+    2521.1,
+    5193.5
    ],
    "effects": [
     {
@@ -365,7 +365,7 @@
    "name": "Strength",
    "ranks": 1,
    "cost": [
-    450.0
+    1100.0
    ],
    "effects": [
     {
@@ -387,10 +387,10 @@
    "name": "Range",
    "ranks": 4,
    "cost": [
-    95.0,
-    223.2,
-    524.6,
-    1232.9
+    110.0,
+    374.0,
+    1271.6,
+    4323.4
    ],
    "effects": [
     {
@@ -418,9 +418,9 @@
    "name": "Catch",
    "ranks": 3,
    "cost": [
-    90.0,
-    315.0,
-    1102.5
+    100.0,
+    350.0,
+    1225.0
    ],
    "effects": [
     {
@@ -446,9 +446,9 @@
    "name": "Lucky cast",
    "ranks": 3,
    "cost": [
-    90.0,
-    315.0,
-    1102.5
+    100.0,
+    350.0,
+    1225.0
    ],
    "effects": [
     {
@@ -474,9 +474,9 @@
    "name": "Double cast",
    "ranks": 3,
    "cost": [
-    90.0,
-    315.0,
-    1102.5
+    100.0,
+    350.0,
+    1225.0
    ],
    "effects": [
     {
@@ -502,11 +502,11 @@
    "name": "Sailing",
    "ranks": 5,
    "cost": [
-    100.0,
-    187.0,
-    349.7,
-    653.9,
-    1222.8
+    130.0,
+    322.4,
+    799.6,
+    1982.9,
+    4917.6
    ],
    "effects": [
     {
@@ -530,47 +530,59 @@
    ]
   },
   {
+   "id": "cargo",
+   "tree": "ferry",
+   "group": "cargo",
+   "name": "Hold",
+   "ranks": 4,
+   "cost": [
+    110.0,
+    374.0,
+    1271.6,
+    4323.4
+   ],
+   "effects": [
+    {
+     "stat": "cargo",
+     "add": [
+      6,
+      6,
+      6,
+      6
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    0.8,
+    6.5,
+    12.3,
+    18.0
+   ]
+  },
+  {
    "id": "fleet",
    "tree": "ferry",
    "group": "fleet",
    "name": "Fleet",
-   "ranks": 1,
+   "ranks": 2,
    "cost": [
-    150.0
+    110.0,
+    385.0
    ],
    "effects": [
     {
      "stat": "boats",
      "add": [
+      1,
       1
      ]
     }
    ],
    "tags": [],
    "schedule": [
-    3.0
-   ]
-  },
-  {
-   "id": "boat_volley",
-   "tree": "ferry",
-   "group": "boat_volley",
-   "name": "Loading",
-   "ranks": 1,
-   "cost": [
-    500.0
-   ],
-   "effects": [
-    {
-     "stat": "boat_volley_cut",
-     "add": [
-      0.15
-     ]
-    }
-   ],
-   "tags": [],
-   "schedule": [
-    10.0
+    2.0,
+    6.0
    ]
   },
   {
@@ -580,7 +592,7 @@
    "name": "Pack",
    "ranks": 1,
    "cost": [
-    200.0
+    300.0
    ],
    "effects": [
     {
@@ -602,7 +614,7 @@
    "name": "Carry",
    "ranks": 1,
    "cost": [
-    650.0
+    1900.0
    ],
    "effects": [
     {
@@ -624,7 +636,7 @@
    "name": "Bonus yard",
    "ranks": 1,
    "cost": [
-    500.0
+    1300.0
    ],
    "effects": [
     {
@@ -646,7 +658,7 @@
    "name": "Pigeons",
    "ranks": 1,
    "cost": [
-    500.0
+    1300.0
    ],
    "effects": [
     {

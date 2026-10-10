@@ -10,13 +10,13 @@
    "id": "early_cadence",
    "label": "early buys every 10-60 s (first 10 min)",
    "status": "pass",
-   "detail": "median gap 25 s"
+   "detail": "median gap 20 s"
   },
   {
    "id": "dead_stretch",
    "label": "no gap between buys over 300 s",
    "status": "pass",
-   "detail": "longest 60 s at 14.0-15.0 min"
+   "detail": "longest 115 s at 14.6-16.5 min"
   },
   {
    "id": "finale",
@@ -28,7 +28,7 @@
    "id": "power_jump",
    "label": "every buy raises income at least 8%",
    "status": "fail",
-   "detail": "net_hold +0.0%, lucky_haul +0.0%, double_cast +0.1%, net_range +1.7%, net_width +1.9%, net_width r2 +1.0%"
+   "detail": "net_hold +0.0%, lucky_haul +0.0%, double_cast +0.1%, net_range +1.7%, net_width +0.7%, net_width r2 +0.8%"
   },
   {
    "id": "dominance",
@@ -40,13 +40,13 @@
    "id": "payback",
    "label": "payback within 4x of its phase median",
    "status": "fail",
-   "detail": "lucky_haul too weak for price (71248353479884800 s vs 1616 s); double_cast too weak for price (26277 s vs 1616 s); boat_speed too strong for price (138 s vs 1616 s); fleet too strong for price (25 s vs 1616 s); boat_speed r2 too strong for price (143 s vs 1616 s); dog_count too weak for price (7916483719987200 s vs 1616 s)"
+   "detail": "double_cast too weak for price (29197 s vs 1220 s); cargo too strong for price (59 s vs 1220 s); fleet too strong for price (16 s vs 1220 s); boat_speed too strong for price (67 s vs 1220 s); dog_count too weak for price (19791209299968000 s vs 1220 s); boat_speed r2 too strong for price (184 s vs 1220 s)"
   },
   {
    "id": "link_catch_ferry",
    "label": "ferry capacity within 1-2.5x of catch rate",
    "status": "fail",
-   "detail": "inside 16%, lagging 82%, overrunning 2%; box peaked at 1641"
+   "detail": "inside 39%, lagging 36%, overrunning 25%; box peaked at 293"
   },
   {
    "id": "chain_lock",
@@ -71,18 +71,18 @@
   {
    "bot": "focused",
    "clearMinutes": null,
-   "endCleared": 0.10062365278502372,
-   "purchaseCount": 31,
-   "earlyMedianGap": 25,
+   "endCleared": 0.10058409371901655,
+   "purchaseCount": 35,
+   "earlyMedianGap": 20,
    "longestGap": {
-    "from": 840,
-    "to": 900,
-    "sec": 60
+    "from": 875,
+    "to": 990,
+    "sec": 115
    },
    "tailGap": {
-    "from": 900,
+    "from": 990,
     "to": 2700,
-    "sec": 1800,
+    "sec": 1710,
     "tail": true
    },
    "fillerBuys": [],
@@ -97,251 +97,288 @@
     {
      "id": "lucky_haul",
      "rank": 1,
-     "t": 35,
-     "gainPct": 2.3614314665113172e-14
+     "t": 40,
+     "gainPct": 0
     },
     {
      "id": "double_cast",
      "rank": 1,
-     "t": 55,
-     "gainPct": 0.06402832724085361
+     "t": 60,
+     "gainPct": 0.0640283272408536
     },
     {
      "id": "net_range",
      "rank": 1,
-     "t": 70,
-     "gainPct": 1.6616377508559834
+     "t": 80,
+     "gainPct": 1.661637750855795
     },
     {
      "id": "net_width",
      "rank": 1,
-     "t": 110,
-     "gainPct": 1.8864889813837198
+     "t": 135,
+     "gainPct": 0.7122448509788569
     },
     {
      "id": "net_width",
      "rank": 2,
-     "t": 165,
-     "gainPct": 1.0098240334330584
+     "t": 150,
+     "gainPct": 0.8291528671905992
     },
     {
      "id": "dog_count",
      "rank": 1,
-     "t": 180,
-     "gainPct": 1.8521711271162477e-13
-    },
-    {
-     "id": "net_range",
-     "rank": 2,
-     "t": 195,
-     "gainPct": 0.6508666371645877
+     "t": 170,
+     "gainPct": 9.14110632932681e-14
     },
     {
      "id": "net_hold",
      "rank": 2,
-     "t": 220,
+     "t": 210,
      "gainPct": 0
     },
     {
      "id": "lucky_haul",
      "rank": 2,
-     "t": 240,
-     "gainPct": 0
+     "t": 230,
+     "gainPct": 5.510454094523705e-14
     },
     {
      "id": "double_cast",
      "rank": 2,
+     "t": 245,
+     "gainPct": 0.06596039819975476
+    },
+    {
+     "id": "net_range",
+     "rank": 2,
      "t": 265,
-     "gainPct": 0.1036184931559788
+     "gainPct": 0.4953877280102565
+    },
+    {
+     "id": "boat_speed",
+     "rank": 3,
+     "t": 345,
+     "gainPct": 1.7149105672239186e-13
     },
     {
      "id": "net_width",
-     "rank": 3,
-     "t": 290,
-     "gainPct": 1.22115769359297
+     "rank": 4,
+     "t": 405,
+     "gainPct": 0.48416663134569937
     },
     {
-     "id": "boat_volley",
-     "rank": 1,
-     "t": 375,
-     "gainPct": 0.535684128926098
+     "id": "net_hold",
+     "rank": 3,
+     "t": 430,
+     "gainPct": 0
+    },
+    {
+     "id": "lucky_haul",
+     "rank": 3,
+     "t": 455,
+     "gainPct": 0.009853682687703542
+    },
+    {
+     "id": "double_cast",
+     "rank": 3,
+     "t": 480,
+     "gainPct": 0.05883837918582279
+    },
+    {
+     "id": "net_range",
+     "rank": 3,
+     "t": 505,
+     "gainPct": 0
     },
     {
      "id": "recycle_bonus",
      "rank": 1,
-     "t": 405,
-     "gainPct": 5.983369681854562
-    },
-    {
-     "id": "net_width",
-     "rank": 4,
-     "t": 460,
-     "gainPct": 1.453908585242612
-    },
-    {
-     "id": "net_range",
-     "rank": 3,
-     "t": 485,
-     "gainPct": 0.23163464823410626
+     "t": 555,
+     "gainPct": 6.133604808811024
     },
     {
      "id": "dog_strength",
      "rank": 1,
-     "t": 515,
+     "t": 605,
      "gainPct": 0
     },
     {
      "id": "boat_speed",
      "rank": 4,
-     "t": 550,
-     "gainPct": 7.112788475310329
+     "t": 640,
+     "gainPct": 7.073745553295113
     },
     {
      "id": "net_width",
      "rank": 5,
-     "t": 585,
-     "gainPct": 1.2654696172653932
-    },
-    {
-     "id": "net_hold",
-     "rank": 3,
-     "t": 635,
-     "gainPct": 0
-    },
-    {
-     "id": "lucky_haul",
-     "rank": 3,
-     "t": 685,
-     "gainPct": 0.008572138826273851
-    },
-    {
-     "id": "double_cast",
-     "rank": 3,
-     "t": 735,
-     "gainPct": 0.1929742493131381
-    },
-    {
-     "id": "boat_speed",
-     "rank": 5,
-     "t": 790,
-     "gainPct": 6.005774123244034
+     "t": 675,
+     "gainPct": 0.4671174349816855
     },
     {
      "id": "net_range",
      "rank": 4,
-     "t": 840,
-     "gainPct": 0.18381041406069423
+     "t": 745,
+     "gainPct": 0.6045447283222535
     },
     {
-     "id": "net_width",
-     "rank": 6,
-     "t": 900,
-     "gainPct": 1.2346691413829232
+     "id": "boat_speed",
+     "rank": 5,
+     "t": 875,
+     "gainPct": 5.020573654451095e-13
     }
    ],
    "paybackOutliers": [
     {
-     "id": "lucky_haul",
-     "rank": 1,
-     "payback": 71248353479884800,
-     "median": 1615.9410925330922,
-     "kind": "too weak for price"
-    },
-    {
      "id": "double_cast",
      "rank": 1,
-     "payback": 26277.135620243047,
-     "median": 1615.9410925330922,
+     "payback": 29196.81735582561,
+     "median": 1220.2290245984714,
      "kind": "too weak for price"
     },
     {
-     "id": "boat_speed",
+     "id": "cargo",
      "rank": 1,
-     "payback": 138.1736746727834,
-     "median": 1615.9410925330922,
+     "payback": 58.66329842624474,
+     "median": 1220.2290245984714,
      "kind": "too strong for price"
     },
     {
      "id": "fleet",
      "rank": 1,
-     "payback": 25.364976001578356,
-     "median": 1615.9410925330922,
+     "payback": 15.569606382046222,
+     "median": 1220.2290245984714,
      "kind": "too strong for price"
     },
     {
      "id": "boat_speed",
-     "rank": 2,
-     "payback": 142.92333604831666,
-     "median": 1615.9410925330922,
+     "rank": 1,
+     "payback": 66.73273973910331,
+     "median": 1220.2290245984714,
      "kind": "too strong for price"
     },
     {
      "id": "dog_count",
      "rank": 1,
-     "payback": 7916483719987200,
-     "median": 1615.9410925330922,
+     "payback": 19791209299968000,
+     "median": 1220.2290245984714,
+     "kind": "too weak for price"
+    },
+    {
+     "id": "boat_speed",
+     "rank": 2,
+     "payback": 183.57117203386503,
+     "median": 1220.2290245984714,
+     "kind": "too strong for price"
+    },
+    {
+     "id": "lucky_haul",
+     "rank": 2,
+     "payback": 34634616274944000,
+     "median": 1220.2290245984714,
      "kind": "too weak for price"
     },
     {
      "id": "double_cast",
      "rank": 2,
-     "payback": 22143.13969576544,
-     "median": 1615.9410925330922,
+     "payback": 28934.40128826146,
+     "median": 1220.2290245984714,
      "kind": "too weak for price"
+    },
+    {
+     "id": "cargo",
+     "rank": 2,
+     "payback": 81.62437388772587,
+     "median": 1220.2290245984714,
+     "kind": "too strong for price"
+    },
+    {
+     "id": "fleet",
+     "rank": 2,
+     "payback": 43.03055877152415,
+     "median": 1220.2290245984714,
+     "kind": "too strong for price"
+    },
+    {
+     "id": "net_width",
+     "rank": 3,
+     "payback": 136.93871754469433,
+     "median": 1220.2290245984714,
+     "kind": "too strong for price"
     },
     {
      "id": "boat_speed",
      "rank": 3,
-     "payback": 294.24758397664357,
-     "median": 1615.9410925330922,
-     "kind": "too strong for price"
+     "payback": 15825050956254414,
+     "median": 1220.2290245984714,
+     "kind": "too weak for price"
     },
     {
      "id": "net_strength",
      "rank": 1,
-     "payback": 230.98903101732796,
-     "median": 1615.9410925330922,
+     "payback": 44.28107841943727,
+     "median": 1220.2290245984714,
      "kind": "too strong for price"
     },
     {
-     "id": "net_range",
-     "rank": 3,
-     "payback": 11157.744207711743,
-     "median": 1615.9410925330922,
+     "id": "net_width",
+     "rank": 4,
+     "payback": 5185.071816041007,
+     "median": 1220.2290245984714,
      "kind": "too weak for price"
     },
     {
      "id": "lucky_haul",
      "rank": 3,
-     "payback": 575998.4411834065,
-     "median": 25565.317564814657,
+     "payback": 253590.2550549811,
+     "median": 1220.2290245984714,
      "kind": "too weak for price"
+    },
+    {
+     "id": "double_cast",
+     "rank": 3,
+     "payback": 42477.17926636201,
+     "median": 1220.2290245984714,
+     "kind": "too weak for price"
+    },
+    {
+     "id": "cargo",
+     "rank": 3,
+     "payback": 136.40818957221748,
+     "median": 1220.2290245984714,
+     "kind": "too strong for price"
+    },
+    {
+     "id": "boat_speed",
+     "rank": 4,
+     "payback": 460.397512934479,
+     "median": 4893.863399690836,
+     "kind": "too strong for price"
+    },
+    {
+     "id": "cargo",
+     "rank": 4,
+     "payback": 435.2181785548961,
+     "median": 4893.863399690836,
+     "kind": "too strong for price"
     },
     {
      "id": "boat_speed",
      "rank": 5,
-     "payback": 908.9435458196098,
-     "median": 25565.317564814657,
-     "kind": "too strong for price"
-    },
-    {
-     "id": "net_width",
-     "rank": 6,
-     "payback": 4708.890525706739,
-     "median": 25565.317564814657,
-     "kind": "too strong for price"
+     "payback": 20276093927817216,
+     "median": 4893.863399690836,
+     "kind": "too weak for price"
     }
    ],
    "phasePayback": [
     {
      "phaseMin": 0,
-     "medianPaybackSec": 1615.9410925330922,
-     "buys": 20
+     "medianPaybackSec": 1220.2290245984714,
+     "buys": 22
     },
     {
      "phaseMin": 10,
-     "medianPaybackSec": 25565.317564814657,
-     "buys": 5
+     "medianPaybackSec": 4893.863399690836,
+     "buys": 6
     }
    ],
    "dominance": {
@@ -352,18 +389,18 @@
    },
    "revealToBuyByGroup": {
     "net_hold": 20,
-    "lucky_haul": 35,
-    "double_cast": 55,
-    "net_range": 70,
-    "boat_speed": 90,
-    "net_width": 110,
-    "fleet": 135,
-    "dog_count": 180,
-    "net_strength": 345,
-    "boat_volley": 375,
-    "recycle_bonus": 405,
-    "bird_worth": 430,
-    "dog_strength": 515
+    "lucky_haul": 40,
+    "double_cast": 60,
+    "net_range": 80,
+    "cargo": 100,
+    "fleet": 115,
+    "boat_speed": 125,
+    "net_width": 135,
+    "dog_count": 170,
+    "net_strength": 375,
+    "recycle_bonus": 555,
+    "bird_worth": 575,
+    "dog_strength": 605
    },
    "deadGates": [],
    "links": [
@@ -374,11 +411,11 @@
       1,
       2.5
      ],
-     "samples": 45,
-     "insideShare": 0.15555555555555556,
-     "underShare": 0.8222222222222222,
-     "overShare": 0.022222222222222223,
-     "maxBuffer": 1640.5204857719618,
+     "samples": 44,
+     "insideShare": 0.38636363636363635,
+     "underShare": 0.36363636363636365,
+     "overShare": 0.25,
+     "maxBuffer": 292.9270080294288,
      "buffer": "box"
     }
    ],
@@ -386,11 +423,11 @@
    "unlockGapsMin": [],
    "unbought": [],
    "lateBuys": [],
-   "totalCost": 15443.599999999999,
+   "totalCost": 41691.5,
    "income": {
-    "at2": 5.8235174926473245,
-    "at10": 21.751110504521936,
-    "at30": 23.72204985229437
+    "at2": 6.7762374554520495,
+    "at10": 60.37648545169077,
+    "at30": 3.3915090459922794
    },
    "seedClearMinutes": [
     null
@@ -408,7 +445,7 @@
      "rank": 1,
      "tree": "net",
      "group": "net_hold",
-     "cost": 90,
+     "cost": 100,
      "gainPct": 0,
      "payback": null,
      "via": null,
@@ -416,142 +453,142 @@
      "why": "cheapest"
     },
     {
-     "t": 35,
+     "t": 40,
      "id": "lucky_haul",
      "rank": 1,
      "tree": "luck",
      "group": "lucky_haul",
-     "cost": 90,
-     "gainPct": 2.3614314665113172e-14,
-     "payback": 71248353479884800,
+     "cost": 100,
+     "gainPct": 0,
+     "payback": null,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 55,
+     "t": 60,
      "id": "double_cast",
      "rank": 1,
      "tree": "luck",
      "group": "double_cast",
-     "cost": 90,
-     "gainPct": 0.06402832724085361,
-     "payback": 26277.135620243047,
+     "cost": 100,
+     "gainPct": 0.0640283272408536,
+     "payback": 29196.81735582561,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 70,
+     "t": 80,
      "id": "net_range",
      "rank": 1,
      "tree": "net",
      "group": "net_range",
-     "cost": 95,
-     "gainPct": 1.6616377508559834,
-     "payback": 1068.1123617050532,
+     "cost": 110,
+     "gainPct": 1.661637750855795,
+     "payback": 1236.7616819744128,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 90,
+     "t": 100,
+     "id": "cargo",
+     "rank": 1,
+     "tree": "ferry",
+     "group": "cargo",
+     "cost": 110,
+     "gainPct": 34.45869226971521,
+     "payback": 58.66329842624474,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 115,
+     "id": "fleet",
+     "rank": 1,
+     "tree": "ferry",
+     "group": "fleet",
+     "cost": 110,
+     "gainPct": 96.56033271711004,
+     "payback": 15.569606382046222,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 125,
      "id": "boat_speed",
      "rank": 1,
      "tree": "ferry",
      "group": "boat_speed",
-     "cost": 100,
-     "gainPct": 13.299866357476727,
-     "payback": 138.1736746727834,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 110,
-     "id": "net_width",
-     "rank": 1,
-     "tree": "net",
-     "group": "net_width",
-     "cost": 120,
-     "gainPct": 1.8864889813837198,
-     "payback": 1031.739743333418,
+     "cost": 130,
+     "gainPct": 13.545412025176207,
+     "payback": 66.73273973910331,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 135,
-     "id": "fleet",
+     "id": "net_width",
      "rank": 1,
-     "tree": "ferry",
-     "group": "fleet",
-     "cost": 150,
-     "gainPct": 94.1419942012342,
-     "payback": 25.364976001578356,
+     "tree": "net",
+     "group": "net_width",
+     "cost": 140,
+     "gainPct": 0.7122448509788569,
+     "payback": 1203.6963672225302,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 150,
-     "id": "boat_speed",
-     "rank": 2,
-     "tree": "ferry",
-     "group": "boat_speed",
-     "cost": 187,
-     "gainPct": 10.728662062587093,
-     "payback": 142.92333604831666,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 165,
      "id": "net_width",
      "rank": 2,
      "tree": "net",
      "group": "net_width",
-     "cost": 195.6,
-     "gainPct": 1.0098240334330584,
-     "payback": 1434.39974593499,
+     "cost": 288.4,
+     "gainPct": 0.8291528671905992,
+     "payback": 2114.932958730166,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 180,
+     "t": 170,
      "id": "dog_count",
      "rank": 1,
      "tree": "dog",
      "group": "dog_count",
-     "cost": 200,
-     "gainPct": 1.8521711271162477e-13,
-     "payback": 7916483719987200,
+     "cost": 300,
+     "gainPct": 9.14110632932681e-14,
+     "payback": 19791209299968000,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 195,
-     "id": "net_range",
+     "t": 190,
+     "id": "boat_speed",
      "rank": 2,
-     "tree": "net",
-     "group": "net_range",
-     "cost": 223.2,
-     "gainPct": 0.6508666371645877,
-     "payback": 2514.1177652564024,
+     "tree": "ferry",
+     "group": "boat_speed",
+     "cost": 322.4,
+     "gainPct": 10.5910834512554,
+     "payback": 183.57117203386503,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 220,
+     "t": 210,
      "id": "net_hold",
      "rank": 2,
      "tree": "net",
      "group": "net_hold",
-     "cost": 315,
+     "cost": 350,
      "gainPct": 0,
      "payback": null,
      "via": null,
@@ -559,105 +596,209 @@
      "why": "cheapest"
     },
     {
-     "t": 240,
+     "t": 230,
      "id": "lucky_haul",
      "rank": 2,
      "tree": "luck",
      "group": "lucky_haul",
-     "cost": 315,
-     "gainPct": 0,
-     "payback": null,
+     "cost": 350,
+     "gainPct": 5.510454094523705e-14,
+     "payback": 34634616274944000,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 245,
+     "id": "double_cast",
+     "rank": 2,
+     "tree": "luck",
+     "group": "double_cast",
+     "cost": 350,
+     "gainPct": 0.06596039819975476,
+     "payback": 28934.40128826146,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 265,
-     "id": "double_cast",
+     "id": "net_range",
      "rank": 2,
-     "tree": "luck",
-     "group": "double_cast",
-     "cost": 315,
-     "gainPct": 0.1036184931559788,
-     "payback": 22143.13969576544,
+     "tree": "net",
+     "group": "net_range",
+     "cost": 374,
+     "gainPct": 0.4953877280102565,
+     "payback": 4114.051417739019,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 290,
-     "id": "net_width",
-     "rank": 3,
-     "tree": "net",
-     "group": "net_width",
-     "cost": 318.8,
-     "gainPct": 1.22115769359297,
-     "payback": 1899.6023792127044,
+     "id": "cargo",
+     "rank": 2,
+     "tree": "ferry",
+     "group": "cargo",
+     "cost": 374,
+     "gainPct": 24.845570075663847,
+     "payback": 81.62437388772587,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 315,
-     "id": "boat_speed",
-     "rank": 3,
+     "t": 305,
+     "id": "fleet",
+     "rank": 2,
      "tree": "ferry",
-     "group": "boat_speed",
-     "cost": 349.7,
-     "gainPct": 8.543337606003465,
-     "payback": 294.24758397664357,
+     "group": "fleet",
+     "cost": 385,
+     "gainPct": 38.86045075711845,
+     "payback": 43.03055877152415,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 325,
+     "id": "net_width",
+     "rank": 3,
+     "tree": "net",
+     "group": "net_width",
+     "cost": 594.1,
+     "gainPct": 15.323183422474347,
+     "payback": 136.93871754469433,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 345,
-     "id": "net_strength",
-     "rank": 1,
-     "tree": "net",
-     "group": "net_strength",
-     "cost": 450,
-     "gainPct": 12.902171996776614,
-     "payback": 230.98903101732796,
+     "id": "boat_speed",
+     "rank": 3,
+     "tree": "ferry",
+     "group": "boat_speed",
+     "cost": 799.6,
+     "gainPct": 1.7149105672239186e-13,
+     "payback": 15825050956254414,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 375,
-     "id": "boat_volley",
+     "id": "net_strength",
      "rank": 1,
-     "tree": "ferry",
-     "group": "boat_volley",
-     "cost": 500,
-     "gainPct": 0.535684128926098,
-     "payback": 5271.667161865972,
+     "tree": "net",
+     "group": "net_strength",
+     "cost": 1100,
+     "gainPct": 107.20888265772358,
+     "payback": 44.28107841943727,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 405,
-     "id": "recycle_bonus",
-     "rank": 1,
-     "tree": "luck",
-     "group": "recycle_bonus",
-     "cost": 500,
-     "gainPct": 5.983369681854562,
-     "payback": 459.8919221473553,
+     "id": "net_width",
+     "rank": 4,
+     "tree": "net",
+     "group": "net_width",
+     "cost": 1223.9,
+     "gainPct": 0.48416663134569937,
+     "payback": 5185.071816041007,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
      "t": 430,
+     "id": "net_hold",
+     "rank": 3,
+     "tree": "net",
+     "group": "net_hold",
+     "cost": 1225,
+     "gainPct": 0,
+     "payback": null,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 455,
+     "id": "lucky_haul",
+     "rank": 3,
+     "tree": "luck",
+     "group": "lucky_haul",
+     "cost": 1225,
+     "gainPct": 0.009853682687703542,
+     "payback": 253590.2550549811,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 480,
+     "id": "double_cast",
+     "rank": 3,
+     "tree": "luck",
+     "group": "double_cast",
+     "cost": 1225,
+     "gainPct": 0.05883837918582279,
+     "payback": 42477.17926636201,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 505,
+     "id": "net_range",
+     "rank": 3,
+     "tree": "net",
+     "group": "net_range",
+     "cost": 1271.6,
+     "gainPct": 0,
+     "payback": null,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 530,
+     "id": "cargo",
+     "rank": 3,
+     "tree": "ferry",
+     "group": "cargo",
+     "cost": 1271.6,
+     "gainPct": 19.3393645852261,
+     "payback": 136.40818957221748,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 555,
+     "id": "recycle_bonus",
+     "rank": 1,
+     "tree": "luck",
+     "group": "recycle_bonus",
+     "cost": 1300,
+     "gainPct": 6.133604808811024,
+     "payback": 369.4882843172225,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 575,
      "id": "bird_worth",
      "rank": 1,
      "tree": "luck",
      "group": "bird_worth",
-     "cost": 500,
-     "gainPct": 1.1942668590821692,
-     "payback": 2150.0613369875937,
+     "cost": 1300,
+     "gainPct": 0.5272625762544285,
+     "payback": 4056.394523863726,
      "via": null,
      "tags": [
       "utility"
@@ -665,38 +806,12 @@
      "why": "cheapest"
     },
     {
-     "t": 460,
-     "id": "net_width",
-     "rank": 4,
-     "tree": "net",
-     "group": "net_width",
-     "cost": 519.7,
-     "gainPct": 1.453908585242612,
-     "payback": 1797.4824391311943,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 485,
-     "id": "net_range",
-     "rank": 3,
-     "tree": "net",
-     "group": "net_range",
-     "cost": 524.6,
-     "gainPct": 0.23163464823410626,
-     "payback": 11157.744207711743,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 515,
+     "t": 605,
      "id": "dog_strength",
      "rank": 1,
      "tree": "dog",
      "group": "dog_strength",
-     "cost": 650,
+     "cost": 1900,
      "gainPct": 0,
      "payback": null,
      "via": null,
@@ -704,105 +819,79 @@
      "why": "cheapest"
     },
     {
-     "t": 550,
+     "t": 640,
      "id": "boat_speed",
      "rank": 4,
      "tree": "ferry",
      "group": "boat_speed",
-     "cost": 653.9,
-     "gainPct": 7.112788475310329,
-     "payback": 448.92392246923316,
+     "cost": 1982.9,
+     "gainPct": 7.073745553295113,
+     "payback": 460.397512934479,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 585,
+     "t": 675,
      "id": "net_width",
      "rank": 5,
      "tree": "net",
      "group": "net_width",
-     "cost": 847.1,
-     "gainPct": 1.2654696172653932,
-     "payback": 3045.722315287783,
+     "cost": 2521.1,
+     "gainPct": 0.4671174349816855,
+     "payback": 8292.150165609395,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 635,
-     "id": "net_hold",
-     "rank": 3,
-     "tree": "net",
-     "group": "net_hold",
-     "cost": 1102.5,
-     "gainPct": 0,
-     "payback": null,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 685,
-     "id": "lucky_haul",
-     "rank": 3,
-     "tree": "luck",
-     "group": "lucky_haul",
-     "cost": 1102.5,
-     "gainPct": 0.008572138826273851,
-     "payback": 575998.4411834065,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 735,
-     "id": "double_cast",
-     "rank": 3,
-     "tree": "luck",
-     "group": "double_cast",
-     "cost": 1102.5,
-     "gainPct": 0.1929742493131381,
-     "payback": 25565.317564814657,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 790,
-     "id": "boat_speed",
-     "rank": 5,
-     "tree": "ferry",
-     "group": "boat_speed",
-     "cost": 1222.8,
-     "gainPct": 6.005774123244034,
-     "payback": 908.9435458196098,
-     "via": null,
-     "tags": [],
-     "why": "cheapest"
-    },
-    {
-     "t": 840,
+     "t": 745,
      "id": "net_range",
      "rank": 4,
      "tree": "net",
      "group": "net_range",
-     "cost": 1232.9,
-     "gainPct": 0.18381041406069423,
-     "payback": 28243.904443455845,
+     "cost": 4323.4,
+     "gainPct": 0.6045447283222535,
+     "payback": 11145.491048369162,
      "via": null,
      "tags": [],
      "why": "cheapest"
     },
     {
-     "t": 900,
+     "t": 810,
+     "id": "cargo",
+     "rank": 4,
+     "tree": "ferry",
+     "group": "cargo",
+     "cost": 4323.4,
+     "gainPct": 15.511570503862805,
+     "payback": 435.2181785548961,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 875,
+     "id": "boat_speed",
+     "rank": 5,
+     "tree": "ferry",
+     "group": "boat_speed",
+     "cost": 4917.6,
+     "gainPct": 5.020573654451095e-13,
+     "payback": 20276093927817216,
+     "via": null,
+     "tags": [],
+     "why": "cheapest"
+    },
+    {
+     "t": 990,
      "id": "net_width",
      "rank": 6,
      "tree": "net",
      "group": "net_width",
-     "cost": 1380.8,
-     "gainPct": 1.2346691413829232,
-     "payback": 4708.890525706739,
+     "cost": 5193.5,
+     "gainPct": 13.358511928317611,
+     "payback": 1495.5766337722757,
      "via": null,
      "tags": [],
      "why": "cheapest"
@@ -845,7 +934,7 @@
     },
     {
      "t": 31,
-     "money": 75.82653451941755,
+     "money": 65.82653451941755,
      "earned": 165.82653451941755,
      "cleared": 0.0007256073935856255,
      "income": 5.349243049013469,
@@ -878,1441 +967,1441 @@
     },
     {
      "t": 61,
-     "money": 56.324376174887334,
-     "earned": 326.3243761748874,
-     "cleared": 0.0014165017688304582,
-     "income": 5.349585552097897,
+     "money": 26.307251020665657,
+     "earned": 326.30725102066583,
+     "cleared": 0.001411534816986637,
+     "income": 5.349300132860872,
      "rates": {
-      "catch": 0.7132313527059378,
+      "catch": 0.7134687638948759,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
       "ferry": 0.4549784596135526,
       "birds": 0.006258799655616138
      },
      "caps": {
-      "catch": 0.7132313527059378,
+      "catch": 0.7134687638948759,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
       "ferry": 0.4549784596135526,
       "birds": 0.006258799655616138
      },
      "pools": {
-      "lake_t0": 9839.840955989728,
+      "lake_t0": 9840.006971388153,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
       "strand": 446.8138888888888,
-      "box": 19.591469084986745,
+      "box": 19.425453686570087,
       "pier": 27.753686036426725,
       "flock": null,
-      "purse": 0.37454152143725816
+      "purse": 0.37388286165950124
      }
     },
     {
      "t": 91,
-     "money": 24.495926456103458,
-     "earned": 489.4959264561032,
-     "cleared": 0.002352589711881903,
-     "income": 5.394489865611428,
+     "money": 77.8656549048215,
+     "earned": 487.865654904821,
+     "cleared": 0.0022246150375466733,
+     "income": 5.367318673090057,
      "rates": {
-      "catch": 1.090120830566819,
+      "catch": 1.096525101164092,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
-      "ferry": 0.5184243141003313,
+      "ferry": 0.4549784596135526,
       "birds": 0.00967964402072952
      },
      "caps": {
-      "catch": 1.090120830566819,
+      "catch": 1.096525101164092,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
-      "ferry": 0.5184243141003313,
+      "ferry": 0.4549784596135526,
       "birds": 0.00967964402072952
      },
      "pools": {
-      "lake_t0": 9809.136485914501,
+      "lake_t0": 9813.41391142948,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
       "strand": 446.23055555555544,
-      "box": 37.16647285066802,
-      "pier": 41.46648567932002,
+      "box": 32.95249319018074,
+      "pier": 41.40303982483324,
       "flock": null,
-      "purse": 0.6341432427731234
+      "purse": 0.5992761393442328
      }
     },
     {
      "t": 121,
-     "money": 90.73542573372795,
-     "earned": 675.7354257337269,
-     "cleared": 0.0035155895516411073,
-     "income": 5.8235174926473245,
+     "money": 102.88149834779018,
+     "earned": 732.8814983477888,
+     "cleared": 0.0032354547550339507,
+     "income": 6.7762374554520495,
      "rates": {
-      "catch": 1.5111401543233238,
+      "catch": 1.0468127624125805,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
-      "ferry": 0.5184243141003313,
-      "birds": 0.01415304406682331
+      "ferry": 1.238721301783477,
+      "birds": 0.00967964402072952
      },
      "caps": {
-      "catch": 1.5111401543233238,
+      "catch": 1.0468127624125805,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
-      "ferry": 0.5184243141003313,
-      "birds": 0.01415304406682331
+      "ferry": 1.238721301783477,
+      "birds": 0.00967964402072952
      },
      "pools": {
-      "lake_t0": 9770.847712603725,
+      "lake_t0": 9780.210938045526,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
       "strand": 445.64722222222207,
-      "box": 60.485850071786814,
-      "pier": 57.0192151023299,
+      "box": 45.921256196888606,
+      "pier": 62.22058353543209,
       "flock": null,
-      "purse": 0.9737399639020402
+      "purse": 0.8896654599661183
      }
     },
     {
      "t": 151,
-     "money": 38.111836801896274,
-     "earned": 960.1118368018949,
-     "cleared": 0.00487571745407811,
-     "income": 7.843598505763196,
+     "money": 28.581536627234797,
+     "earned": 1216.9815366272317,
+     "cleared": 0.004438739689622273,
+     "income": 12.151931362040179,
      "rates": {
-      "catch": 1.4128278796178448,
+      "catch": 1.9818475775109932,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
-      "ferry": 1.1515495796072908,
-      "birds": 0.01415304406682331
+      "ferry": 1.4094997076889808,
+      "birds": 0.019397800240543765
      },
      "caps": {
-      "catch": 1.4128278796178448,
+      "catch": 1.9818475775109932,
       "dog": 0.03611111111111111,
       "dog_beach": 0.01944444444444444,
-      "ferry": 1.1515495796072908,
-      "birds": 0.01415304406682331
+      "ferry": 1.4094997076889808,
+      "birds": 0.019397800240543765
      },
      "pools": {
-      "lake_t0": 9725.970130926004,
+      "lake_t0": 9740.57567572518,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
       "strand": 445.0638888888887,
-      "box": 81.98454568283623,
-      "pier": 80.98143450235169,
+      "box": 44.537974243538095,
+      "pier": 103.82246114247945,
       "flock": null,
-      "purse": 1.3983312859067416
+      "purse": 1.2568739374992264
      }
     },
     {
      "t": 181,
-     "money": 49.80481137969143,
-     "earned": 1367.4048113796864,
-     "cleared": 0.006385170213456526,
-     "income": 11.527823094099325,
+     "money": 226.05671578309747,
+     "earned": 1714.4567157830922,
+     "cleared": 0.006203813184185947,
+     "income": 16.359586957255058,
      "rates": {
-      "catch": 1.788274504265964,
+      "catch": 1.8070736807270202,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
+      "ferry": 1.4094997076889808,
       "birds": 0.019397800240543765
      },
      "caps": {
-      "catch": 1.788274504265964,
+      "catch": 1.8070736807270202,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
+      "ferry": 1.4094997076889808,
       "birds": 0.019397800240543765
      },
      "pools": {
-      "lake_t0": 9676.12095967432,
+      "lake_t0": 9682.377081465103,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 444.4611111111109,
-      "box": 97.89000732409501,
-      "pier": 115.52792189057043,
+      "strand": 444.2666666666664,
+      "box": 61.2487994951689,
+      "pier": 146.10745237314885,
       "flock": null,
-      "purse": 1.9068387066909684
+      "purse": 1.8388079447155379
      }
     },
     {
      "t": 211,
-     "money": 237.22733572474394,
-     "earned": 1778.0273357247354,
-     "cleared": 0.008259643663341643,
-     "income": 13.631924982047341,
+     "money": 88.0135029005349,
+     "earned": 2248.813502900528,
+     "cleared": 0.007849389565364184,
+     "income": 17.197199437888273,
      "rates": {
-      "catch": 2.1350559991325713,
+      "catch": 1.6453033107501307,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
-      "birds": 0.022812363990599674
+      "ferry": 1.563463681195542,
+      "birds": 0.019397800240543765
      },
      "caps": {
-      "catch": 2.1350559991325713,
+      "catch": 1.6453033107501307,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
-      "birds": 0.022812363990599674
+      "ferry": 1.563463681195542,
+      "birds": 0.019397800240543765
      },
      "pools": {
-      "lake_t0": 9614.635225752025,
+      "lake_t0": 9628.542003167271,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 443.29444444444414,
-      "box": 125.99592052481285,
-      "pier": 150.07440927878915,
+      "strand": 443.0999999999997,
+      "box": 70.73230978533647,
+      "pier": 191.62568704745607,
       "flock": null,
-      "purse": 2.5434057339081724
+      "purse": 2.4207419519318494
      }
     },
     {
      "t": 241,
-     "money": 19.092761274817047,
-     "earned": 2189.892761274808,
-     "cleared": 0.010199948801466241,
-     "income": 13.708132498252025,
+     "money": 288.1766934300768,
+     "earned": 2798.9766934300706,
+     "cleared": 0.009376854460884987,
+     "income": 18.075332960782973,
      "rates": {
-      "catch": 2.0434600629483164,
+      "catch": 1.5589246452635686,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
-      "birds": 0.022812363990599674
+      "ferry": 1.563463681195542,
+      "birds": 0.019397800240543765
      },
      "caps": {
-      "catch": 2.0434600629483164,
+      "catch": 1.5589246452635686,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
-      "birds": 0.022812363990599674
+      "ferry": 1.563463681195542,
+      "birds": 0.019397800240543765
      },
      "pools": {
-      "lake_t0": 9550.94913348201,
+      "lake_t0": 9578.654683166047,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 442.1277777777774,
-      "box": 156.30219207325877,
-      "pier": 184.62089666700788,
+      "strand": 441.93333333333294,
+      "box": 74.8823860173371,
+      "pier": 238.52959748332236,
       "flock": null,
-      "purse": 3.227776653626157
+      "purse": 3.002675959148161
      }
     },
     {
      "t": 271,
-     "money": 116.04354057444681,
-     "earned": 2601.843540574441,
-     "cleared": 0.012066544572791993,
-     "income": 13.730270080828424,
+     "money": 115.1998362083353,
+     "earned": 3349.9998362083334,
+     "cleared": 0.010938498204568159,
+     "income": 18.35310555513009,
      "rates": {
-      "catch": 1.9254379161989943,
+      "catch": 2.0267663421007525,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
+      "ferry": 1.563463681195542,
       "birds": 0.023359503410834318
      },
      "caps": {
-      "catch": 1.9254379161989943,
+      "catch": 2.0267663421007525,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
+      "ferry": 1.563463681195542,
       "birds": 0.023359503410834318
      },
      "pools": {
-      "lake_t0": 9489.72670308789,
+      "lake_t0": 9527.624969343851,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 440.96111111111065,
-      "box": 184.14480174580376,
-      "pier": 219.16738405522662,
+      "strand": 440.7666666666662,
+      "box": 80.17485607031334,
+      "pier": 285.4335079191881,
       "flock": null,
-      "purse": 3.915430409865552
+      "purse": 3.6176850528535383
      }
     },
     {
      "t": 301,
-     "money": 211.38180541758155,
-     "earned": 3015.9818054175744,
-     "cleared": 0.013982839806682246,
-     "income": 13.768150735712773,
+     "money": 344.85476693588504,
+     "earned": 3953.654766935887,
+     "cleared": 0.012781471204935335,
+     "income": 19.244634558430274,
      "rates": {
-      "catch": 2.2445506156383392,
+      "catch": 1.86518726540121,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
-      "birds": 0.029814295527186233
+      "ferry": 1.9651437638017508,
+      "birds": 0.023359503410834318
      },
      "caps": {
-      "catch": 2.2445506156383392,
+      "catch": 1.86518726540121,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.1515495796072908,
-      "birds": 0.029814295527186233
+      "ferry": 1.9651437638017508,
+      "birds": 0.023359503410834318
      },
      "pools": {
-      "lake_t0": 9426.843117857008,
+      "lake_t0": 9467.192106446242,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 439.7944444444439,
-      "box": 213.64856625511098,
-      "pier": 253.71387144344536,
+      "strand": 439.59999999999945,
+      "box": 90.45199429002918,
+      "pier": 336.755899263722,
       "flock": null,
-      "purse": 4.687218225470445
+      "purse": 4.3184701551785665
      }
     },
     {
      "t": 331,
-     "money": 298.02401689111986,
-     "earned": 3452.3240168911157,
-     "cleared": 0.01599101275664383,
-     "income": 14.174674605277914,
+     "money": 348.88710845499986,
+     "earned": 4936.787108454984,
+     "cleared": 0.01457024846369026,
+     "income": 26.446454537444183,
      "rates": {
-      "catch": 2.0193143338289192,
+      "catch": 2.182149791840732,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.2557360403601412,
+      "ferry": 2.9477156457026266,
       "birds": 0.029814295527186233
      },
      "caps": {
-      "catch": 2.0193143338289192,
+      "catch": 2.182149791840732,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.2557360403601412,
+      "ferry": 2.9477156457026266,
       "birds": 0.029814295527186233
      },
      "pools": {
-      "lake_t0": 9360.888611844159,
+      "lake_t0": 9408.570682016283,
       "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 438.62777777777717,
-      "box": 244.55626817433952,
-      "pier": 289.92734220370943,
+      "strand": 438.4333333333327,
+      "box": 65.73890354315539,
+      "pier": 421.25708110719654,
       "flock": null,
-      "purse": 5.58164709128602
+      "purse": 5.057984010201698
      }
     },
     {
      "t": 361,
-     "money": 310.8930345501462,
-     "earned": 3915.1930345501464,
-     "cleared": 0.019206852019916565,
-     "income": 14.9868538188762,
+     "money": 628.6392082362036,
+     "earned": 6016.139208236184,
+     "cleared": 0.016525272680205094,
+     "income": 34.37474068833828,
      "rates": {
-      "catch": 4.665388592668549,
+      "catch": 1.9629801080612495,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.2557360403601412,
+      "ferry": 3.2072009297064596,
       "birds": 0.029814295527186233
      },
      "caps": {
-      "catch": 4.665388592668549,
+      "catch": 1.9629801080612495,
       "dog": 0.07222222222222222,
       "dog_beach": 0.03888888888888888,
-      "ferry": 1.2557360403601412,
+      "ferry": 3.2072009297064596,
       "birds": 0.029814295527186233
      },
      "pools": {
-      "lake_t0": 9303.25642136572,
-      "lake_t1": 8192.312645609476,
+      "lake_t0": 9344.392619270162,
+      "lake_t1": 8241,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 437.4611111111104,
-      "box": 314.37039849914225,
-      "pier": 327.59942341451386,
+      "strand": 437.26666666666597,
+      "box": 38.500399040776024,
+      "pier": 513.8403150223363,
       "flock": null,
-      "purse": 6.476075957101595
+      "purse": 5.952412876017274
      }
     },
     {
      "t": 391,
-     "money": 315.95667661860347,
-     "earned": 4420.256676618598,
-     "cleared": 0.0232798246681295,
-     "income": 16.132210995458042,
+     "money": 774.2253011707631,
+     "earned": 7261.725301170734,
+     "cleared": 0.0196933348386501,
+     "income": 38.74896987859584,
      "rates": {
-      "catch": 4.211374180758528,
+      "catch": 4.616234311687635,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
+      "ferry": 3.2072009297064596,
       "birds": 0.029814295527186233
      },
      "caps": {
-      "catch": 4.211374180758528,
+      "catch": 4.616234311687635,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
+      "ferry": 3.2072009297064596,
       "birds": 0.029814295527186233
      },
      "pools": {
-      "lake_t0": 9254.81450604619,
-      "lake_t1": 8107.880634246247,
+      "lake_t0": 9288.954160472253,
+      "lake_t1": 8192.293593658485,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 434.20000000000005,
-      "box": 412.7210886503449,
-      "pier": 365.3837710571801,
+      "strand": 435.52222222222167,
+      "box": 48.17368073343352,
+      "pier": 610.0563429135301,
       "flock": null,
-      "purse": 7.37050482291717
+      "purse": 6.846841741832849
      }
     },
     {
      "t": 421,
-     "money": 362.0357098446822,
-     "earned": 4966.335709844665,
-     "cleared": 0.026966512522153097,
-     "income": 17.519044588241975,
+     "money": 1005.9195543596582,
+     "earned": 8717.319554359625,
+     "cleared": 0.024199904757869817,
+     "income": 45.01967243539069,
      "rates": {
-      "catch": 3.8019450618217405,
+      "catch": 5.102887823395799,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.029814295527186233
+      "ferry": 3.2072009297064596,
+      "birds": 0.03695754091068775
      },
      "caps": {
-      "catch": 3.8019450618217405,
+      "catch": 5.102887823395799,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.029814295527186233
+      "ferry": 3.2072009297064596,
+      "birds": 0.03695754091068775
      },
      "pools": {
-      "lake_t0": 9211.14753476283,
-      "lake_t1": 8031.657084030055,
+      "lake_t0": 9236.328913701498,
+      "lake_t1": 8097.624580782572,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 430.86666666666747,
-      "box": 498.06236271268614,
-      "pier": 403.2663518277255,
+      "strand": 432.1888888888891,
+      "box": 102.58524582224179,
+      "pier": 706.2723708047239,
       "flock": null,
-      "purse": 8.264933688732754
+      "purse": 7.8555625337844575
      }
     },
     {
      "t": 451,
-     "money": 441.1594197112993,
-     "earned": 5545.459419711282,
-     "cleared": 0.030304476789155266,
-     "income": 18.75337905154473,
+     "money": 1250.88774769272,
+     "earned": 10187.287747692686,
+     "cleared": 0.02859213247054193,
+     "income": 48.75937410869919,
      "rates": {
-      "catch": 3.4323205758238275,
+      "catch": 4.495037706959901,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.029814295527186233
+      "ferry": 3.2072009297064596,
+      "birds": 0.03695754091068775
      },
      "caps": {
-      "catch": 3.4323205758238275,
+      "catch": 4.495037706959901,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.029814295527186233
+      "ferry": 3.2072009297064596,
+      "birds": 0.03695754091068775
      },
      "pools": {
-      "lake_t0": 9171.725859388072,
-      "lake_t1": 7962.843975077865,
+      "lake_t0": 9185.069109112163,
+      "lake_t1": 8005.411899636885,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 427.5333333333349,
-      "box": 571.7478996024163,
-      "pier": 441.14893259827085,
+      "strand": 428.8555555555565,
+      "box": 153.17503699940158,
+      "pier": 802.4883986959177,
       "flock": null,
-      "purse": 9.159362554548355
+      "purse": 8.964288761105095
      }
     },
     {
      "t": 481,
-     "money": 516.669677286064,
-     "earned": 6140.6696772860405,
-     "cleared": 0.033790269906472825,
-     "income": 19.572232790689593,
+     "money": 272.05628435850673,
+     "earned": 11658.456284358475,
+     "cleared": 0.0325609751673942,
+     "income": 49.018945499980845,
      "rates": {
-      "catch": 3.7786665777126998,
+      "catch": 4.161440739984342,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.03695754091068775
+      "ferry": 3.2072009297064596,
+      "birds": 0.03792917798051941
      },
      "caps": {
-      "catch": 3.7786665777126998,
+      "catch": 4.161440739984342,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.03695754091068775
+      "ferry": 3.2072009297064596,
+      "birds": 0.03792917798051941
      },
      "pools": {
-      "lake_t0": 9130.504543160867,
-      "lake_t1": 7890.889475485187,
+      "lake_t0": 9138.865248229326,
+      "lake_t1": 7922.294495553465,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 424.2000000000023,
-      "box": 650.3744679850844,
-      "pier": 479.0315133688162,
+      "strand": 425.52222222222395,
+      "box": 189.6136074077999,
+      "pier": 898.7044265871115,
       "flock": null,
-      "purse": 10.203799573417482
+      "purse": 10.073986625495564
      }
     },
     {
      "t": 511,
-     "money": 598.4685828608191,
-     "earned": 6747.0685828608,
-     "cleared": 0.03816065494205645,
-     "income": 20.026819385825306,
+     "money": 472.1536924854856,
+     "earned": 13130.15369248544,
+     "cleared": 0.03642532024135703,
+     "income": 49.04776574654591,
      "rates": {
-      "catch": 4.698768359244631,
+      "catch": 5.149881452453703,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.04003484925964521
+      "ferry": 3.2072009297064596,
+      "birds": 0.04108739070767604
      },
      "caps": {
-      "catch": 4.698768359244631,
+      "catch": 5.149881452453703,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.04003484925964521
+      "ferry": 3.2072009297064596,
+      "birds": 0.04108739070767604
      },
      "pools": {
-      "lake_t0": 9069.257155244744,
-      "lake_t1": 7809.394447305292,
+      "lake_t0": 9091.493629845509,
+      "lake_t1": 7843.837577518485,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 420.86666666666974,
-      "box": 758.5676366438902,
-      "pier": 516.9140941393617,
+      "strand": 422.18888888889137,
+      "box": 222.55944926873644,
+      "pier": 994.9204544783053,
       "flock": null,
-      "purse": 11.392535817811032
+      "purse": 11.230811241274079
      }
     },
     {
      "t": 541,
-     "money": 558.7238874305738,
-     "earned": 7357.323887430564,
-     "cleared": 0.04225277100735325,
-     "income": 20.277570169075396,
+     "money": 763.479416098078,
+     "earned": 14693.079416098039,
+     "cleared": 0.04089447333080398,
+     "income": 50.577052195659384,
      "rates": {
-      "catch": 4.221736570124778,
+      "catch": 4.6140230306233425,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.04003484925964521
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "caps": {
-      "catch": 4.221736570124778,
+      "catch": 4.6140230306233425,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.2627526923515169,
-      "birds": 0.04003484925964521
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "pools": {
-      "lake_t0": 9010.987693354256,
-      "lake_t1": 7734.222355162633,
+      "lake_t0": 9028.002116670848,
+      "lake_t1": 7761.285451164802,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 417.53333333333717,
-      "box": 857.4599432398206,
-      "pier": 554.7966749099088,
+      "strand": 418.8555555555588,
+      "box": 268.7318569329089,
+      "pier": 1098.1250196758135,
       "flock": null,
-      "purse": 12.593581295600414
+      "purse": 12.463432962504335
      }
     },
     {
      "t": 571,
-     "money": 547.8299397227474,
-     "earned": 8000.329939722746,
-     "cleared": 0.04593956901394358,
-     "income": 20.887689281032422,
+     "money": 1249.4825375381806,
+     "earned": 16479.082537538146,
+     "cleared": 0.04490897656879733,
+     "income": 55.81548075087843,
      "rates": {
-      "catch": 3.7931343502947685,
+      "catch": 4.1339220569784185,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04003484925964521
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "caps": {
-      "catch": 3.7931343502947685,
+      "catch": 4.1339220569784185,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04003484925964521
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "pools": {
-      "lake_t0": 8958.633906281406,
-      "lake_t1": 7666.6819389965385,
+      "lake_t0": 8971.11705888035,
+      "lake_t1": 7687.323086061941,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 414.2000000000046,
-      "box": 940.7855329409495,
-      "pier": 594.6986217810596,
+      "strand": 415.5222222222262,
+      "box": 287.6369380693605,
+      "pier": 1213.400694766047,
       "flock": null,
-      "purse": 13.794626773389796
+      "purse": 13.696054683734591
      }
     },
     {
      "t": 601,
-     "money": 362.79051770186976,
-     "earned": 8662.39051770188,
-     "cleared": 0.0495825245457816,
-     "income": 21.751110504521936,
+     "money": 1786.0685431994898,
+     "earned": 18315.668543199485,
+     "cleared": 0.04851613744272931,
+     "income": 60.37648545169077,
      "rates": {
-      "catch": 4.037775621135189,
+      "catch": 3.7037768255058046,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "caps": {
-      "catch": 4.037775621135189,
+      "catch": 3.7037768255058046,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "pools": {
-      "lake_t0": 8906.92000637436,
-      "lake_t1": 7599.967026540767,
+      "lake_t0": 8920.151037785126,
+      "lake_t1": 7621.056695440195,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 410.866666666672,
-      "box": 1021.7802891514023,
-      "pier": 635.4660112667549,
+      "strand": 412.18888888889364,
+      "box": 292.9270080294288,
+      "pier": 1328.6763698562806,
       "flock": null,
-      "purse": 15.122111293030718
+      "purse": 14.928676404964847
      }
     },
     {
      "t": 631,
-     "money": 1030.0302128035041,
-     "earned": 9329.630212803539,
-     "cleared": 0.05307638865524067,
-     "income": 22.15500455134655,
+     "money": 1719.3111927268058,
+     "earned": 20148.911192726853,
+     "cleared": 0.05175834097415166,
+     "income": 61.16381091981178,
      "rates": {
-      "catch": 3.5518322648772642,
+      "catch": 3.3183893126375468,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "caps": {
-      "catch": 3.5518322648772642,
+      "catch": 3.3183893126375468,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 3.842522503007857,
+      "birds": 0.04108739070767604
      },
      "pools": {
-      "lake_t0": 8857.382117019879,
-      "lake_t1": 7536.059335234017,
+      "lake_t0": 8874.488162380378,
+      "lake_t1": 7561.685493344014,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 407.53333333333944,
-      "box": 1097.791813660265,
-      "pier": 676.2334007524502,
+      "strand": 408.85555555556107,
+      "box": 286.018743773455,
+      "pier": 1443.9520449465142,
       "flock": null,
-      "purse": 16.56022997429172
+      "purse": 16.16129812619511
      }
     },
     {
      "t": 661,
-     "money": 595.8095989635049,
-     "earned": 9997.909598963563,
-     "cleared": 0.05616177104386111,
-     "income": 22.258651354361366,
+     "money": 1656.9996547795763,
+     "earned": 22069.499654779665,
+     "cleared": 0.05467356191401729,
+     "income": 62.563851859669676,
      "rates": {
-      "catch": 3.1243718377487277,
+      "catch": 2.973102362538615,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 4.120906868851465,
+      "birds": 0.04108739070767604
      },
      "caps": {
-      "catch": 3.1243718377487277,
+      "catch": 2.973102362538615,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 4.120906868851465,
+      "birds": 0.04108739070767604
      },
      "pools": {
-      "lake_t0": 8813.806076582623,
-      "lake_t1": 7479.842888047355,
+      "lake_t0": 8833.576626705782,
+      "lake_t1": 7508.492017657878,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 404.20000000000687,
-      "box": 1160.1502451318154,
-      "pier": 717.0007902381454,
+      "strand": 405.5222222222285,
+      "box": 262.3353416945644,
+      "pier": 1565.0737917194665,
       "flock": null,
-      "purse": 17.998348655552686
+      "purse": 17.39391984742542
      }
     },
     {
      "t": 691,
-     "money": 162.33702553792762,
-     "earned": 10666.937025538018,
-     "cleared": 0.058914355840782195,
-     "income": 22.288446878907994,
+     "money": 1096.943598530578,
+     "earned": 24030.543598530698,
+     "cleared": 0.05754615744021774,
+     "income": 64.69387343006407,
      "rates": {
-      "catch": 2.8945360103893556,
+      "catch": 3.15506177183669,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 4.120906868851465,
+      "birds": 0.04919759096028308
      },
      "caps": {
-      "catch": 2.8945360103893556,
+      "catch": 3.15506177183669,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 4.120906868851465,
+      "birds": 0.04919759096028308
      },
      "pools": {
-      "lake_t0": 8775.087264414122,
-      "lake_t1": 7429.892639296898,
+      "lake_t0": 8793.284475141201,
+      "lake_t1": 7456.103869688065,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 400.8666666666743,
-      "box": 1211.3852498984106,
-      "pier": 757.7681797238407,
+      "strand": 402.1888888888959,
+      "box": 234.72176849674943,
+      "pier": 1688.7009977850125,
       "flock": null,
-      "purse": 19.436467336813653
+      "purse": 18.756304772697423
      }
     },
     {
      "t": 721,
-     "money": 831.936378903481,
-     "earned": 11336.5363789036,
-     "cleared": 0.061447218060793674,
-     "income": 22.31044633233396,
+     "money": 3059.6918229470975,
+     "earned": 25993.291822947223,
+     "cleared": 0.06029348748088137,
+     "income": 65.39653613612596,
      "rates": {
-      "catch": 2.546180708936905,
+      "catch": 2.7659912291970836,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 4.120906868851465,
+      "birds": 0.04919759096028308
      },
      "caps": {
-      "catch": 2.546180708936905,
+      "catch": 2.7659912291970836,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04793728937536666
+      "ferry": 4.120906868851465,
+      "birds": 0.04919759096028308
      },
      "pools": {
-      "lake_t0": 8739.575334562289,
-      "lake_t1": 7384.079515640406,
+      "lake_t0": 8754.812539372859,
+      "lake_t1": 7406.082379510596,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 397.5333333333417,
-      "box": 1255.276247254378,
-      "pier": 798.535569209536,
+      "strand": 398.85555555556334,
+      "box": 202.92132171035195,
+      "pier": 1812.3282038505586,
       "flock": null,
-      "purse": 20.87458601807462
+      "purse": 20.23223250150591
      }
     },
     {
      "t": 751,
-     "money": 400.1461311188992,
-     "earned": 12007.24613111904,
-     "cleared": 0.0637102733380851,
-     "income": 22.33848509301703,
+     "money": 696.798789341131,
+     "earned": 27953.798789341272,
+     "cleared": 0.06305738652705961,
+     "income": 65.38758651350958,
      "rates": {
-      "catch": 2.284356043129221,
+      "catch": 4.322228425501278,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04919759096028308
+      "ferry": 4.120906868851465,
+      "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 2.284356043129221,
+      "catch": 4.322228425501278,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04919759096028308
+      "ferry": 4.120906868851465,
+      "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8708.00127548227,
-      "lake_t1": 7343.346548465565,
+      "lake_t0": 8714.48253766328,
+      "lake_t1": 7357.36515283405,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 394.20000000000914,
-      "box": 1290.1492173568756,
-      "pier": 839.3029586952313,
+      "strand": 395.52222222223077,
+      "box": 171.67467736426346,
+      "pier": 1935.9554099161046,
       "flock": null,
-      "purse": 22.332869524694264
+      "purse": 21.72358467426594
      }
     },
     {
      "t": 781,
-     "money": 1071.768474968059,
-     "earned": 12678.868474968203,
-     "cleared": 0.06572694205151719,
-     "income": 22.37220160107672,
+     "money": 2642.271489111106,
+     "earned": 29899.271489111292,
+     "cleared": 0.06682064910182284,
+     "income": 65.09966110273447,
      "rates": {
-      "catch": 2.0026577089742608,
+      "catch": 3.8648619108383593,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04919759096028308
+      "ferry": 4.120906868851465,
+      "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 2.0026577089742608,
+      "catch": 3.8648619108383593,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.3589129828564634,
-      "birds": 0.04919759096028308
+      "ferry": 4.120906868851465,
+      "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8680.023263407604,
-      "lake_t1": 7307.252758795807,
+      "lake_t0": 8653.682775011466,
+      "lake_t1": 7295.71496052031,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 390.86666666667657,
-      "box": 1316.786962948935,
-      "pier": 880.0703481809265,
+      "strand": 392.1888888888982,
+      "box": 173.83075959760995,
+      "pier": 2059.58261598165,
       "flock": null,
-      "purse": 23.80879725350275
+      "purse": 23.27663462283215
      }
     },
     {
      "t": 811,
-     "money": 549.0560915420683,
-     "earned": 13378.95609154222,
-     "cleared": 0.06750722082064742,
-     "income": 22.86183267371968,
+     "money": 261.1187355375541,
+     "earned": 31841.518735537786,
+     "cleared": 0.07019624644064903,
+     "income": 64.79533243660856,
      "rates": {
-      "catch": 1.7556973709842842,
+      "catch": 3.4558926829779213,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.04919759096028308
+      "ferry": 4.7797656587114545,
+      "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 1.7556973709842842,
+      "catch": 3.4558926829779213,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.04919759096028308
+      "ferry": 4.7797656587114545,
+      "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8655.495396251506,
-      "lake_t1": 7275.609921705831,
+      "lake_t0": 8599.316678699983,
+      "lake_t1": 7240.588424712199,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 387.533333333344,
-      "box": 1333.672313213035,
-      "pier": 922.6890354962329,
+      "strand": 388.8555555555656,
+      "box": 162.37066019513077,
+      "pier": 2183.8686808370494,
       "flock": null,
-      "purse": 25.284724982311236
+      "purse": 24.829684571398364
      }
     },
     {
      "t": 841,
-     "money": 28.58550641943918,
-     "earned": 14091.385506419603,
-     "cleared": 0.06914206321213634,
-     "income": 23.541950524189996,
+     "money": 2485.6096772709493,
+     "earned": 34066.00967727116,
+     "cleared": 0.07322520022965939,
+     "income": 69.44563646933118,
      "rates": {
-      "catch": 3.604889173993212,
+      "catch": 3.090199472008999,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 4.7797656587114545,
       "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 3.604889173993212,
+      "catch": 3.090199472008999,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 4.7797656587114545,
       "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8632.816034644558,
-      "lake_t1": 7246.979644552985,
+      "lake_t0": 8550.70345556825,
+      "lake_t1": 7191.29522973338,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 384.2000000000114,
-      "box": 1344.9031846353064,
-      "pier": 966.1011361670869,
+      "strand": 385.52222222223304,
+      "box": 120.21744187767328,
+      "pier": 2327.2616505983888,
       "flock": null,
-      "purse": 26.763223451778313
+      "purse": 26.382734519964576
      }
     },
     {
      "t": 871,
-     "money": 743.0930458067548,
-     "earned": 14805.893045806908,
-     "cleared": 0.07229730687587843,
-     "income": 23.78228257107812,
+     "money": 4704.388675978837,
+     "earned": 36284.788675978976,
+     "cleared": 0.07594419135116814,
+     "income": 74.05449900735317,
      "rates": {
-      "catch": 3.223429557576896,
+      "catch": 2.7632029269427583,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 4.7797656587114545,
       "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 3.223429557576896,
+      "catch": 2.7632029269427583,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 4.7797656587114545,
       "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8580.453353889496,
-      "lake_t1": 7197.2147944244625,
+      "lake_t0": 8507.234352145486,
+      "lake_t1": 7147.218107244169,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 380.86666666667884,
-      "box": 1406.951948181374,
-      "pier": 1009.5132368379409,
+      "strand": 382.18888888890046,
+      "box": 67.70403136163685,
+      "pier": 2470.654620359728,
       "flock": null,
-      "purse": 28.316273400344524
+      "purse": 27.935784468530787
      }
     },
     {
      "t": 901,
-     "money": 76.30827506127616,
-     "earned": 15519.908275061418,
-     "cleared": 0.07514376690156199,
-     "income": 23.808712810696914,
+     "money": 2089.9056820367455,
+     "earned": 38587.90568203683,
+     "cleared": 0.07838601921579269,
+     "income": 75.36493341276109,
      "rates": {
-      "catch": 3.3684095755008046,
+      "catch": 2.470808271318867,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.06049850070336303
+      "ferry": 3.464603841143916,
+      "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 3.3684095755008046,
+      "catch": 2.470808271318867,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.06049850070336303
+      "ferry": 5.069440777314252,
+      "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8533.382330826871,
-      "lake_t1": 7152.479070921972,
+      "lake_t0": 8468.365031605712,
+      "lake_t1": 7107.805106570066,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 377.53333333334626,
-      "box": 1458.6799274089751,
-      "pier": 1052.9253375087926,
+      "strand": 378.8555555555679,
+      "box": 0,
+      "pier": 2619.9743062685775,
       "flock": null,
-      "purse": 29.878053517995227
+      "purse": 29.488834417097
      }
     },
     {
      "t": 931,
-     "money": 798.1860510734248,
-     "earned": 16241.786051073594,
-     "cleared": 0.07807136131313985,
-     "income": 23.931550087778092,
+     "money": 3245.5514597116367,
+     "earned": 39743.55145971164,
+     "cleared": 0.08058001248928448,
+     "income": 57.646046395544424,
      "rates": {
-      "catch": 2.955574089156007,
+      "catch": 2.2093540268402556,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.06049850070336303
+      "ferry": 2.3204651379513668,
+      "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 2.955574089156007,
+      "catch": 2.2093540268402556,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.06049850070336303
+      "ferry": 5.069440777314252,
+      "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8484.920899257053,
-      "lake_t1": 7106.421920212547,
+      "lake_t0": 8433.608757372725,
+      "lake_t1": 7072.562682963193,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 374.2000000000137,
-      "box": 1513.119742350704,
-      "pier": 1096.3374381796432,
+      "strand": 375.5222222222353,
+      "box": 0,
+      "pier": 2693.306337441772,
       "flock": null,
-      "purse": 31.693008539096148
+      "purse": 31.04188436566321
      }
     },
     {
      "t": 961,
-     "money": 1519.4524189813562,
-     "earned": 16963.052418981555,
-     "cleared": 0.08065236981389823,
-     "income": 24.052402398668953,
+     "money": 4288.739601894026,
+     "earned": 40786.739601893954,
+     "cleared": 0.08255239635735845,
+     "income": 36.647231997618775,
      "rates": {
-      "catch": 2.593336113287707,
+      "catch": 1.9755661629340855,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.06049850070336303
+      "ferry": 2.0866772740451967,
+      "birds": 0.05176833161887485
      },
      "caps": {
-      "catch": 2.593336113287707,
+      "catch": 1.9755661629340855,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
-      "birds": 0.06049850070336303
+      "ferry": 5.069440777314252,
+      "birds": 0.05176833161887485
      },
      "pools": {
-      "lake_t0": 8442.398946905145,
-      "lake_t1": 7066.009577768442,
+      "lake_t0": 8402.530298017547,
+      "lake_t1": 7041.049517245201,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 370.8666666666811,
-      "box": 1555.9752698092004,
-      "pier": 1139.7495388504938,
+      "strand": 372.18888888890274,
+      "box": 0,
+      "pier": 2759.2312958482726,
       "flock": null,
-      "purse": 33.507963560196984
+      "purse": 32.59493431422943
      }
     },
     {
      "t": 991,
-     "money": 2240.191601035495,
-     "earned": 17683.791601035722,
-     "cleared": 0.08292927030322728,
-     "income": 24.033425832702143,
+     "money": 42.68806846415492,
+     "earned": 41734.18806846404,
+     "cleared": 0.08433553380446379,
+     "income": 33.17727681254,
      "rates": {
-      "catch": 2.275494368812341,
+      "catch": 2.064421096040566,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 2.175532207151677,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 2.275494368812341,
+      "catch": 2.064421096040566,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8405.088525540208,
-      "lake_t1": 7030.550210511375,
+      "lake_t0": 8374.592559613711,
+      "lake_t1": 7012.721002950322,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 367.53333333334854,
-      "box": 1588.6662910936857,
-      "pier": 1183.1616395213443,
+      "strand": 368.85555555557016,
+      "box": 0,
+      "pier": 2818.830881880316,
       "flock": null,
-      "purse": 35.3229185812978
+      "purse": 34.156714431880125
      }
     },
     {
      "t": 1021,
-     "money": 2960.465759203823,
-     "earned": 18404.065759204077,
-     "cleared": 0.08493933454870362,
-     "income": 24.016889003708698,
+     "money": 1023.9274405810331,
+     "earned": 42715.42744058085,
+     "cleared": 0.08616839665879727,
+     "income": 32.1447973114482,
      "rates": {
-      "catch": 1.9966076113182214,
+      "catch": 1.811403679927316,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 1.9225147910384273,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 1.9966076113182214,
+      "catch": 1.811403679927316,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8372.35090495993,
-      "lake_t1": 6999.436777084186,
+      "lake_t0": 8345.829581675644,
+      "lake_t1": 6983.555706178478,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 364.20000000001596,
-      "box": 1612.4385777636292,
-      "pier": 1226.573740192195,
+      "strand": 365.5222222222376,
+      "box": 0,
+      "pier": 2880.092489923565,
       "flock": null,
-      "purse": 37.137873602398614
+      "purse": 35.97166945298094
      }
     },
     {
      "t": 1051,
-     "money": 3680.321516834553,
-     "earned": 19123.921516834835,
-     "cleared": 0.08671526625456338,
-     "income": 24.002165263318542,
+     "money": 1897.3751778991186,
+     "earned": 43588.87517789885,
+     "cleared": 0.08778884494481665,
+     "income": 30.9114518239135,
      "rates": {
-      "catch": 1.751901480492137,
+      "catch": 1.5893963193591165,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 1.7005074304702277,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 1.751901480492137,
+      "catch": 1.5893963193591165,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8343.62563834407,
-      "lake_t1": 6972.136635696717,
+      "lake_t0": 8320.591821713484,
+      "lake_t1": 6957.964935962063,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 360.8666666666834,
-      "box": 1628.3852184294396,
-      "pier": 1269.9858408630455,
+      "strand": 362.188888888905,
+      "box": 0,
+      "pier": 2934.2543534354727,
       "flock": null,
-      "purse": 38.95282862349943
+      "purse": 37.786624474081755
      }
     },
     {
      "t": 1081,
-     "money": 4399.7942301409685,
-     "earned": 19843.39423014127,
-     "cleared": 0.08828576092789886,
-     "income": 23.988807848953243,
+     "money": 2676.2423258624376,
+     "earned": 44367.7423258621,
+     "cleared": 0.08922291239436153,
+     "income": 27.5385814213542,
      "rates": {
-      "catch": 1.5371867661689556,
+      "catch": 1.3945983923879899,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 1.505709503499101,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 1.5371867661689556,
+      "catch": 1.3945983923879899,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8318.420967768547,
-      "lake_t1": 6948.182425644012,
+      "lake_t0": 8298.447225653961,
+      "lake_t1": 6935.510594921326,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 357.5333333333508,
-      "box": 1637.465331720152,
-      "pier": 1313.397941533896,
+      "strand": 358.85555555557244,
+      "box": 0,
+      "pier": 2982.1866238690673,
       "flock": null,
-      "purse": 40.76778364460024
+      "purse": 39.60157949518257
      }
     },
     {
      "t": 1111,
-     "money": 5118.910878928595,
-     "earned": 20562.51087892892,
-     "cleared": 0.08967599712711671,
-     "income": 23.976489368234738,
+     "money": 3372.1207716004737,
+     "earned": 45063.62077160005,
+     "cleared": 0.0904934420202983,
+     "income": 24.579093228353305,
      "rates": {
-      "catch": 1.348787691772009,
+      "catch": 1.2236750849123632,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 1.3347861960234744,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 1.348787691772009,
+      "catch": 1.2236750849123632,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8296.305405628913,
-      "lake_t1": 6927.16406639432,
+      "lake_t0": 8279.016692382596,
+      "lake_t1": 6915.8082793087115,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 354.20000000001824,
-      "box": 1640.5204857719618,
-      "pier": 1356.8100422047467,
+      "strand": 355.52222222223986,
+      "box": 0,
+      "pier": 3024.6528060863825,
       "flock": null,
-      "purse": 42.58273866570106
+      "purse": 41.416534516283384
      }
     },
     {
      "t": 1141,
-     "money": 5837.692077982018,
-     "earned": 21281.292077982373,
-     "cleared": 0.09090806750252045,
-     "income": 23.964964130685015,
+     "money": 3995.181689513597,
+     "earned": 45686.6816895131,
+     "cleared": 0.09162047717407584,
+     "income": 21.982322727516657,
      "rates": {
-      "catch": 1.1834789874034934,
+      "catch": 1.0737003008237307,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 1.1848114119348419,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 1.1834789874034934,
+      "catch": 1.0737003008237307,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8276.90034785256,
-      "lake_t1": 6908.721737276513,
+      "lake_t0": 8261.967583778633,
+      "lake_t1": 6898.520698266149,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 350.86666666668566,
-      "box": 1638.2891053286091,
-      "pier": 1400.2221428755972,
+      "strand": 352.1888888889073,
+      "box": 0,
+      "pier": 3062.32282906624,
       "flock": null,
-      "purse": 44.39769368680187
+      "purse": 43.2314895373842
      }
     },
     {
      "t": 1171,
-     "money": 6556.1535102358885,
-     "earned": 21999.75351023628,
-     "cleared": 0.0920013570081466,
-     "income": 23.954043855122716,
+     "money": 4554.349665178531,
+     "earned": 46245.849665177964,
+     "cleared": 0.09262160467489566,
+     "income": 19.703814892965237,
      "rates": {
-      "catch": 1.0384306753166495,
+      "catch": 0.9421065691400572,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 1.0532176802511684,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 1.0384306753166495,
+      "catch": 0.9421065691400572,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8259.873592442671,
-      "lake_t1": 6892.5397175836815,
+      "lake_t0": 8247.008030166278,
+      "lake_t1": 6883.351899624436,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 347.5333333333531,
-      "box": 1631.4191130938118,
-      "pier": 1443.6342435464478,
+      "strand": 348.8555555555747,
+      "box": 0,
+      "pier": 3095.784514653639,
       "flock": null,
-      "purse": 46.21264870790269
+      "purse": 45.046444558485014
      }
     },
     {
      "t": 1201,
-     "money": 7274.306968970112,
-     "earned": 22717.90696897053,
-     "cleared": 0.09297287475959926,
-     "income": 23.943581516469262,
+     "money": 5057.455478462094,
+     "earned": 46748.95547846146,
+     "cleared": 0.09351225588464485,
+     "income": 17.704563149139357,
      "rates": {
-      "catch": 0.9111596225332182,
+      "catch": 0.8266410905686712,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.9377522016797823,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 0.9111596225332182,
+      "catch": 0.8266410905686712,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8244.933652395628,
-      "lake_t1": 6878.34098163951,
+      "lake_t0": 8233.88193369523,
+      "lake_t1": 6870.042203394158,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 344.2000000000205,
-      "box": 1620.4790217475052,
-      "pier": 1487.0463442172984,
+      "strand": 345.52222222224214,
+      "box": 0,
+      "pier": 3125.5536406882925,
       "flock": null,
-      "purse": 48.0276037290035
+      "purse": 46.86139957958583
      }
     },
     {
      "t": 1231,
-     "money": 7992.161129026322,
-     "earned": 23435.761129026774,
-     "cleared": 0.09383754521906962,
-     "income": 23.933460313174873,
+     "money": 5511.37016139097,
+     "earned": 47202.87016139025,
+     "cleared": 0.09430597088279757,
+     "income": 15.950341603538133,
      "rates": {
-      "catch": 0.7994870312182919,
+      "catch": 0.7253271710442439,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.8364382821553551,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 0.7994870312182919,
+      "catch": 0.7253271710442439,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8231.824765632653,
-      "lake_t1": 6865.8824562984755,
+      "lake_t0": 8222.364584111687,
+      "lake_t1": 6858.363756212779,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 340.86666666668793,
-      "box": 1605.9676665140007,
-      "pier": 1530.458444888149,
+      "strand": 342.18888888890956,
+      "box": 0,
+      "pier": 3152.082770786544,
       "flock": null,
-      "purse": 49.84255875010432
+      "purse": 48.67635460068664
      }
     },
     {
      "t": 1261,
-     "money": 8709.722126010445,
-     "earned": 24153.3221260109,
-     "cleared": 0.09460846369244724,
-     "income": 23.923585950672834,
+     "money": 5922.1226257612625,
+     "earned": 47613.622625760465,
+     "cleared": 0.09501463026378898,
+     "income": 14.411119121650094,
      "rates": {
-      "catch": 0.7015011390750273,
+      "catch": 0.6364303820091353,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.7475414931202464,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 0.7015011390750273,
+      "catch": 0.6364303820091353,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8220.322516518965,
-      "lake_t1": 6854.950859691321,
+      "lake_t0": 8212.258811864618,
+      "lake_t1": 6848.116630642923,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 337.53333333335536,
-      "box": 1588.3227448973253,
-      "pier": 1573.8705455589995,
+      "strand": 338.855555555577,
+      "box": 0,
+      "pier": 3175.769001936802,
       "flock": null,
-      "purse": 51.65751377120513
+      "purse": 50.49130962178746
      }
     },
     {
      "t": 1291,
-     "money": 9426.993996670086,
-     "earned": 24870.593996670534,
-     "cleared": 0.0952971205124562,
-     "income": 23.913881127395992,
+     "money": 6295.002874196161,
+     "earned": 47986.502874195256,
+     "cleared": 0.0956486585250832,
+     "income": 13.060545213416724,
      "rates": {
-      "catch": 0.6155244912149374,
+      "catch": 0.5584288681218939,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.669539979233005,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 0.6155244912149374,
+      "catch": 0.5584288681218939,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8210.22999401378,
-      "lake_t1": 6845.35904997786,
+      "lake_t0": 8203.391612690984,
+      "lake_t1": 6839.125402544392,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 334.2000000000228,
-      "box": 1567.9283097784596,
-      "pier": 1617.2826462298501,
+      "strand": 335.5222222222444,
+      "box": 0,
+      "pier": 3196.9607625422996,
       "flock": null,
-      "purse": 53.472468792305946
+      "purse": 52.30626464288827
      }
     },
     {
      "t": 1321,
-     "money": 10143.979017019925,
-     "earned": 25587.579017020358,
-     "cleared": 0.09591359774569652,
-     "income": 23.904281516824327,
+     "money": 6524.378494531005,
+     "earned": 48215.878494530014,
+     "cleared": 0.09599989606995585,
+     "income": 10.037597812825819,
      "rates": {
-      "catch": 0.5400852232185496,
+      "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
-      "catch": 0.5400852232185496,
+      "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
-      "lake_t0": 8201.374420681037,
-      "lake_t1": 6836.942821600109,
+      "lake_t0": 8199.217589342628,
+      "lake_t1": 6834.892995526258,
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 330.8666666666902,
-      "box": 1545.121344151439,
-      "pier": 1660.6947469007007,
+      "strand": 332.18888888891183,
+      "box": 0,
+      "pier": 3208.700526242127,
       "flock": null,
-      "purse": 55.28742381340676
+      "purse": 54.12121966398909
      }
     },
     {
      "t": 1351,
-     "money": 10860.67923405109,
-     "earned": 26304.279234051526,
-     "cleared": 0.09613918387379594,
-     "income": 23.894753956349874,
+     "money": 6626.123765910883,
+     "earned": 48317.62376590978,
+     "cleared": 0.09609962480778889,
+     "income": 5.5186815285754465,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2321,31 +2410,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 327.53333333335763,
-      "box": 1509.2492342261817,
-      "pier": 1704.1068475715513,
+      "strand": 328.85555555557926,
+      "box": 0,
+      "pier": 3212.0338595754665,
       "flock": null,
-      "purse": 57.102378834507576
+      "purse": 55.9361746850899
      }
     },
     {
      "t": 1381,
-     "money": 11577.094184528349,
-     "earned": 27020.694184528777,
-     "cleared": 0.09623891261162898,
-     "income": 23.885252791806973,
+     "money": 6727.86903729076,
+     "earned": 48419.36903728955,
+     "cleared": 0.09619935354562192,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2354,31 +2443,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 324.20000000002506,
-      "box": 1469.1704668886637,
-      "pier": 1747.5189482424018,
+      "strand": 325.5222222222467,
+      "box": 0,
+      "pier": 3215.367192908806,
       "flock": null,
-      "purse": 58.91733385560839
+      "purse": 57.75112970619072
      }
     },
     {
      "t": 1411,
-     "money": 12293.216947901718,
-     "earned": 27736.816947902145,
-     "cleared": 0.09633864134946202,
-     "income": 23.875628564176985,
+     "money": 6829.614308670638,
+     "earned": 48521.11430866932,
+     "cleared": 0.09629908228345496,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2387,31 +2476,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 320.8666666666925,
-      "box": 1429.0916995511457,
-      "pier": 1790.9310489132524,
+      "strand": 322.1888888889141,
+      "box": 0,
+      "pier": 3218.7005262421453,
       "flock": null,
-      "purse": 60.732288876709205
+      "purse": 59.56608472729153
      }
     },
     {
      "t": 1441,
-     "money": 13009.040018437436,
-     "earned": 28452.640018437858,
-     "cleared": 0.09643837008729528,
-     "income": 23.865763898484694,
+     "money": 6931.359580050515,
+     "earned": 48622.85958004909,
+     "cleared": 0.096398811021288,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2420,31 +2509,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 317.5333333333599,
-      "box": 1389.0129322136277,
-      "pier": 1834.343149584103,
+      "strand": 318.85555555558153,
+      "box": 0,
+      "pier": 3222.0338595754847,
       "flock": null,
-      "purse": 62.54724389781002
+      "purse": 61.38103974839235
      }
     },
     {
      "t": 1471,
-     "money": 13724.55547561535,
-     "earned": 29168.15547561577,
-     "cleared": 0.09653809882512832,
-     "income": 23.85564212856043,
+     "money": 7033.104851430393,
+     "earned": 48724.604851428856,
+     "cleared": 0.09649853975912115,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2453,31 +2542,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 314.20000000002733,
-      "box": 1348.9341648761097,
-      "pier": 1877.7552502549536,
+      "strand": 315.52222222224896,
+      "box": 0,
+      "pier": 3225.367192908824,
       "flock": null,
-      "purse": 64.36219891891083
+      "purse": 63.19599476949316
      }
     },
     {
      "t": 1501,
-     "money": 14439.754948207436,
-     "earned": 29883.354948207863,
-     "cleared": 0.09663782756296135,
-     "income": 23.845248829500086,
+     "money": 7134.8501228102705,
+     "earned": 48826.350122808624,
+     "cleared": 0.0965982684969543,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2486,31 +2575,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 310.86666666669475,
-      "box": 1308.8553975385917,
-      "pier": 1921.1673509258042,
+      "strand": 312.1888888889164,
+      "box": 0,
+      "pier": 3228.7005262421635,
       "flock": null,
-      "purse": 66.17715394001165
+      "purse": 65.01094979059398
      }
     },
     {
      "t": 1531,
-     "money": 15154.629574050365,
-     "earned": 30598.229574050787,
-     "cleared": 0.09673755630079439,
-     "income": 23.834568307250265,
+     "money": 7236.595394190148,
+     "earned": 48928.09539418839,
+     "cleared": 0.09669799723478734,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2519,31 +2608,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 307.5333333333622,
-      "box": 1268.7766302010737,
-      "pier": 1964.5794515966547,
+      "strand": 308.8555555555838,
+      "box": 0,
+      "pier": 3232.033859575503,
       "flock": null,
-      "purse": 67.99210896111246
+      "purse": 66.8259048116948
      }
     },
     {
      "t": 1561,
-     "money": 15869.16995484359,
-     "earned": 31312.76995484401,
-     "cleared": 0.09683728503862743,
-     "income": 23.823583443935785,
+     "money": 7338.3406655700255,
+     "earned": 49029.84066556816,
+     "cleared": 0.09679772597262037,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2552,31 +2641,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 304.2000000000296,
-      "box": 1228.6978628635557,
-      "pier": 2007.9915522675053,
+      "strand": 305.52222222225123,
+      "box": 0,
+      "pier": 3235.3671929088423,
       "flock": null,
-      "purse": 69.80706398221328
+      "purse": 68.64085983279561
      }
     },
     {
      "t": 1591,
-     "money": 16583.366105175486,
-     "earned": 32026.966105175914,
-     "cleared": 0.09693701377646047,
-     "income": 23.812275518752116,
+     "money": 7440.085936949903,
+     "earned": 49131.58593694793,
+     "cleared": 0.09689745471045341,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2585,31 +2674,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 300.86666666669703,
-      "box": 1188.6190955260377,
-      "pier": 2051.4036529383566,
+      "strand": 302.18888888891865,
+      "box": 0,
+      "pier": 3238.7005262421817,
       "flock": null,
-      "purse": 71.6220190033141
+      "purse": 70.45581485389643
      }
     },
     {
      "t": 1621,
-     "money": 17297.20739482102,
-     "earned": 32740.807394821448,
-     "cleared": 0.09703674251429362,
-     "income": 23.800623999623955,
+     "money": 7541.831208329781,
+     "earned": 49233.3312083277,
+     "cleared": 0.09699718344828645,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2618,31 +2707,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 297.53333333336445,
-      "box": 1148.5403281885197,
-      "pier": 2094.815753609214,
+      "strand": 298.8555555555861,
+      "box": 0,
+      "pier": 3242.033859575521,
       "flock": null,
-      "purse": 73.43697402441491
+      "purse": 72.27076987499724
      }
     },
     {
      "t": 1651,
-     "money": 18010.682483156757,
-     "earned": 33454.2824831571,
-     "cleared": 0.09713647125212665,
-     "income": 23.7886062996864,
+     "money": 7643.576479709658,
+     "earned": 49335.076479707466,
+     "cleared": 0.09709691218611949,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2651,31 +2740,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 294.2000000000319,
-      "box": 1108.4615608510017,
-      "pier": 2138.2278542800714,
+      "strand": 295.5222222222535,
+      "box": 0,
+      "pier": 3245.3671929088605,
       "flock": null,
-      "purse": 75.25192904551572
+      "purse": 74.08572489609806
      }
     },
     {
      "t": 1681,
-     "money": 18723.7792442925,
-     "earned": 34167.37924429275,
-     "cleared": 0.0972361999899598,
-     "income": 23.776197491188395,
+     "money": 7745.321751089536,
+     "earned": 49436.821751087235,
+     "cleared": 0.09719664092395264,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2684,31 +2773,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 290.8666666666993,
-      "box": 1068.3827935134836,
-      "pier": 2181.6399549509288,
+      "strand": 292.1888888889209,
+      "box": 0,
+      "pier": 3248.7005262422,
       "flock": null,
-      "purse": 77.06688406661654
+      "purse": 75.90067991719887
      }
     },
     {
      "t": 1711,
-     "money": 19436.484681207512,
-     "earned": 34880.08468120764,
-     "cleared": 0.09733592872779284,
-     "income": 23.76336996750906,
+     "money": 7847.067022469413,
+     "earned": 49538.567022467,
+     "cleared": 0.09729636966178579,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2717,31 +2806,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 287.5333333333667,
-      "box": 1028.3040261759656,
-      "pier": 2225.052055621786,
+      "strand": 288.85555555558835,
+      "box": 0,
+      "pier": 3252.0338595755393,
       "flock": null,
-      "purse": 78.88183908771735
+      "purse": 77.71563493829969
      }
     },
     {
      "t": 1741,
-     "money": 20148.784826784984,
-     "earned": 35592.384826785,
-     "cleared": 0.09743565746562588,
-     "income": 23.750093041537426,
+     "money": 7948.812293849291,
+     "earned": 49640.31229384677,
+     "cleared": 0.09739609839961882,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2750,31 +2839,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 284.20000000003415,
-      "box": 988.2252588384446,
-      "pier": 2268.4641562926436,
+      "strand": 285.5222222222558,
+      "box": 0,
+      "pier": 3255.3671929088787,
       "flock": null,
-      "purse": 80.69679410881817
+      "purse": 79.5305899594005
      }
     },
     {
      "t": 1771,
-     "money": 20860.664629132465,
-     "earned": 36304.264629132354,
-     "cleared": 0.09753538620345903,
-     "income": 23.73633246541188,
+     "money": 8050.557565229168,
+     "earned": 49742.05756522654,
+     "cleared": 0.09749582713745186,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2783,31 +2872,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 280.8666666667016,
-      "box": 948.1464915009232,
-      "pier": 2311.876256963501,
+      "strand": 282.1888888889232,
+      "box": 0,
+      "pier": 3258.700526242218,
       "flock": null,
-      "purse": 82.51174912991898
+      "purse": 81.34554498050132
      }
     },
     {
      "t": 1801,
-     "money": 21572.107817922908,
-     "earned": 37015.70781792266,
-     "cleared": 0.09763511494129207,
-     "income": 23.72204985229437,
+     "money": 8152.302836609046,
+     "earned": 49843.80283660631,
+     "cleared": 0.0975955558752849,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2816,31 +2905,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 277.533333333369,
-      "box": 908.0677241634017,
-      "pier": 2355.2883576343584,
+      "strand": 278.8555555555906,
+      "box": 0,
+      "pier": 3262.0338595755575,
       "flock": null,
-      "purse": 84.3267041510198
+      "purse": 83.16050000160213
      }
     },
     {
      "t": 1831,
-     "money": 22283.096747637883,
-     "earned": 37726.696747637514,
-     "cleared": 0.0977348436791251,
-     "income": 23.70720197508599,
+     "money": 8254.048107988923,
+     "earned": 49945.54810798608,
+     "cleared": 0.09769528461311805,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2849,31 +2938,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 274.2000000000364,
-      "box": 867.9889568258803,
-      "pier": 2398.7004583052158,
+      "strand": 275.52222222225805,
+      "box": 0,
+      "pier": 3265.367192908897,
       "flock": null,
-      "purse": 86.14165917212061
+      "purse": 84.97545502270295
      }
     },
     {
      "t": 1861,
-     "money": 22993.612212469197,
-     "earned": 38437.212212468716,
-     "cleared": 0.09783457241695814,
-     "income": 23.691739909100942,
+     "money": 8355.7933793688,
+     "earned": 50047.293379365845,
+     "cleared": 0.09779501335095109,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2882,31 +2971,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 270.86666666670385,
-      "box": 827.9101894883589,
-      "pier": 2442.112558976073,
+      "strand": 272.1888888889255,
+      "box": 0,
+      "pier": 3268.7005262422363,
       "flock": null,
-      "purse": 87.95661419322143
+      "purse": 86.79041004380376
      }
     },
     {
      "t": 1891,
-     "money": 23703.63322613237,
-     "earned": 39147.23322613179,
-     "cleared": 0.09793430115479118,
-     "income": 23.675607974904658,
+     "money": 8457.538650748678,
+     "earned": 50149.03865074561,
+     "cleared": 0.09789474208878413,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2915,31 +3004,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 267.5333333333713,
-      "box": 787.8314221508375,
-      "pier": 2485.5246596469306,
+      "strand": 268.8555555555929,
+      "box": 0,
+      "pier": 3272.0338595755757,
       "flock": null,
-      "purse": 89.77156921432224
+      "purse": 88.60536506490457
      }
     },
     {
      "t": 1921,
-     "money": 24413.13675781377,
-     "earned": 39856.73675781306,
-     "cleared": 0.09803402989262433,
-     "income": 23.6587424224057,
+     "money": 8559.283922128556,
+     "earned": 50250.78392212538,
+     "cleared": 0.09799447082661716,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2948,31 +3037,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 264.2000000000387,
-      "box": 747.7526548133161,
-      "pier": 2528.936760317788,
+      "strand": 265.5222222222603,
+      "box": 0,
+      "pier": 3275.367192908915,
       "flock": null,
-      "purse": 91.58652423542306
+      "purse": 90.42032008600539
      }
     },
     {
      "t": 1951,
-     "money": 25122.09741268748,
-     "earned": 40565.69741268666,
-     "cleared": 0.09813375863045748,
-     "income": 23.641069775914488,
+     "money": 8661.029193508433,
+     "earned": 50352.52919350515,
+     "cleared": 0.09809419956445031,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -2981,31 +3070,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 260.8666666667061,
-      "box": 707.6738874757947,
-      "pier": 2572.3488609886454,
+      "strand": 262.18888888892775,
+      "box": 0,
+      "pier": 3278.7005262422545,
       "flock": null,
-      "purse": 93.40147925652387
+      "purse": 92.2352751071062
      }
     },
     {
      "t": 1981,
-     "money": 25830.487041559198,
-     "earned": 41274.08704155829,
-     "cleared": 0.09823348736829052,
-     "income": 23.622504729087208,
+     "money": 8762.77446488831,
+     "earned": 50454.27446488492,
+     "cleared": 0.09819392830228335,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3014,31 +3103,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 257.53333333337355,
-      "box": 667.5951201382733,
-      "pier": 2615.7609616595028,
+      "strand": 258.8555555555952,
+      "box": 0,
+      "pier": 3282.033859575594,
       "flock": null,
-      "purse": 95.21643427762469
+      "purse": 94.05023012820702
      }
     },
     {
      "t": 2011,
-     "money": 26538.27425870319,
-     "earned": 41981.87425870219,
-     "cleared": 0.09833321610612356,
-     "income": 23.60294743359215,
+     "money": 8864.519736268188,
+     "earned": 50556.01973626469,
+     "cleared": 0.0982936570401165,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3047,31 +3136,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 254.2000000000405,
-      "box": 627.5163528007519,
-      "pier": 2659.17306233036,
+      "strand": 255.52222222226246,
+      "box": 0,
+      "pier": 3285.3671929089332,
       "flock": null,
-      "purse": 97.0313892987255
+      "purse": 95.86518514930783
      }
     },
     {
      "t": 2041,
-     "money": 27245.423839035837,
-     "earned": 42689.02383903473,
-     "cleared": 0.0984329448439566,
-     "income": 23.582279957940653,
+     "money": 8966.265007648066,
+     "earned": 50657.765007644455,
+     "cleared": 0.09839338577794954,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3080,31 +3169,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 250.86666666670706,
-      "box": 587.4375854632304,
-      "pier": 2702.5851630012176,
+      "strand": 252.18888888892903,
+      "box": 0,
+      "pier": 3288.7005262422726,
       "flock": null,
-      "purse": 98.84634431982631
+      "purse": 97.68014017040865
      }
     },
     {
      "t": 2071,
-     "money": 27951.89595410019,
-     "earned": 43395.495954098995,
-     "cleared": 0.09853267358178974,
-     "income": 23.56036158994672,
+     "money": 9068.010279027943,
+     "earned": 50759.51027902422,
+     "cleared": 0.09849311451578269,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3113,31 +3202,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 247.53333333337363,
-      "box": 547.358818125709,
-      "pier": 2745.997263672075,
+      "strand": 248.8555555555956,
+      "box": 0,
+      "pier": 3292.033859575612,
       "flock": null,
-      "purse": 100.66129934092713
+      "purse": 99.49509519150946
      }
     },
     {
      "t": 2101,
-     "money": 28657.645188739276,
-     "earned": 44101.24518873798,
-     "cleared": 0.09863240231962278,
-     "income": 23.537022495054163,
+     "money": 9169.755550407821,
+     "earned": 50861.25555040399,
+     "cleared": 0.09859284325361573,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3146,31 +3235,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 244.2000000000402,
-      "box": 507.28005078818785,
-      "pier": 2789.4093643429323,
+      "strand": 245.52222222226217,
+      "box": 0,
+      "pier": 3295.3671929089514,
       "flock": null,
-      "purse": 102.47625436202794
+      "purse": 101.31005021261028
      }
     },
     {
      "t": 2131,
-     "money": 29362.6192530905,
-     "earned": 44806.21925308915,
-     "cleared": 0.09873213105745604,
-     "income": 23.512054983169218,
+     "money": 9271.500821787698,
+     "earned": 50963.00082178376,
+     "cleared": 0.09869257199144876,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3179,31 +3268,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 240.86666666670678,
-      "box": 467.20128345066814,
-      "pier": 2832.8214650137897,
+      "strand": 242.18888888892874,
+      "box": 0,
+      "pier": 3298.700526242291,
       "flock": null,
-      "purse": 104.29120938312876
+      "purse": 103.1250052337111
      }
     },
     {
      "t": 2161,
-     "money": 30066.757261051993,
-     "earned": 45510.35726105055,
-     "cleared": 0.09883185979528908,
-     "income": 23.485201205209524,
+     "money": 9373.246093167576,
+     "earned": 51064.74609316353,
+     "cleared": 0.09879230072928191,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3212,31 +3301,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 237.53333333337335,
-      "box": 427.12251611314844,
-      "pier": 2876.233565684647,
+      "strand": 238.85555555559532,
+      "box": 0,
+      "pier": 3302.0338595756302,
       "flock": null,
-      "purse": 106.10616440422957
+      "purse": 104.93996025481191
      }
     },
     {
      "t": 2191,
-     "money": 30769.987374518278,
-     "earned": 46213.58737451672,
-     "cleared": 0.09893158853312212,
-     "income": 23.456135357126186,
+     "money": 9474.991364547453,
+     "earned": 51166.4913645433,
+     "cleared": 0.09889202946711506,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3245,31 +3334,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 234.20000000003992,
-      "box": 387.0437487756287,
-      "pier": 2919.6456663555045,
+      "strand": 235.5222222222619,
+      "box": 0,
+      "pier": 3305.3671929089696,
       "flock": null,
-      "purse": 107.92111942533039
+      "purse": 106.75491527591272
      }
     },
     {
      "t": 2221,
-     "money": 31472.22348901795,
-     "earned": 46915.82348901628,
-     "cleared": 0.09903131727095527,
-     "income": 23.42443713276213,
+     "money": 9576.736635927331,
+     "earned": 51268.236635923065,
+     "cleared": 0.0989917582049481,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3278,31 +3367,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 230.8666666667065,
-      "box": 346.964981438109,
-      "pier": 2963.057767026362,
+      "strand": 232.18888888892846,
+      "box": 0,
+      "pier": 3308.700526242309,
       "flock": null,
-      "purse": 109.7360744464312
+      "purse": 108.56987029701354
      }
     },
     {
      "t": 2251,
-     "money": 32173.360413060625,
-     "earned": 47616.96041305883,
-     "cleared": 0.0991310460087883,
-     "income": 23.389550642368462,
+     "money": 9678.481907307209,
+     "earned": 51369.981907302834,
+     "cleared": 0.09909148694278125,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3311,31 +3400,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 227.53333333337306,
-      "box": 306.8862141005893,
-      "pier": 3006.4698676972193,
+      "strand": 228.85555555559503,
+      "box": 0,
+      "pier": 3312.0338595756484,
       "flock": null,
-      "purse": 111.55102946753202
+      "purse": 110.38482531811435
      }
     },
     {
      "t": 2281,
-     "money": 32873.26656615691,
-     "earned": 48316.86656615503,
-     "cleared": 0.09923077474662134,
-     "income": 23.350717952312575,
+     "money": 9780.227178687086,
+     "earned": 51471.7271786826,
+     "cleared": 0.09919121568061429,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3344,31 +3433,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 224.20000000003964,
-      "box": 266.8074467630696,
-      "pier": 3049.8819683680767,
+      "strand": 225.5222222222616,
+      "box": 0,
+      "pier": 3315.367192908988,
       "flock": null,
-      "purse": 113.36598448863283
+      "purse": 112.19978033921517
      }
     },
     {
      "t": 2311,
-     "money": 33571.772342356984,
-     "earned": 49015.372342355106,
-     "cleared": 0.0993305034844546,
-     "income": 23.30686548827131,
+     "money": 9881.972450066964,
+     "earned": 51573.47245006237,
+     "cleared": 0.09929094441844732,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3377,31 +3466,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 220.8666666667062,
-      "box": 226.7286794255505,
-      "pier": 3093.294069038934,
+      "strand": 222.18888888892818,
+      "box": 0,
+      "pier": 3318.700526242327,
       "flock": null,
-      "purse": 115.18093950973365
+      "purse": 114.01473536031598
      }
     },
     {
      "t": 2341,
-     "money": 34268.65031157924,
-     "earned": 49712.25031157736,
-     "cleared": 0.09943023222228764,
-     "income": 23.25639575703875,
+     "money": 9983.717721446841,
+     "earned": 51675.21772144214,
+     "cleared": 0.09939067315628047,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3410,31 +3499,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 217.53333333337278,
-      "box": 186.64991208803164,
-      "pier": 3136.7061697097915,
+      "strand": 218.85555555559475,
+      "box": 0,
+      "pier": 3322.0338595756666,
       "flock": null,
-      "purse": 116.99589453083446
+      "purse": 115.8296903814168
      }
     },
     {
      "t": 2371,
-     "money": 34963.57843214311,
-     "earned": 50407.178432141234,
-     "cleared": 0.09952996096012068,
-     "income": 23.196768163102146,
+     "money": 10085.462992826719,
+     "earned": 51776.96299282191,
+     "cleared": 0.09949040189411362,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3443,31 +3532,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 214.20000000003935,
-      "box": 146.5711447505128,
-      "pier": 3180.118270380649,
+      "strand": 215.52222222226132,
+      "box": 0,
+      "pier": 3325.367192909006,
       "flock": null,
-      "purse": 118.81084955193528
+      "purse": 117.64464540251761
      }
     },
     {
      "t": 2401,
-     "money": 35656.06252315995,
-     "earned": 51099.66252315807,
-     "cleared": 0.09962968969795383,
-     "income": 23.12353685967852,
+     "money": 10187.208264206596,
+     "earned": 51878.708264201676,
+     "cleared": 0.09959013063194677,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3476,31 +3565,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 210.86666666670592,
-      "box": 106.49237741299369,
-      "pier": 3223.5303710515063,
+      "strand": 212.1888888889279,
+      "box": 0,
+      "pier": 3328.7005262423454,
       "flock": null,
-      "purse": 120.62580457303609
+      "purse": 119.45960042361843
      }
     },
     {
      "t": 2431,
-     "money": 36345.236898440875,
-     "earned": 51788.836898438996,
-     "cleared": 0.09972941843578687,
-     "income": 23.0276411049627,
+     "money": 10288.953535586474,
+     "earned": 51980.453535581444,
+     "cleared": 0.09968985936977981,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3509,31 +3598,31 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 207.5333333333725,
-      "box": 66.41361007547441,
-      "pier": 3266.9424717223637,
+      "strand": 208.85555555559446,
+      "box": 0,
+      "pier": 3332.033859575685,
       "flock": null,
-      "purse": 122.4407595941369
+      "purse": 121.27455544471924
      }
     },
     {
      "t": 2461,
-     "money": 37029.108284911956,
-     "earned": 52472.70828491008,
-     "cleared": 0.0998291471736199,
-     "income": 22.88409602920013,
+     "money": 10390.698806966351,
+     "earned": 52082.19880696121,
+     "cleared": 0.09978958810761285,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 0.1111111111111111,
       "birds": 0.06049850070336303
      },
      "caps": {
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3542,19 +3631,19 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 204.20000000003907,
-      "box": 26.33484273795513,
-      "pier": 3310.354572393221,
+      "strand": 205.52222222226104,
+      "box": 0,
+      "pier": 3335.367192909024,
       "flock": null,
-      "purse": 124.25571461523772
+      "purse": 123.08951046582006
      }
     },
     {
      "t": 2491,
-     "money": 37506.06602546662,
-     "earned": 52949.66602546474,
-     "cleared": 0.09992887591145316,
-     "income": 19.34715211709578,
+     "money": 10492.444078346229,
+     "earned": 52183.94407834098,
+     "cleared": 0.099889316845446,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
@@ -3566,7 +3655,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3575,19 +3664,19 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 200.86666666670564,
+      "strand": 202.1888888889276,
       "box": 0,
-      "pier": 3340.0227484645147,
+      "pier": 3338.7005262423636,
       "flock": null,
-      "purse": 126.07066963633854
+      "purse": 124.90446548692087
      }
     },
     {
      "t": 2521,
-     "money": 37607.81129684639,
-     "earned": 53051.41129684451,
-     "cleared": 0.1000286046492862,
-     "income": 9.64505019890724,
+     "money": 10594.189349726106,
+     "earned": 52285.68934972075,
+     "cleared": 0.09998904558327903,
+     "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
       "dog": 0,
@@ -3599,7 +3688,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3608,18 +3697,18 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 197.5333333333722,
+      "strand": 198.85555555559418,
       "box": 0,
-      "pier": 3343.356081797854,
+      "pier": 3342.033859575703,
       "flock": null,
-      "purse": 127.88562465743935
+      "purse": 126.71942050802168
      }
     },
     {
      "t": 2551,
-     "money": 37709.55656822616,
-     "earned": 53153.15656822428,
-     "cleared": 0.10012833338711935,
+     "money": 10695.934621105984,
+     "earned": 52387.43462110052,
+     "cleared": 0.10008877432111218,
      "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
@@ -3632,7 +3721,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3641,18 +3730,18 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 194.20000000003878,
+      "strand": 195.52222222226075,
       "box": 0,
-      "pier": 3346.6894151311935,
+      "pier": 3345.3671929090424,
       "flock": null,
-      "purse": 129.70057967854058
+      "purse": 128.53437552912263
      }
     },
     {
      "t": 2581,
-     "money": 37811.30183960593,
-     "earned": 53254.90183960405,
-     "cleared": 0.10022806212495239,
+     "money": 10797.679892485861,
+     "earned": 52489.179892480286,
+     "cleared": 0.10018850305894533,
      "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
@@ -3665,7 +3754,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3674,18 +3763,18 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 190.86666666670536,
+      "strand": 192.18888888892732,
       "box": 0,
-      "pier": 3350.022748464533,
+      "pier": 3348.700526242382,
       "flock": null,
-      "purse": 131.51553469964182
+      "purse": 130.34933055022387
      }
     },
     {
      "t": 2611,
-     "money": 37913.047110985695,
-     "earned": 53356.64711098382,
-     "cleared": 0.10032779086278543,
+     "money": 10899.425163865739,
+     "earned": 52590.925163860054,
+     "cleared": 0.10028823179677837,
      "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
@@ -3698,7 +3787,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3707,18 +3796,18 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 187.53333333337193,
+      "strand": 188.8555555555939,
       "box": 0,
-      "pier": 3353.3560817978723,
+      "pier": 3352.033859575721,
       "flock": null,
-      "purse": 133.33048972074306
+      "purse": 132.1642855713251
      }
     },
     {
      "t": 2641,
-     "money": 38014.792382365464,
-     "earned": 53458.392382363585,
-     "cleared": 0.10042751960061858,
+     "money": 11001.170435245616,
+     "earned": 52692.67043523982,
+     "cleared": 0.10038796053461141,
      "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
@@ -3731,7 +3820,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3740,18 +3829,18 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 184.2000000000385,
+      "strand": 185.52222222226047,
       "box": 0,
-      "pier": 3356.6894151312117,
+      "pier": 3355.3671929090606,
       "flock": null,
-      "purse": 135.1454447418443
+      "purse": 133.97924059242635
      }
     },
     {
      "t": 2671,
-     "money": 38116.53765374523,
-     "earned": 53560.13765374335,
-     "cleared": 0.10052724833845172,
+     "money": 11102.915706625494,
+     "earned": 52794.41570661959,
+     "cleared": 0.10048768927244456,
      "income": 3.3915090459922794,
      "rates": {
       "catch": 0,
@@ -3764,7 +3853,7 @@
       "catch": 0.5194427020111877,
       "dog": 0,
       "dog_beach": 0.1111111111111111,
-      "ferry": 1.4470700223617539,
+      "ferry": 5.069440777314252,
       "birds": 0.06049850070336303
      },
      "pools": {
@@ -3773,11 +3862,11 @@
       "lake_t2": 7591,
       "lake_t3": 3942,
       "lake_t4": 3316,
-      "strand": 180.86666666670507,
+      "strand": 182.18888888892704,
       "box": 0,
-      "pier": 3360.022748464551,
+      "pier": 3358.7005262424,
       "flock": null,
-      "purse": 136.96039976294554
+      "purse": 135.7941956135276
      }
     }
    ],
@@ -3789,8 +3878,8 @@
     "lucky_haul": 0,
     "double_cast": 0,
     "boat_speed": 0,
+    "cargo": 0,
     "fleet": 0,
-    "boat_volley": 0,
     "dog_count": 0,
     "dog_strength": 0,
     "recycle_bonus": 0,
@@ -3804,19 +3893,19 @@
      "lucky_haul": 3,
      "double_cast": 3,
      "net_range": 4,
+     "cargo": 4,
+     "fleet": 2,
      "boat_speed": 5,
      "net_width": 6,
-     "fleet": 1,
      "dog_count": 1,
      "net_strength": 1,
-     "boat_volley": 1,
      "recycle_bonus": 1,
      "bird_worth": 1,
      "dog_strength": 1
     },
-    "money": 38214.89141607901,
-    "earned": 53658.49141607713,
-    "cleared": 0.10062365278502372
+    "money": 11201.269468959375,
+    "earned": 52892.76946895337,
+    "cleared": 0.10058409371901655
    }
   }
  ]

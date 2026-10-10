@@ -6781,12 +6781,15 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   is the demo's done flag. A save or the menu's pose settles the tornado without `ended`, so
   the finale is owed again.
 - **Off in the demo**: the tornado schedule, the hive's swarm (the hive stands as scenery).
-- **Not on Demo** (second pass the same day, Richard): Reel, Capacity (`cargo`), Fetch and
+- **Not on Demo** (second pass the same day, Richard): Reel, Loading (`boat_volley`, PT
+  "Carga"; not Capacity, PT "Carrega", which the first cut took out by mistake), Fetch and
   Keenness are not sold (cap 0, `Demo.locked`): the row stands drawn back with "Not on Demo"
   (`DEMO_LOCKED`) in place of its figure and no tag. Pigeons and $ Bonus one level each; the
-  hose stops at level 2 (`WashRoom.hose_most`). Re-priced: every level by minute 15 in the
-  sim, income held near 24/s by the boats at their base hold (16), so Waiting grows; judge
-  it in play.
+  hose stops at level 2 (`WashRoom.hose_most`).
+- **The boats keep up** (third pass, Richard: "o ritmo dos barcos fica muito lento"): Capacity
+  4 levels (16 to 40 a hold) and Fleet 2 (three hulls). In the sim the ferry carries 3-4
+  pieces a second against the net's 2-3, Waiting peaks near 200 at minute 12 and drains;
+  every level bought by minute 16-17. `price_demo.py` prints catch against ferry and the box.
 - **Finds**: `Demo.FINDS` (15, the record player among them) are dealt within `Demo.REACH`
   (9) tiles of the shelf, tier `Demo.FIND_TIER` (1) or under, never under heavier rubbish.
   Every other find is dealt past `Demo.TEASE_FROM` (14) tiles, out of reach, and
