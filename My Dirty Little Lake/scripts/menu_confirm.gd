@@ -159,8 +159,9 @@ func _draw() -> void:
 
 	var y := face.position.y + BOARD_PAD + (0.0 if not words.is_empty() else WORDLESS_AIR)
 	if not words.is_empty():
+		var said := Text.of(words)
 		Style.write(
-			self, Text.of(words), Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
+			self, said, fitted(said, face.size.x - BOARD_PAD * 2.0), Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
 			Style.PAPER_INK, HORIZONTAL_ALIGNMENT_CENTER, face
 		)
 		y += WORDS_TALL + ROW_GAP
@@ -196,7 +197,17 @@ func _draw_door(box: Rect2, key: StringName, label: String, warn: bool) -> void:
 	Style.lit_edge(self, box, face)
 	var ink := Style.WARN_INK if warn else Style.INK
 	Style.write(
-		self, label, Style.TEXT_BODY,
+		self, label, fitted(label, box.size.x - 8.0),
 		Vector2(0.0, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
 		ink, HORIZONTAL_ALIGNMENT_CENTER, box
 	)
+
+
+## The size a line is written at: the body size, or a rung down the ladder when a language's
+## words run longer than the board (2026-10-10: German and French overran it, and nothing
+## shrank them). The smallest rung when none fits, which `test_lake` reports.
+static func fitted(text: String, wide: float) -> int:
+	for px: int in [Style.TEXT_BODY, Style.TEXT_SMALL, Style.TEXT_TINY]:
+		if Style.measure(text, px).x <= wide:
+			return px
+	return Style.TEXT_TINY

@@ -2274,13 +2274,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		Sfx.ui(&"ui_close")
 		get_viewport().set_input_as_handled()
 		return
-	# Through the input map since 2026-09-16 (issue #26): the bind board moves these two, and
-	# they are the shed's own actions rather than the lake's, because the buttons that turn a
-	# piece and work a switch in here open the shed and the upgrades out there.
+	# Through the input map since 2026-09-16 (issue #26): the bind board moves these two. R is
+	# the shed's own action (the button opens the shed out there); E is Interact, one verb in
+	# the house and on the lake since 2026-10-10.
 	if event.is_action_pressed(&"shed_rotate"):
 		turn_carried()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(&"shed_switch") and switch_near():
+	elif event.is_action_pressed(&"interact") and switch_near():
 		get_viewport().set_input_as_handled()
 
 
@@ -3769,7 +3769,7 @@ func _draw_prompt(floor_box: Rect2) -> void:
 		)
 	var side := 18.0
 	var box := Rect2(over - Vector2(side, side) * 0.5, Vector2(side, side))
-	var glyph := Glyphs.lone(Binds.shown(&"shed_switch", Pad.is_pad()))
+	var glyph := Glyphs.lone(Binds.shown(&"interact", Pad.is_pad()))
 	if glyph != null:
 		Glyphs.draw_centred(self, glyph, box.get_center())
 		return
@@ -3778,7 +3778,7 @@ func _draw_prompt(floor_box: Rect2) -> void:
 	# What the switch is actually bound to, named as this keyboard prints it — the pad's
 	# button in pad mode. It said "Y" or "E" in so many words until the bind board existed.
 	Style.write(
-		self, Binds.shown(&"shed_switch", Pad.is_pad()), Style.TEXT_SMALL,
+		self, Binds.shown(&"interact", Pad.is_pad()), Style.TEXT_SMALL,
 		box.position + Vector2(5.0, 14.0), Style.INK
 	)
 
@@ -3795,9 +3795,11 @@ func _stamp_piece(
 
 
 ## The pad in the shed (2026-09-26, `/grill-me` with Richard). **The room is free aim**: the
-## left stick walks the player and, with a piece in hand, carries it; A picks up the placed
-## piece the player stands at (ringed) and puts a carried one down; Y works a switch and X
-## turns what is in hand, as before. **The shelf is a list opened with a shoulder** (RB or
+## left stick walks the player and, with a piece in hand, carries it; **Y picks up the placed
+## piece the player stands at (ringed) and puts a carried one down**; A is Interact, which
+## works a switch, a seat, a book or a dog here as it does on the lake; X turns what is in
+## hand. (Until 2026-10-10 A picked up and Y worked a switch: the switch verb was folded into
+## Interact, and pickup moved to the button that opens the upgrades out there.) **The shelf is a list opened with a shoulder** (RB or
 ## LB): the stick walks its rows, A takes one into the hands and puts the shelf away, B puts
 ## the shelf away.
 func _pad_tick() -> void:
@@ -3808,6 +3810,16 @@ func _pad_tick() -> void:
 			Input.is_action_just_pressed(&"zoom_in") or Input.is_action_just_pressed(&"zoom_out")):
 		_pad_shelf = not _pad_shelf
 		Sfx.ui(&"ui_click" if _pad_shelf else &"ui_close")
+	if not _pad_shelf and not record_up() and Input.is_action_just_pressed(&"open_upgrades"):
+		if carrying.is_empty():
+			var at := _piece_near()
+			if at >= 0:
+				_pointer = _piece_box(at).get_center()
+				get_viewport().warp_mouse(get_global_transform_with_canvas() * _pointer)
+				_pick_up()
+		else:
+			_put_down()
+		queue_redraw()
 	if _pad_shelf and not carrying.is_empty():
 		# Taken off the shelf: into the player's hands, out in the room.
 		_pad_shelf = false
@@ -3848,22 +3860,13 @@ func pad_scroll(step: int) -> bool:
 	return not is_equal_approx(was, _scroll)
 
 
-## A in the room: pick up the piece the player stands at. A carried piece goes down through
-## the pointer's own click, where the stick has carried it.
+## A in the room is Interact (read by the lake), so it is taken here and sends no click:
+## a click would pick up or put down, which is Y's (`_pad_tick`).
 func pad_press(_key: Variant) -> bool:
-	if _pad_shelf or not carrying.is_empty():
-		return false
-	var at := _piece_near()
-	if at >= 0:
-		var box := _piece_box(at)
-		_pointer = box.get_center()
-		get_viewport().warp_mouse(get_global_transform_with_canvas() * _pointer)
-		_pick_up()
-		queue_redraw()
-	return true
+	return not _pad_shelf
 
 
-## What A would pick up, ringed.
+## What Y would pick up, ringed.
 func pad_mark() -> Rect2:
 	if _pad_shelf or not carrying.is_empty():
 		return Rect2()

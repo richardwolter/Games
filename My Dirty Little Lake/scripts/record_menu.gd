@@ -285,7 +285,7 @@ func _input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
-	if key.keycode == KEY_ESCAPE or event.is_action_pressed(&"shed_switch"):
+	if key.keycode == KEY_ESCAPE or event.is_action_pressed(&"interact"):
 		close()
 		get_viewport().set_input_as_handled()
 

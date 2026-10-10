@@ -845,7 +845,7 @@
   },
   {
    "name": "decor_vynil_player",
-   "title": "Record player",
+   "title": "Record Player",
    "dirty": "Decoration Dirty/Vynil Player",
    "kind": "STATE",
    "mirror": false,

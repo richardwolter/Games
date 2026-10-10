@@ -1408,7 +1408,7 @@
     0,
     1
    ],
-   "title": "Record player",
+   "title": "Record Player",
    "wash_scale": 1.0
   },
   {
@@ -6355,7 +6355,7 @@
     0
    ],
    "tier": 2,
-   "title": "Old Seat",
+   "title": "Old Armchair",
    "wash_scale": 1.0
   },
   {
@@ -6491,7 +6491,7 @@
     0
    ],
    "tier": 0,
-   "title": "Bed",
+   "title": "Small Bed",
    "wash_scale": 1.0
   },
   {
@@ -6775,7 +6775,7 @@
     0
    ],
    "tier": 1,
-   "title": "Corner Desk",
+   "title": "Small Desk",
    "wash_scale": 1.0
   },
   {
@@ -6851,7 +6851,7 @@
     0
    ],
    "tier": 1,
-   "title": "Drawer",
+   "title": "Chest of Drawers",
    "wash_scale": 1.0
   },
   {
@@ -6957,7 +6957,7 @@
     1
    ],
    "tier": 4,
-   "title": "Drawer Desk",
+   "title": "Corner Desk",
    "wash_scale": 1.0
   },
   {
@@ -7200,7 +7200,7 @@
     1
    ],
    "tier": 0,
-   "title": "File Cabinet",
+   "title": "Cabinet",
    "wash_scale": 1.0
   },
   {
@@ -7312,7 +7312,7 @@
     0
    ],
    "tier": 1,
-   "title": "Kitchen Counter",
+   "title": "Kitchen Sink",
    "wash_scale": 1.0
   },
   {
@@ -7753,7 +7753,7 @@
     0
    ],
    "tier": 1,
-   "title": "Diner Chair",
+   "title": "Bar Chair",
    "wash_scale": 1.0
   },
   {
@@ -8273,7 +8273,7 @@
     0
    ],
    "tier": 0,
-   "title": "Coat Stand",
+   "title": "Coat Rack",
    "wash_scale": 1.0
   },
   {
@@ -8876,7 +8876,7 @@
     0
    ],
    "tier": 2,
-   "title": "Diner Table",
+   "title": "Counter",
    "wash_scale": 1.0
   },
   {
@@ -8968,7 +8968,7 @@
     0
    ],
    "tier": 2,
-   "title": "Flower Pot",
+   "title": "Plant Pot",
    "wash_scale": 1.0
   },
   {
@@ -9065,7 +9065,7 @@
     0
    ],
    "tier": 3,
-   "title": "Dotted Rug",
+   "title": "Modern Rug",
    "wash_scale": 1.0
   },
   {
@@ -9111,7 +9111,7 @@
     0
    ],
    "tier": 1,
-   "title": "Aloe",
+   "title": "Aloe Vera",
    "wash_scale": 1.0
   },
   {
@@ -9227,7 +9227,7 @@
     0
    ],
    "tier": 2,
-   "title": "Diner Seat",
+   "title": "Bar Stool",
    "wash_scale": 1.0
   },
   {
@@ -9339,7 +9339,7 @@
     0
    ],
    "tier": 2,
-   "title": "Small Table",
+   "title": "Side Table",
    "wash_scale": 1.0
   },
   {
@@ -9431,7 +9431,7 @@
     0
    ],
    "tier": 1,
-   "title": "Sprout Pot",
+   "title": "Seedling Pot",
    "wash_scale": 1.0
   },
   {
@@ -9727,7 +9727,7 @@
     0
    ],
    "tier": 3,
-   "title": "Drinks Cart",
+   "title": "Bar Cart",
    "wash_scale": 1.0
   },
   {
@@ -9952,7 +9952,7 @@
     0
    ],
    "tier": 2,
-   "title": "Decorated Table",
+   "title": "Decorated Shelf",
    "wash_scale": 1.0
   }
  ],

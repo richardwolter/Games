@@ -75,3 +75,22 @@ static func lines(text: String, measure: Callable, wide: float) -> Array[String]
 				row = tried
 		out.append(row)
 	return out
+
+
+## Rows from `lines` drawn centred across `across` (its x and width), the first baseline at
+## `y`, each `line_tall` below the last: the paper cards' writing (the tours, the first
+## steps' note). A word between asterisks is drawn in `mark_ink`, as the letter does, a mark
+## carrying on from one row to the next; pad glyph tokens draw as pictures (`Glyphs`).
+static func draw_marked(on: CanvasItem, face: Font, lines: Array, size_px: int, across: Rect2,
+		y: float, line_tall: float, ink: Color, mark_ink: Color) -> void:
+	var marked := false
+	for line: String in lines:
+		var span := Glyphs.measure(line.replace("*", ""), face, size_px).x
+		var x := roundf(across.position.x + (across.size.x - span) * 0.5)
+		for piece in line.split("*"):
+			if not piece.is_empty():
+				Glyphs.draw_line(on, face, Vector2(x, y), piece, size_px, mark_ink if marked else ink)
+				x += Glyphs.measure(piece, face, size_px).x
+			marked = not marked
+		marked = not marked
+		y += line_tall

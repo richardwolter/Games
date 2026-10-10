@@ -2144,10 +2144,40 @@ spaces only, and a Japanese or Chinese sentence has none, so it reached them as 
   them when a board is resized. `test_lake`'s `_check_cjk_wrap` guards the breaking.
 - `shot_cues` and `shot_letter` take `CUES_LOCALE` / `LETTER_LOCALE` to photograph the cards
   in a language, set on `TranslationServer` and `Style` by hand, never through `Prefs`.
-- **The final translation pass** (same session): Richard writes the final PT in the PT
-  rewrite artifact (db collection `final`), then every other language is retranslated from
-  it by translator and adversarial reviewer agents with back-translation, under
-  `docs/l10n/style_guide.md` and a glossary. No human native check, by Richard's call.
+### The Final Translation (2026-10-10, `/grill-me` with Richard)
+- **Richard's final PT is the source** (the PT rewrite artifact's `final` collection, 289
+  live strings, merged). Every other language, English included, was retranslated from it:
+  per language a translator agent (glossary first, then the strings, with a literal
+  back-translation in `_back_<locale>`), then **an independent adversarial reviewer**
+  (offence and second meanings in every region, regionalisms, player gender, gambling
+  wording, glossary drift, calques, fit). **No human native check, by Richard's call.**
+  Caught this way: es "La manada" as a heading (a notorious Spanish crime), "Goma", "mando",
+  "bono"; de "säubern"; fr "pigeon" as slang; ja ほりもの (tattoo).
+- **Rules**: `docs/l10n/style_guide.md` (voice, register per language, formatting, the
+  safeguard list) and `docs/l10n/glossary.md` (the game's terms; each language's own
+  choices in `docs/l10n/glossary_<locale>.json`). French takes U+00A0 before `! ? : ;`.
+- **Pipeline record**: `tools/l10n_work/` (git-ignored): `source.json`, `out_<l>.json`,
+  `review_<l>.json`; `tools/l10n_merge.py` validates every cell against PT (placeholders,
+  marks, paragraphs, spaces) and writes the CSV. **Run `build_translations.py` with the
+  base Python313** (fontTools) after: it also re-subsets the CJK fonts. **A find's English
+  name lives in `assets/pieces.json` and `tools/build_pack_decor.py`** (`decor_sets.json` for
+  the record player); the builder resets the CSV's `en` to it, so rename there.
+- **Both Strength rows share one word in every language**, by Richard's call; `test_lake`'s
+  unique-name guard excepts that pair. PT also repeats two find names on purpose (two
+  paintings, two side tables); translators kept them distinct where their language reads
+  better.
+- **Interact is one verb** (`VERB_SHED_SWITCH` and `shed_switch` deleted): E / A on the lake
+  and in the house. **On the pad in the house, Y picks up and puts down furniture** (it was
+  A) and A uses things; the shelf's tour card names Y. An old `settings.cfg` line for
+  `shed_switch` is dropped by `Binds.load_from`.
+- **Small changes off Richard's notes**: the Pigeons row reads `$26 → $34` (money on both
+  figures, the one exception to "a mark said once"); the shop legend's sentence is centred
+  under the plate with `LEGEND_RULE_GAP`, and the legend grows to as many rows as the
+  sentence wraps to; `*marked*` words draw in the head ink on the tour cards, the first
+  steps' note and the camera tip (`Wrap.draw_marked`); plank counts take one space
+  (`Decorar %d`).
+- English was then shown to Richard beside the PT (the same artifact, `en_review`
+  collection) for his read.
 
 ### Portuguese Is the Source (2026-09-29, Richard)
 Richard rewrote 85 strings in Portuguese in an artifact (see memory `lake-pt-rewrite-artifact`);

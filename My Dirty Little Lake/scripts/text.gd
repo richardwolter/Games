@@ -200,9 +200,6 @@ static var VERB_CAMERA_LOCK: String:
 static var VERB_SHED_ROTATE: String:
 	get: return TranslationServer.translate(&"VERB_SHED_ROTATE")
 
-static var VERB_SHED_SWITCH: String:
-	get: return TranslationServer.translate(&"VERB_SHED_SWITCH")
-
 static var BIND_GROUP_MOVE: String:
 	get: return TranslationServer.translate(&"BIND_GROUP_MOVE")
 

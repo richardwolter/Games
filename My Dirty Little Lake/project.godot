@@ -105,10 +105,6 @@ shed_rotate={
 "deadzone": 0.2,
 "events": []
 }
-shed_switch={
-"deadzone": 0.2,
-"events": []
-}
 aim_left={
 "deadzone": 0.2,
 "events": []

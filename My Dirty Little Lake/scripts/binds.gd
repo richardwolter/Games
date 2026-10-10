@@ -73,7 +73,9 @@ const ACTIONS := [
 	},
 	{
 		"action": &"interact", "label": "VERB_INTERACT", "group": "BIND_GROUP_NET",
-		"contexts": [CONTEXT_LAKE], "key": "key:69", "pad": "pad:0", "extra": [],
+		# One verb out on the lake and in the house (2026-10-10, Richard): the house's own
+		# switch verb was folded into it. On the pad in the house, A uses and Y picks up.
+		"contexts": [CONTEXT_LAKE, CONTEXT_SHED], "key": "key:69", "pad": "pad:0", "extra": [],
 	},
 	{
 		"action": &"open_shed", "label": "VERB_OPEN_SHED", "group": "BIND_GROUP_OPEN",
@@ -115,10 +117,6 @@ const ACTIONS := [
 	{
 		"action": &"shed_rotate", "label": "VERB_SHED_ROTATE", "group": "BIND_GROUP_SHED",
 		"contexts": [CONTEXT_SHED], "key": "key:82", "pad": "pad:2", "extra": [],
-	},
-	{
-		"action": &"shed_switch", "label": "VERB_SHED_SWITCH", "group": "BIND_GROUP_SHED",
-		"contexts": [CONTEXT_SHED], "key": "key:69", "pad": "pad:3", "extra": [],
 	},
 ]
 

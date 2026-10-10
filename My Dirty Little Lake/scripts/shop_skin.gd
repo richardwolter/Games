@@ -293,6 +293,7 @@ const TAG_SWELL := 2.0
 
 ## Where the legend stands this frame; zero-sized when there is no room for it.
 var _legend_box := Rect2()
+var _legend_wide_at := 0.0
 
 ## The ferry's wake and the hull over it. Both are nodes rather than this control's own
 ## drawing: HullFoam is a Node2D with a shader, and a child of a Control draws after the
@@ -526,6 +527,9 @@ func _lay_out() -> void:
 	var talls := {}
 	for board in BOARDS:
 		talls[board] = minf(_board_tall(board), tallest)
+	# The legend spans the two middle boards and reaches past both: its width decides how many
+	# rows its sentence wraps to, so it is known before its height is asked.
+	_legend_wide_at = floorf(each) * 2.0 + BOARD_GAP + LEGEND_REACH * 2.0
 	var middle_foot := 0.0
 	if _mid_boards().size() == 2:
 		for board in _mid_boards():
@@ -1142,8 +1146,12 @@ func _draw_blurb(row: Dictionary, on: CanvasItem = self) -> void:
 ## and their padding, in the board's wood.
 func _legend_tall() -> float:
 	var line := float(Style.TEXT_SMALL) + LEGEND_LINE
-	# Five lines: the materials over their prices, the bonus's own line, and two of rule.
-	var inner := LEGEND_PAD * 2.0 + line * 5.0 + LEGEND_GAP_ROW * 2.0 + _pay_drop()
+	# The materials over their prices and the bonus's own line, then the rule's rows: as many
+	# as it wraps to in the language up (2026-10-10, Richard: the spacing; German runs to
+	# three where English takes two), under `LEGEND_RULE_GAP` of paper.
+	var rows := maxi(_legend_rule_rows(), 1)
+	var inner := LEGEND_PAD * 2.0 + line * float(3 + rows) + LEGEND_GAP_ROW * 2.0 \
+		+ LEGEND_RULE_GAP + _pay_drop()
 	return inner + Style.board_wood_tall(BOARDS_WIDE * 0.5, FRAME)
 
 
@@ -1154,6 +1162,18 @@ func _pay_drop() -> float:
 
 ## The gap between the legend's three parts.
 const LEGEND_GAP_ROW := 6.0
+## Paper between the figures' dark plate and the sentence under it.
+const LEGEND_RULE_GAP := 8.0
+
+
+func _legend_wide() -> float:
+	return _legend_wide_at if _legend_wide_at > 0.0 else BOARDS_WIDE * 0.5
+
+
+## The rows the legend's sentence wraps to, at the width `_draw_legend` gives it.
+func _legend_rule_rows() -> int:
+	var face_wide := Style.board_face(Rect2(Vector2.ZERO, Vector2(_legend_wide(), 200.0)), FRAME).size.x
+	return _wrap(String(legend.get("rule", "")), Style.TEXT_SMALL, face_wide - LEGEND_PAD * 2.0).size()
 
 
 ## The legend: one plate in the boards' wood under the ferry's and the dog's. The four
@@ -1222,8 +1242,11 @@ func _draw_legend(box: Rect2) -> void:
 			var took := Style.write(self, String(pair[0]), Style.TEXT_SMALL, Vector2(x, at.y), Style.BOARD_INK)
 			Style.write(self, String(pair[1]), Style.TEXT_SMALL, Vector2(x + took.x + 6.0, at.y), Style.LEVEL_INK)
 		at.y += line_tall + LEGEND_GAP_ROW
+	# Centred under the centred figures, clear of the plate.
+	at.y += LEGEND_RULE_GAP
 	for line in _wrap(String(legend.get("rule", "")), Style.TEXT_SMALL, wide):
-		Style.write(self, line, Style.TEXT_SMALL, at, Style.PAPER_INK)
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.PAPER_INK,
+			HORIZONTAL_ALIGNMENT_CENTER, Rect2(Vector2(at.x, 0.0), Vector2(wide, 0.0)))
 		at.y += line_tall
 
 
@@ -1499,10 +1522,7 @@ func _draw_tour() -> void:
 	_tour_layer.draw_string(face, Vector2(inner.position.x, inner.position.y + ascent), "%d/%d" % [tour + 1, TOUR.size()],
 		HORIZONTAL_ALIGNMENT_RIGHT, inner.size.x, size_px, Style.PAPER_SOFT)
 	var y := inner.position.y + line_tall + ascent
-	for line in lines:
-		_tour_layer.draw_string(face, Vector2(card.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER, card.size.x,
-			size_px, Style.PAPER_INK)
-		y += line_tall
+	Wrap.draw_marked(_tour_layer, face, lines, size_px, card, y, line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
 	var foot_mid := inner.end.y - foot_tall * 0.5
 	var base := foot_mid + ascent * 0.5 - 1.0
 	var skip_wide := face.get_string_size(TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x

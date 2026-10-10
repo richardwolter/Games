@@ -165,11 +165,8 @@ func _draw() -> void:
 		draw_string(face, Vector2(inner.position.x, inner.position.y + ascent), "%d/%d" % [count, total],
 			HORIZONTAL_ALIGNMENT_RIGHT, inner.size.x, size_px, Style.PAPER_SOFT)
 	var y := inner.position.y + head + ascent
-	for line in lines:
-		# Through `Style.write`, which draws a pad glyph where a line carries one.
-		Style.write(self, line, size_px, Vector2(card.position.x, y), Style.PAPER_INK,
-			HORIZONTAL_ALIGNMENT_CENTER, card)
-		y += line_tall
+	# Pad glyphs drawn as pictures, `*marked*` words in the head ink, as the letter does.
+	Wrap.draw_marked(self, face, lines, size_px, card, y, line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
 	if count <= 0:
 		return
 	var foot_mid := inner.end.y - foot_tall * 0.5

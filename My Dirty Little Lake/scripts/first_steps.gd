@@ -237,16 +237,11 @@ func _note(box_at: Vector2) -> void:
 	draw_rect(box, Style.PAPER, true)
 	draw_rect(box.grow(-1.0), Style.PAPER_EDGE, false, NOTE_RIM)
 	var y := box.position.y + NOTE_PAD.y + face.get_ascent(size_px)
-	for line in lines:
-		draw_string(
-			face, Vector2(box.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER, box.size.x,
-			size_px, Style.PAPER_INK
-		)
-		y += line_tall
+	Wrap.draw_marked(self, face, lines, size_px, box, y, line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
 
 
 static func _wrap(text: String, face: Font, size_px: int, wide: float) -> Array[String]:
 	if text.strip_edges().is_empty():
 		return []
 	# Glyphs counted as their pictures: a token's own characters are not what is drawn.
-	return Wrap.lines(text, func(s: String) -> float: return Glyphs.measure(s, face, size_px).x, wide)
+	return Wrap.lines(text, func(s: String) -> float: return Glyphs.measure(s.replace("*", ""), face, size_px).x, wide)

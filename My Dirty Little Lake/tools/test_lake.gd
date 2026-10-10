@@ -3100,7 +3100,7 @@ func _check_display(settings: Node) -> void:
 	var caps: Array = settings.call(&"_choices_of", &"fps_cap")
 	_check(caps.size() >= 4 and int(caps[0]) == 0,
 		"the frame cap offers uncapped and a few steps", "%d steps" % caps.size())
-	_check(String(settings.call(&"_choice_text", &"fps_cap", 0)) == "Uncapped"
+	_check(String(settings.call(&"_choice_text", &"fps_cap", 0)) == Text.FPS_UNCAPPED
 		and String(settings.call(&"_choice_text", &"fps_cap", 60)) == "60",
 		"and reads in whole frames", "")
 	var modes: Array = settings.call(&"_choices_of", &"window_mode")
@@ -4363,8 +4363,8 @@ func _check_trophy() -> void:
 	if card == null:
 		_check(false, "the find card was built", "")
 		return
-	_check(Text.TROPHY_FOUND == "Found a decoration!",
-		"the card says a decoration was found (Richard's wording, 2026-09-29)", Text.TROPHY_FOUND)
+	_check(Text.TROPHY_FOUND == "You found a decoration!",
+		"the card says a decoration was found (Richard's PT, 2026-10-10)", Text.TROPHY_FOUND)
 
 	# The retired drawing, gone rather than left unused: the disc, the wheel of rays and the
 	# motes, and the restored sprite it used to hold up.
@@ -5546,8 +5546,8 @@ func _check_credits() -> void:
 	for head: String in CreditsBoard.HEADS:
 		_check(CreditsBoard.LINES.has(head),
 			"the credits heading \"%s\" is a line of the board" % head, "")
-	_check(CreditsBoard.LINES.has("Made with Godot Engine")
-		and CreditsBoard.HEADS.has("Tools"),
+	_check(CreditsBoard.LINES.has(Text.CREDITS_GODOT) and Text.CREDITS_GODOT.contains("Godot")
+		and CreditsBoard.HEADS.has(Text.CREDITS_HEAD_TOOLS),
 		"the engine is credited under a Tools heading", "")
 	# Every name unique, so a pack cannot be thanked twice under two headings.
 	var seen: Dictionary = {}
@@ -5949,7 +5949,7 @@ func _stage_pad() -> void:
 		[&"open_upgrades", JOY_BUTTON_Y], [&"open_settings", JOY_BUTTON_START],
 		[&"recentre", JOY_BUTTON_RIGHT_STICK], [&"zoom_out", JOY_BUTTON_LEFT_SHOULDER],
 		[&"zoom_in", JOY_BUTTON_RIGHT_SHOULDER],
-		[&"shed_rotate", JOY_BUTTON_X], [&"shed_switch", JOY_BUTTON_Y],
+		[&"shed_rotate", JOY_BUTTON_X],
 	]:
 		var found := false
 		for event: InputEvent in InputMap.action_get_events(pair[0]):
@@ -9142,12 +9142,13 @@ func _stage_shop_shape() -> void:
 
 	var shop_rows: Array = _main.call(&"_shop_rows")
 	# Two rows called "Speed" on two boards was the thing this pass set out to kill, so the
-	# guard is uniqueness across the whole shop, not within a board.
+	# guard is uniqueness across the whole shop, not within a board. One pair shares its word
+	# by decision (2026-10-10, Richard): the net's Strength and the dogs', both "how heavy".
 	var seen := {}
 	var clashes := []
 	for row: Dictionary in shop_rows:
 		var name := String(row["name"])
-		if seen.has(name):
+		if seen.has(name) and not (row["key"] == &"dog_strength" and seen[name] == "net_strength"):
 			clashes.append("%s: %s and %s" % [name, seen[name], row["key"]])
 		seen[name] = String(row["key"])
 	_check(clashes.is_empty(), "every row's name is unique across the four boards", ", ".join(clashes))
@@ -9249,8 +9250,9 @@ func _stage_shop_shape() -> void:
 				nouns.append("%s: %s" % [row["key"], value])
 				break
 		# Said once: a mark or a word may appear on one end of the line, never on both.
+		# Except the pigeons' money, on both figures by decision (2026-10-10, Richard).
 		for mark in ["%", "$", "Tier"]:
-			if value.count(mark) > 1:
+			if value.count(mark) > 1 and not (mark == "$" and row["key"] == &"bird_worth"):
 				doubled.append("%s: %s" % [row["key"], value])
 		# Between the prefix and the suffix there is nothing but two figures and the arrow.
 		var arrow := String(_main.get(&"ARROW"))
@@ -9271,8 +9273,8 @@ func _stage_shop_shape() -> void:
 			pigeons = String(row["value"])
 	_check(strength.begins_with("Tier ") and strength.count("Tier") == 1,
 		"a prefix binds to the first figure alone", strength)
-	_check(pigeons.begins_with("$") and pigeons.count("$") == 1,
-		"and so does the money mark", pigeons)
+	_check(pigeons.begins_with("$") and pigeons.count("$") == (1 if not String(_main.get(&"ARROW")) in pigeons else 2),
+		"the pigeons' money is on both figures", pigeons)
 
 	# The HUD's cohesion pass (2026-09-17). The meter's frame is built to the wood's own box
 	# rather than stamped from the sheet at `METER_SCALE`, so its planks are the 16 and 14 of
@@ -9466,7 +9468,7 @@ func _stage_settings_shape() -> void:
 		elif heads.is_empty() and line.has("label"):
 			before_head = String(line["label"])
 	_check(heads.size() >= 2, "the rows are grouped under headings", ", ".join(heads))
-	_check(before_head == "Master",
+	_check(before_head == Text.SETTINGS_MASTER,
 		"and Master leads, above the first rule", before_head)
 
 	# No key name written into a name. The two that had one are not rebindable, so the
@@ -9586,7 +9588,7 @@ func _stage_binds_shape() -> void:
 		board.queue_redraw()
 		return
 
-	_check(ControlsSkin.RESET_LABEL == "Set to default",
+	_check(ControlsSkin.RESET_LABEL == Text.CONTROLS_DEFAULT and not ControlsSkin.RESET_LABEL.is_empty(),
 		"the way back is called what it does", ControlsSkin.RESET_LABEL)
 
 	# The two columns are named, and the gesture is said — but only when there is something
@@ -9660,12 +9662,15 @@ func _stage_binds_shape() -> void:
 	]:
 		var line := float(asked[0]) - float(Style.BORDER_WALL) * 2.0 - MenuConfirm.BOARD_PAD * 2.0
 		var door := (line - MenuConfirm.ROW_GAP) * 0.5
+		# At the size the board writes it: a rung down the ladder when a language runs long.
 		var over := []
-		if Style.measure(String(asked[1]), Style.TEXT_BODY).x > line:
-			over.append("words %.0f of %.0f" % [Style.measure(String(asked[1]), Style.TEXT_BODY).x, line])
+		var words_px := MenuConfirm.fitted(String(asked[1]), line)
+		if Style.measure(String(asked[1]), words_px).x > line:
+			over.append("words %.0f of %.0f" % [Style.measure(String(asked[1]), words_px).x, line])
 		for label: String in [String(asked[2]), String(asked[3])]:
-			if Style.measure(label, Style.TEXT_BODY).x > door:
-				over.append("%s %.0f of %.0f" % [label, Style.measure(label, Style.TEXT_BODY).x, door])
+			var label_px := MenuConfirm.fitted(label, door - 8.0)
+			if Style.measure(label, label_px).x > door - 8.0:
+				over.append("%s %.0f of %.0f" % [label, Style.measure(label, label_px).x, door])
 		_check(over.is_empty(), "%s fits its own board" % asked[4], ", ".join(over))
 
 	if _binds_touched:
@@ -9870,6 +9875,16 @@ func _check_loading() -> void:
 func _check_shop_purse(skin: Node) -> void:
 	var hud: HudSkin = _main.get(&"_skin")
 	_main.call(&"_set_menu", true)
+	# Opened on boards still laid for the empty shop, with no `_lay_out` of the test's own: the
+	# one `_update_hud` that hands the rows over hangs the purse under the boards they make,
+	# not under the empty shop's one-row net board (it hung over Range and Reel for that frame).
+	skin.set(&"rows", [])
+	skin.call(&"_lay_out_rows")
+	_main.call(&"_update_hud")
+	var net: Rect2 = (skin.get(&"_boards") as Dictionary)[ShopSkin.BOARDS[0]]
+	_check(is_equal_approx(hud.purse_over.position.y, roundf(net.end.y + ShopSkin.PURSE_GAP)),
+		"the purse is hung under the first board as the same frame lays it out",
+		"%s under %s" % [hud.purse_over, net])
 	skin.call(&"_lay_out")
 	_main.call(&"_update_hud")
 	var box := hud.purse_over
@@ -10024,7 +10039,7 @@ func _check_wash_plank() -> void:
 	_check(box.position.y > list.position.y + 8.0 and box.end.y <= list.end.y,
 		"under the empty line and on the shelf", "%s in %s" % [box, list])
 	var plank: PlankButton = room.get(&"_wash_plank")
-	_check(plank.label == "Wash  1", "and says how many wait", plank.label)
+	_check(plank.label == Text.SHELF_WASH_N % 1 and plank.label.ends_with("1"), "and says how many wait", plank.label)
 	_check(room.wash_pulse_amount() == 0.0 and float(room.get(&"_wash_pulse")) > 0.0,
 		"it pulses the first time the shelf opens with something waiting", str(room.get(&"_wash_pulse")))
 	room.call(&"_process", 0.3)
@@ -11704,7 +11719,8 @@ func _stage_letter() -> void:
 		heads.append(String(card["head"]))
 		if card.has("text") and (letter.call(&"_rows", card) as Dictionary).is_empty():
 			long_cards.append(String(card["head"]))
-	_check(heads == ["", "Net", "Upgrades", "Object Tier", "Decoration"],
+	_check(heads == ["", Text.LETTER_NET_HEAD, Text.LETTER_UPGRADES_HEAD, Text.LETTER_WEIGHT_HEAD, Text.LETTER_DECOR_HEAD]
+		and not "" in heads.slice(1),
 		"named for what each one teaches, the welcome bare", ", ".join(heads))
 	_check(String(Letter.CARDS[0].get("title", "")) == "Welcome"
 		and not Letter.CARDS[1].has("title"),
@@ -11862,11 +11878,11 @@ func _stage_letter() -> void:
 	_check(unshot.is_empty(), "the worded stills are shot in every language", ", ".join(unshot))
 	# The welcome's line stands under the greeting and over the picture.
 	var lead_rows: Array = (letter.call(&"_lead_fit") as Dictionary)["rows"]
-	_check(String(Letter.CARDS[0].get("lead", "")).begins_with("The lake has been abandoned")
+	_check(String(Letter.CARDS[0].get("lead", "")) == Text.LETTER_WELCOME_LEAD
 		and lead_rows.size() == 1,
 		"the welcome's abandoned line is one row under the greeting", "%d rows" % lead_rows.size())
-	_check(String(Text.LETTER_NET_TEXT).begins_with("*Left mouse-click*"),
-		"the net card says left mouse-click", String(Text.LETTER_NET_TEXT).get_slice("\n", 0))
+	_check(String(Text.LETTER_NET_TEXT).begins_with("*Left-click*"),
+		"the net card says left-click", String(Text.LETTER_NET_TEXT).get_slice("\n", 0))
 	var crowded := []
 	for card: Dictionary in Letter.CARDS:
 		var pinned: Array = card["snaps"]

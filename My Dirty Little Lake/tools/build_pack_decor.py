@@ -109,11 +109,11 @@ def dried(im):
 PIECES = [
     ("armchair", "Armchair", "ROTATE", "floor", "", [
         (373, CUT["chair_front"], F, 0, 0, 0), (374, None, S, 1, 0, 1), (373, CUT["chair_back"], B, 2, 0, 0)]),
-    ("old_seat", "Old Seat", "ROTATE", "floor", "", [
+    ("old_seat", "Old Armchair", "ROTATE", "floor", "", [
         (925, CUT["chair_front"], F, 0, 0, 0), (926, None, S, 1, 0, 1), (925, CUT["seat_back"], B, 2, 0, 0)]),
     ("bathtub", "Bathtub", "ROTATE", "floor", "", [
         (2065, None, F, 0, 0, 0), (2058, None, S, 1, 0, 0), (2051, CUT["tub_bare"], "top", 2, 0, 0)]),
-    ("bed", "Bed", "ROTATE", "floor", "", [
+    ("bed", "Small Bed", "ROTATE", "floor", "", [
         (2137, CUT["bed_bare"], F, 0, 0, 0), (2147, None, S, 1, 0, 0), (2142, None, B, 2, 0, 0)]),
     ("bookshelf", "Bookshelf", "ROTATE", "floor", "", [
         (418, None, F, 0, 0, 0), (420, None, S, 1, 0, 1), (419, None, B, 2, 0, 0)]),
@@ -121,21 +121,21 @@ PIECES = [
         (1593, None, F, 0, 0, 0), (1595, None, S, 1, 0, 0), (1594, None, B, 2, 0, 0), (1596, None, R, 3, 0, 0)]),
     ("coffee_table", "Coffee Table", "ROTATE", "floor", "", [
         (2208, None, F, 0, 0, 0), (2209, None, "front_open", 0, 1, 0), (2210, None, B, 1, 0, 0)]),
-    ("corner_desk", "Corner Desk", "ROTATE", "floor", "", [
+    ("corner_desk", "Small Desk", "ROTATE", "floor", "", [
         (1158, None, F, 0, 0, 0), (1159, None, "front_open", 0, 1, 0), (1160, None, B, 1, 0, 0)]),
-    ("drawer", "Drawer", "ROTATE", "floor", "", [
+    ("drawer", "Chest of Drawers", "ROTATE", "floor", "", [
         (2150, None, F, 0, 0, 0), (2149, None, "front_open", 0, 1, 0), (2151, None, S, 1, 0, 1)]),
-    ("drawer_desk", "Drawer Desk", "ROTATE", "floor", "", [
+    ("drawer_desk", "Corner Desk", "ROTATE", "floor", "", [
         (412, None, F, 0, 0, 0), (413, None, "front_open", 0, 1, 0), (414, None, B, 2, 0, 0)]),
     ("fancy_bed", "Fancy Bed", "ROTATE", "floor", "", [
         (443, None, F, 0, 0, 0), (445, None, S, 1, 0, 1), (444, None, B, 2, 0, 0)]),
     ("fancy_table", "Fancy Table", "ROTATE", "floor", "", [
         (395, None, F, 0, 0, 0), (394, None, S, 1, 0, 0)]),
-    ("file_cabinet", "File Cabinet", "ROTATE", "floor", "", [
+    ("file_cabinet", "Cabinet", "ROTATE", "floor", "", [
         (1324, None, F, 0, 0, 0), (1323, None, "front_open", 0, 1, 0), (1327, None, S, 1, 0, 1)]),
     ("fireplace", "Fireplace", "STATE", "floor", "fire", [
         (435, None, "off", 0, 0, 0), (436, None, "on", 0, 1, 0)]),
-    ("kitchen_counter", "Kitchen Counter", "VARIANT", "floor", "", [
+    ("kitchen_counter", "Kitchen Sink", "VARIANT", "floor", "", [
         (1854, CUT["sink"], "sink", 0, 0, 0), (1854, CUT["basin"], "basin", 1, 0, 0)]),
     ("microwave", "Microwave", "ROTATE", "small", "", [
         (1817, None, F, 0, 0, 0), (1818, None, "front_open", 0, 1, 0), (1819, None, B, 1, 0, 0)]),
@@ -148,7 +148,7 @@ PIECES = [
     ("toilet", "Toilet", "ROTATE", "floor", "", [
         (2011, None, F, 0, 0, 0), (2013, None, S, 1, 0, 1), (2014, None, "side_shut", 1, 1, 1),
         (2012, None, B, 2, 0, 0)]),
-    ("diner_chair", "Diner Chair", "ROTATE", "floor", "", [
+    ("diner_chair", "Bar Chair", "ROTATE", "floor", "", [
         (3, None, F, 0, 0, 0), (2, None, S, 1, 0, 1), (7, None, B, 2, 0, 0)]),
     ("green_chair", "Green Chair", "ROTATE", "floor", "", [
         (288, None, F, 0, 0, 0), (289, None, S, 1, 0, 1), (292, None, B, 2, 0, 0)]),
@@ -162,7 +162,7 @@ PIECES = [
         (437, None, F, 0, 0, 0), (438, None, "front_open", 0, 1, 0), (439, None, B, 1, 0, 0)]),
     ("bonsai", "Bonsai", "SINGLE", "small", "", [(297, None, F, 0, 0, 0)]),
     ("rug", "Gold Rug", "ROTATE", "floor", "", [(300, None, F, 0, 0, 0), (300, TURN, S, 1, 0, 0)]),
-    ("coat_stand", "Coat Stand", "SINGLE", "floor", "", [(328, None, F, 0, 0, 0)]),
+    ("coat_stand", "Coat Rack", "SINGLE", "floor", "", [(328, None, F, 0, 0, 0)]),
     ("landscape", "Landscape", "SINGLE", "wall", "", [(385, None, F, 0, 0, 0)]),
     ("portrait", "Portrait", "SINGLE", "wall", "", [(389, None, F, 0, 0, 0)]),
     ("grandfather_clock", "Old Clock", "SINGLE", "floor", "", [(427, None, F, 0, 0, 0)]),
@@ -178,21 +178,21 @@ PIECES = [
         (1152, None, S, 1, 0, 1), (1151, None, B, 2, 0, 0)]),
     ("sink", "Sink", "ROTATE", "floor", "", [
         (2008, None, F, 0, 0, 0), (2010, None, S, 1, 0, 1), (2009, None, B, 2, 0, 0)]),
-    ("diner_table", "Diner Table", "SINGLE", "floor", "", [(4, None, F, 0, 0, 0)]),
+    ("diner_table", "Counter", "SINGLE", "floor", "", [(4, None, F, 0, 0, 0)]),
     ("flower_vase", "Flower Vase", "SINGLE", "small", "", [(361, None, F, 0, 0, 0)]),
-    ("flower_pot", "Flower Pot", "SINGLE", "floor", "", [(505, None, F, 0, 0, 0)]),
+    ("flower_pot", "Plant Pot", "SINGLE", "floor", "", [(505, None, F, 0, 0, 0)]),
     ("car_picture", "Poster", "SINGLE", "wall", "", [(964, None, F, 0, 0, 0)]),
-    ("dotted_rug", "Dotted Rug", "ROTATE", "floor", "", [(1192, None, F, 0, 0, 0), (1192, TURN, S, 1, 0, 0)]),
-    ("aloe", "Aloe", "SINGLE", "small", "", [(1213, None, F, 0, 0, 0)]),
+    ("dotted_rug", "Modern Rug", "ROTATE", "floor", "", [(1192, None, F, 0, 0, 0), (1192, TURN, S, 1, 0, 0)]),
+    ("aloe", "Aloe Vera", "SINGLE", "small", "", [(1213, None, F, 0, 0, 0)]),
     ("cactus", "Cactus", "SINGLE", "small", "", [(2138, None, F, 0, 0, 0)]),
     # The third batch (2026-10-01).
-    ("diner_seat", "Diner Seat", "ROTATE", "floor", "", [
+    ("diner_seat", "Bar Stool", "ROTATE", "floor", "", [
         (49, None, F, 0, 0, 0), (45, None, S, 1, 0, 1)]),
     ("glass_table", "Glass Table", "ROTATE", "floor", "", [
         (2165, None, F, 0, 0, 0), (2158, CUT["glass_side"], S, 1, 0, 1)]),
-    ("small_table", "Small Table", "SINGLE", "floor", "", [(380, None, F, 0, 0, 0)]),
+    ("small_table", "Side Table", "SINGLE", "floor", "", [(380, None, F, 0, 0, 0)]),
     ("plant", "Plant", "SINGLE", "small", "", [(471, None, F, 0, 0, 0)]),
-    ("sprout_pot", "Sprout Pot", "SINGLE", "small", "", [(673, None, F, 0, 0, 0)]),
+    ("sprout_pot", "Seedling Pot", "SINGLE", "small", "", [(673, None, F, 0, 0, 0)]),
     ("potted_tree", "Potted Tree", "SINGLE", "floor", "", [(1019, CUT["tree"], F, 0, 0, 0)]),
     # The Messy pack draws the table lamp off (1063) and lit (1064); E switches it
     # (2026-10-03). It was 1064 alone, so a lamp saved before reads as off.
@@ -213,11 +213,11 @@ PIECES = [
     ("floor_lamp", "Floor Lamp", "STATE", "floor", "warm", [
         (332, [0, 0, 13, 42, "main"], "off", 0, 0, 0),
         (332, [0, 0, 13, 42, "main", "lit"], "on", 0, 1, 0)]),
-    ("drinks_cart", "Drinks Cart", "SINGLE", "floor", "", [(428, None, F, 0, 0, 0)]),
+    ("drinks_cart", "Bar Cart", "SINGLE", "floor", "", [(428, None, F, 0, 0, 0)]),
     ("striped_rug", "Striped Rug", "ROTATE", "floor", "", [(1097, None, F, 0, 0, 0), (1097, TURN, S, 1, 0, 0)]),
     ("oval_rug", "Small Rug", "ROTATE", "floor", "", [(1112, None, F, 0, 0, 0), (1112, TURN, S, 1, 0, 0)]),
     ("runner_rug", "Runner Rug", "ROTATE", "floor", "", [(2156, None, F, 0, 0, 0), (2156, TURN, S, 1, 0, 0)]),
-    ("decorated_table", "Decorated Table", "ROTATE", "floor", "", [
+    ("decorated_table", "Decorated Shelf", "ROTATE", "floor", "", [
         (1232, None, F, 0, 0, 0), (1229, None, S, 1, 0, 1)]),
 ]
 

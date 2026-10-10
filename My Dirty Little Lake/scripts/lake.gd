@@ -2605,12 +2605,11 @@ func _pad_buttons(busy: bool) -> void:
 	if _settings_open or _controls_open or _farewell != null:
 		return
 	if _shed_open:
-		# The room's own verbs, the shed's R and E. Their own actions, because the buttons
-		# that turn a piece and work a switch in here open the shed and the upgrades out
-		# there: one button, two places, and `Binds` checks a clash inside a context only.
+		# The room's own verbs: R turns (its own action, the button that opens the shed out
+		# there), and Interact works the thing in front of the player, as it does outside.
 		if Input.is_action_just_pressed(&"shed_rotate"):
 			_room.turn_carried()
-		if Input.is_action_just_pressed(&"shed_switch"):
+		if Input.is_action_just_pressed(&"interact"):
 			# The record player's menu is up: the button that put it up puts it away, as E
 			# does on the keyboard, rather than reaching past it to the player again.
 			if _room.record_up():
@@ -3978,7 +3977,7 @@ func _decor_tour_step(delta: float) -> void:
 				# The shelf is opened with a shoulder on the pad, which the card has to say:
 				# nothing on the screen does (issue #33 audit).
 				words = Text.TOUR_DECOR_SHELF_PAD % [
-					Binds.shown(&"zoom_in", true), Binds.shown(&"interact", true),
+					Binds.shown(&"zoom_in", true), Binds.shown(&"open_upgrades", true),
 					Binds.shown(&"shed_rotate", true),
 				]
 			# A piece put down on the floor is the step done: the room's card follows.
@@ -3994,7 +3993,7 @@ func _decor_tour_step(delta: float) -> void:
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
 				lit = _room.room_box()
-			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM % Binds.shown(&"shed_switch", pad), 5, DECOR_TOUR_CARDS)
+			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM % Binds.shown(&"interact", pad), 5, DECOR_TOUR_CARDS)
 
 
 ## A rect in the shed room's own pixels, on the HUD layer the card is drawn on.
@@ -4997,8 +4996,10 @@ func _shop_rows() -> Array:
 		# says the multiplier.
 		[&"recycle_bonus", &"luck", Text.TRACK_RECYCLE_BONUS, "%", func(l: int) -> String:
 			return "%d" % roundi(_track_value(&"recycle_bonus", l) * 100.0)],
+		# Money on both figures, by decision (2026-10-10, Richard): "$26 → $30". The one row
+		# that says its mark twice.
 		[&"bird_worth", &"luck", Text.TRACK_BIRD_WORTH, "", func(l: int) -> String:
-			return "%d" % roundi(_economy.bird_bonus * _track_value(&"bird_worth", l)), "$"],
+			return "$%d" % roundi(_economy.bird_bonus * _track_value(&"bird_worth", l))],
 	]
 	for line: Array in listed:
 		var key: StringName = line[0]
