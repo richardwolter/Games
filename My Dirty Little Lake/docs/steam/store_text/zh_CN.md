@@ -13,26 +13,24 @@ the English field's.
 ## About This Game
 
 ```
-[h2][b][i]轻松解压的温馨游戏。[/i][/b][/h2]
-[p][i][b]升级你的渔网[/b][/i]
-提升力量、尺寸、幸运、双网等能力，把湖里的物品统统捞上来。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]捞到的不全是垃圾。[/i][/b]
+[h2][b][i]轻松解压的温馨游戏。[/i][/b][/h2][p][i][b]升级你的渔网[/b][/i]
+提升力量、尺寸、幸运、双网等能力，把湖里的物品统统捞上来。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]捞到的不全是垃圾。[/i][/b] 
 清洗藏在湖里的宝物，装饰你温馨的房子。
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]从污浊到美景。[/i][/b]
-随着你清理湖泊，看野生动物重回家园。[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]从污浊到美景。[/i][/b] 
+随着你清理湖泊，看野生动物重回家园。 [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]迎战风雨。[/b][/i]
-用你的渔网驯服龙卷风。
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]游戏特色[/i][/b]
+[b][i]迎战风雨。[/i][/b]  
+用你的渔网驯服龙卷风。  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]游戏特色
+[/i][/b]
 
-- 按自己的节奏来玩，游戏里没有任何事会催促你。
-- 支持 Xbox 和 PlayStation 手柄
-- Steam 成就
-- 超过 50 件收藏品等你清洗和装饰
-- 生机勃勃、可以互动的野生动物
+- 按自己的节奏来玩，游戏里没有任何事会催促你。  
+- 支持 Xbox 和 PlayStation 手柄  
+- Steam 成就   
+- 超过 50 件收藏品等你清洗和装饰  
+- 生机勃勃、可以互动的野生动物  
 - 轻松解压的玩法[/p]
 ```
 

@@ -12,26 +12,24 @@ Lanza tu red, limpia un lago sucio y haz que vuelva la naturaleza en este juego 
 ## About This Game
 
 ```
-[h2][b][i]Un juego acogedor, relajante y satisfactorio.[/i][/b][/h2]
-[p][i][b]Mejora tu red[/b][/i]
-Aumenta su fuerza, su tamaño, su suerte, el lanzamiento doble y más para atrapar todos los objetos del lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]No todo lo que encuentras es basura.[/i][/b]
+[h2][b][i]Un juego acogedor, relajante y satisfactorio.[/i][/b][/h2][p][i][b]Mejora tu red[/b][/i]
+Aumenta su fuerza, su tamaño, su suerte, el lanzamiento doble y más para atrapar todos los objetos del lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]No todo lo que encuentras es basura.[/i][/b] 
 Lava tesoros escondidos y decora tu acogedora casa.
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]De la mugre a la belleza.[/i][/b]
-Mira cómo la vida silvestre recupera su lugar mientras limpias el lago.[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]De la mugre a la belleza.[/i][/b] 
+Mira cómo la vida silvestre recupera su lugar mientras limpias el lago. [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]Enfréntate a los elementos.[/b][/i]
-Doma un tornado con tu red.
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]Características[/i][/b]
+[b][i]Enfréntate a los elementos.[/i][/b]  
+Doma un tornado con tu red.  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]Características
+[/i][/b]
 
-- Juega a tu ritmo. En este juego no hay ninguna prisa.
-- Compatible con controles de Xbox y PlayStation
-- Logros de Steam
-- Más de 50 coleccionables para lavar y decorar
-- Vida silvestre animada e interactiva
+- Juega a tu ritmo. En este juego no hay ninguna prisa.  
+- Compatible con controles de Xbox y PlayStation  
+- Logros de Steam   
+- Más de 50 coleccionables para lavar y decorar  
+- Vida silvestre animada e interactiva  
 - Jugabilidad relajante y satisfactoria[/p]
 ```
 

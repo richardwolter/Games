@@ -12,26 +12,24 @@ Translated 2026-10-10 from `en.md`. Paste each block into the matching Steamwork
 ## About This Game
 
 ```
-[h2][b][i]のんびりスッキリ、ほっこりゲーム。[/i][/b][/h2]
-[p][i][b]あみを強化[/b][/i]
-パワー、大きさ、ラッキー投げ、ダブル投げなどを強化して、湖のものをぜんぶ取りましょう。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]取ったものが、ぜんぶゴミとはかぎりません。[/i][/b]
+[h2][b][i]のんびりスッキリ、ほっこりゲーム。[/i][/b][/h2][p][i][b]あみを強化[/b][/i]
+パワー、大きさ、ラッキー投げ、ダブル投げなどを強化して、湖のものをぜんぶ取りましょう。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]取ったものが、ぜんぶゴミとはかぎりません。[/i][/b] 
 かくれたお宝を洗って、居心地のいい家をかざりましょう。
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]よごれた湖から、美しい湖へ。[/i][/b]
-湖をきれいにしていくと、生き物たちがすみかを取りもどしていきます。[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]よごれた湖から、美しい湖へ。[/i][/b] 
+湖をきれいにしていくと、生き物たちがすみかを取りもどしていきます。 [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]自然の力に立ち向かう。[/b][/i]
-たつまきを、あみでしずめましょう。
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]ゲームの特徴[/i][/b]
+[b][i]自然の力に立ち向かう。[/i][/b]  
+たつまきを、あみでしずめましょう。  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]ゲームの特徴
+[/i][/b]
 
-- 自分のペースで遊べます。ゲームにせかされることはありません。
-- XboxとPlayStationのコントローラーに対応
-- Steam実績
-- 洗ってかざれるアイテムが50個以上
-- あなたに反応する、生き生きとした生き物たち
+- 自分のペースで遊べます。ゲームにせかされることはありません。  
+- XboxとPlayStationのコントローラーに対応  
+- Steam実績   
+- 洗ってかざれるアイテムが50個以上  
+- あなたに反応する、生き生きとした生き物たち  
 - のんびりスッキリ、気持ちのいいゲームプレイ[/p]
 ```
 

@@ -12,26 +12,24 @@ Lance ton filet, nettoie un lac crasseux et ramène la nature dans ce jeu cosy e
 ## About This Game
 
 ```
-[h2][b][i]Un jeu cosy, relaxant et satisfaisant.[/i][/b][/h2]
-[p][i][b]Améliore ton filet[/b][/i]
-Augmente sa force, sa taille, sa chance, le lancer double et bien plus pour attraper tous les objets du lac.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]Tout n'est pas bon à jeter.[/i][/b]
+[h2][b][i]Un jeu cosy, relaxant et satisfaisant.[/i][/b][/h2][p][i][b]Améliore ton filet[/b][/i]
+Augmente sa force, sa taille, sa chance, le lancer double et bien plus pour attraper tous les objets du lac.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]Tout n'est pas bon à jeter.[/i][/b] 
 Lave des trésors cachés et décore ta maison douillette.
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]De la crasse à la beauté.[/i][/b]
-Regarde la faune reprendre sa place à mesure que tu nettoies le lac.[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]De la crasse à la beauté.[/i][/b] 
+Regarde la faune reprendre sa place à mesure que tu nettoies le lac. [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]Affronte les éléments.[/b][/i]
-Dompte une tornade avec ton filet.
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]Fonctionnalités[/i][/b]
+[b][i]Affronte les éléments.[/i][/b]  
+Dompte une tornade avec ton filet.  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]Fonctionnalités
+[/i][/b]
 
-- Joue à ton rythme. Rien dans le jeu ne viendra te presser.
-- Compatible avec les manettes Xbox et PlayStation
-- Succès Steam
-- Plus de 50 objets de collection à laver pour décorer ta maison
-- Une faune vivante et interactive
+- Joue à ton rythme. Rien dans le jeu ne viendra te presser.  
+- Compatible avec les manettes Xbox et PlayStation  
+- Succès Steam   
+- Plus de 50 objets de collection à laver pour décorer ta maison  
+- Une faune vivante et interactive  
 - Un gameplay relaxant et satisfaisant[/p]
 ```
 

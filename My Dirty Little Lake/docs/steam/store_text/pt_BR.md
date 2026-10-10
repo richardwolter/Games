@@ -9,26 +9,24 @@ Lance sua rede para limpar um lago sujo e trazer a natureza de volta neste jogo 
 ## About This Game
 
 ```
-[h2][b][i]Um jogo aconchegante, relaxante e satisfatório.[/i][/b][/h2]
-[p][i][b]Melhore sua rede[/b][/i]
-Aumente a força, o tamanho, a sorte, o lançamento duplo e muito mais para pegar todos os objetos do lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]Nem tudo o que você encontra é lixo.[/i][/b]
+[h2][b][i]Um jogo aconchegante, relaxante e satisfatório.[/i][/b][/h2][p][i][b]Melhore sua rede[/b][/i]
+Aumente a força, o tamanho, a sorte, o lançamento duplo e muito mais para pegar todos os objetos do lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]Nem tudo o que você encontra é lixo.[/i][/b] 
 Lave tesouros escondidos e decore sua casa aconchegante.
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]Da sujeira à beleza.[/i][/b]
-Veja a vida selvagem voltar ao seu lugar enquanto você limpa o lago.[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]Da sujeira à beleza.[/i][/b] 
+Veja a vida selvagem voltar ao seu lugar enquanto você limpa o lago. [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]Enfrente os elementos.[/b][/i]
-Dome um tornado com sua rede.
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]Recursos[/i][/b]
+[b][i]Enfrente os elementos.[/i][/b]  
+Dome um tornado com sua rede.  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]Recursos
+[/i][/b]
 
-- Jogue no seu ritmo. Nada no jogo vai te apressar.
-- Suporte a controles de Xbox e PlayStation
-- Conquistas Steam
-- Mais de 50 colecionáveis para lavar e decorar
-- Vida selvagem viva e interativa
+- Jogue no seu ritmo. Nada no jogo vai te apressar.  
+- Suporte a controles de Xbox e PlayStation  
+- Conquistas Steam   
+- Mais de 50 colecionáveis para lavar e decorar  
+- Vida selvagem viva e interativa  
 - Jogabilidade relaxante e satisfatória[/p]
 ```
 

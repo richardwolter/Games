@@ -12,26 +12,24 @@ Translated 2026-10-10 from `en.md`. Paste each block into the matching Steamwork
 ## About This Game
 
 ```
-[h2][b][i]느긋하고 속 시원한 힐링 게임.[/i][/b][/h2]
-[p][i][b]그물을 업그레이드해요[/b][/i]
-힘, 크기, 행운, 쌍그물 등을 강화해서 호수에 있는 물건을 모두 잡아요.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]건져 올린 게 다 쓰레기는 아니에요.[/i][/b]
+[h2][b][i]느긋하고 속 시원한 힐링 게임.[/i][/b][/h2][p][i][b]그물을 업그레이드해요[/b][/i]
+힘, 크기, 행운, 쌍그물 등을 강화해서 호수에 있는 물건을 모두 잡아요.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]건져 올린 게 다 쓰레기는 아니에요.[/i][/b] 
 숨은 보물을 씻어서 아늑한 집을 꾸며요.
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]구정물에서 아름다운 호수로.[/i][/b]
-호수를 치울수록 야생 동물이 제자리를 되찾아요.[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]구정물에서 아름다운 호수로.[/i][/b] 
+호수를 치울수록 야생 동물이 제자리를 되찾아요. [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]자연의 힘에 맞서요.[/b][/i]
-그물로 토네이도를 길들여요.
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]특징[/i][/b]
+[b][i]자연의 힘에 맞서요.[/i][/b]  
+그물로 토네이도를 길들여요.  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]특징
+[/i][/b]
 
-- 내 속도대로 즐겨요. 게임이 재촉하는 일은 없어요.
-- Xbox 및 PlayStation 컨트롤러 지원
-- Steam 도전 과제
-- 씻어서 꾸밀 수 있는 수집품 50개 이상
-- 살아 움직이고 상호작용할 수 있는 야생 동물
+- 내 속도대로 즐겨요. 게임이 재촉하는 일은 없어요.  
+- Xbox 및 PlayStation 컨트롤러 지원  
+- Steam 도전 과제   
+- 씻어서 꾸밀 수 있는 수집품 50개 이상  
+- 살아 움직이고 상호작용할 수 있는 야생 동물  
 - 편안하고 속 시원한 게임 플레이[/p]
 ```
 

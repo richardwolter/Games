@@ -12,26 +12,24 @@ Wirf dein Netz aus, mach einen verdreckten See sauber und hol die Natur zurück 
 ## About This Game
 
 ```
-[h2][b][i]Ein gemütliches Spiel zum Entspannen und Wohlfühlen.[/i][/b][/h2]
-[p][i][b]Verbessere dein Netz[/b][/i]
-Steigere Stärke, Größe, Glück, Doppelwurf und mehr, um alle Objekte im See zu fangen.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
-[p][b][i]Nicht jeder Fund ist Müll.[/i][/b]
+[h2][b][i]Ein gemütliches Spiel zum Entspannen und Wohlfühlen.[/i][/b][/h2][p][i][b]Verbessere dein Netz[/b][/i]
+Steigere Stärke, Größe, Glück, Doppelwurf und mehr, um alle Objekte im See zu fangen.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]Nicht jeder Fund ist Müll.[/i][/b] 
 Wasch versteckte Schätze und dekoriere dein gemütliches Haus.
-[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
-[p][b][i]Vom Dreck zur Pracht.[/i][/b]
-Sieh zu, wie sich die Tierwelt ihren Platz zurückholt, während du den See sauber machst.[/p]
-[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]Vom Dreck zur Pracht.[/i][/b] 
+Sieh zu, wie sich die Tierwelt ihren Platz zurückholt, während du den See sauber machst. [/p][p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img] [b][i]
+[/i][/b]
 
-[i][b]Trotze den Elementen.[/b][/i]
-Bändige einen Tornado mit deinem Netz.
-[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
-[p][b][i]Features[/i][/b]
+[b][i]Trotze den Elementen.[/i][/b]  
+Bändige einen Tornado mit deinem Netz.  
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p][p]
+[b][i]Features
+[/i][/b]
 
-- Spiel in deinem eigenen Tempo. Nichts im Spiel setzt dich unter Druck.
-- Controller-Unterstützung für Xbox und PlayStation
-- Steam-Errungenschaften
-- Über 50 Sammelobjekte zum Waschen und Dekorieren
-- Lebendige Tierwelt, mit der du interagieren kannst
+- Spiel in deinem eigenen Tempo. Nichts im Spiel setzt dich unter Druck.  
+- Controller-Unterstützung für Xbox und PlayStation  
+- Steam-Errungenschaften   
+- Über 50 Sammelobjekte zum Waschen und Dekorieren  
+- Lebendige Tierwelt, mit der du interagieren kannst  
 - Entspanntes Gameplay, das einfach guttut[/p]
 ```
 
