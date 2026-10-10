@@ -11,8 +11,8 @@ Lance sua rede para limpar um lago sujo e trazer a natureza de volta neste jogo 
 ```
 [h2][b][i]Um jogo aconchegante, relaxante e satisfatório.[/i][/b][/h2]
 [p][i][b]Melhore sua rede[/b][/i]
-Aumente a Força, o Tamanho, a Sorte, o Dobro e muito mais para pegar todos os objetos do lago.[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
-[p][b][i]Nem tudo o que você acha é lixo.[/i][/b]
+Aumente a força, o tamanho, a sorte, o lançamento duplo e muito mais para pegar todos os objetos do lago.[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
+[p][b][i]Nem tudo o que você encontra é lixo.[/i][/b]
 Lave tesouros escondidos e decore sua casa aconchegante.
 [video mp4="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.mp4" webm="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.webm" poster="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.poster.avif" autoplay="true" controls="false"][/video][/p]
 [p][b][i]Da sujeira à beleza.[/i][/b]
@@ -98,3 +98,8 @@ Left for Richard:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Owner decisions (2026-10-10)
+
+- Upgrade list in plain words: "a força, o tamanho, a sorte, o lançamento duplo" (was the shop's row names, "o Dobro" unclear to a store reader).
+- "Nem tudo o que você encontra é lixo" (was "acha", which can read as "think").
