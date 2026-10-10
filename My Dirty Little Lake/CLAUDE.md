@@ -6812,6 +6812,17 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   1 is traded for a tier 0-1 piece from past it (`LakeGrid._lighten_reach`, the ring's trade),
   bar `Demo.HEAVY_KEEP` (12%) left sprinkled where rolled, so no ring is ever wholly cleared.
   Range and Width stop at level 4 in the demo.
+- **Tier 3-4 by the island** (same day): the ring keeps `Demo.RING_TEASE` (6%) of its tier
+  3-4 pieces in the demo instead of trading them all out. Strength 1 never lifts them.
+- **Locks against turning the demo into the full game** (same day): `Demo.on()` is the
+  `demo` feature tag **or** `res://demo.flag`, a file only the demo preset packs (the full
+  preset excludes it), read only in an exported game (the editor build runs from source, where
+  the file exists). An `override.cfg` could reach a feature tag; taking the file out means
+  repacking the pck. Every save carries `"demo"`, and a demo save never loads in the full game
+  nor a full save in the demo. Levels are clamped to the caps on load, so an edited save buys
+  nothing. **Not protected**: the pck holds the whole game, so someone who unpacks it and
+  runs it in Godot gets everything. Only PCK encryption (a custom-compiled export template
+  with a key) closes that, not done.
   Same piece count, no re-pricing, by decision: the demo will likely run shorter.
 - **The finale tornado takes 5 hits** (`Demo.TORNADO_HITS`, `Tornado.need_next`).
 - **The ending's doors are Wishlist now and Back to lake** (`Farewell.lake_door`,

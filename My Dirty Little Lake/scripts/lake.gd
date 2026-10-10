@@ -7203,6 +7203,7 @@ func save_game() -> bool:
 
 	var save := {
 		"version": SAVE_VERSION,
+		"demo": Demo.on(),
 		"seed": _level_seed(),
 		"level": level_name(),
 		"sludge": sludge,
@@ -7324,6 +7325,10 @@ func load_game() -> bool:
 	var written := int(save.get("version", 0))
 	var readable := written == SAVE_VERSION
 	if not readable or int(save.get("seed", 0)) != _level_seed():
+		return false
+	# A demo run never loads in the full game and a full run never loads in the demo, however
+	# the file got there.
+	if bool(save.get("demo", false)) != Demo.on():
 		return false
 	if not _grid.restore(save.get("stacks", []) as Array):
 		return false

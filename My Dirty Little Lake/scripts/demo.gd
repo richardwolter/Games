@@ -55,6 +55,9 @@ const LIGHT_TIER := 1
 ## Share of the heavier pieces in reach left where they were rolled, sprinkled about so no
 ## ring round the island is ever wholly cleared: a tease of what Strength buys.
 const HEAVY_KEEP := 0.12
+## Share of the tier 3-4 pieces the island's ring keeps in the demo (the full game trades them
+## all out): a few heavy pieces right by the island that the demo's net can never lift.
+const RING_TEASE := 0.06
 ## Net hits to tame the finale tornado.
 const TORNADO_HITS := 5
 
@@ -85,8 +88,18 @@ const PRICES := {
 static var forced := false
 
 
+## Two locks, either one enough: the export's `demo` feature tag, and `res://demo.flag`, a file
+## only the demo preset packs (the full preset excludes it). A feature tag lives in the project
+## settings an `override.cfg` beside the exe could reach; a file in the pack cannot be taken
+## out without unpacking and repacking the game. The file is only read in an exported game:
+## the editor build runs the project from source, where the file always exists.
 static func on() -> bool:
-	return forced or OS.has_feature("demo")
+	if forced or OS.has_feature("demo"):
+		return true
+	return not OS.has_feature("editor") and FileAccess.file_exists(FLAG)
+
+
+const FLAG := "res://demo.flag"
 
 
 ## Where a track stops: the demo's cap, never past the full game's own.

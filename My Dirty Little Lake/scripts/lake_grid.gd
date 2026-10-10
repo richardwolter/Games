@@ -1981,6 +1981,8 @@ func _lighten_ring(ring_tiles: PackedInt32Array) -> void:
 			var tier := defs[stack[k]].tier
 			if tier == 0 or (tier <= RING_TIER and _rng.randf() < RING_BAIT):
 				continue
+			if tier >= 3 and Demo.on() and _rng.randf() < Demo.RING_TEASE:
+				continue
 			var partner := Vector2i(-1, -1)
 			var bin := _up_bin(k, stack.size())
 			for tries in light.size():
