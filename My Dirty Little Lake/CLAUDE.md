@@ -2182,6 +2182,15 @@ spaces only, and a Japanese or Chinese sentence has none, so it reached them as 
   (`Decorar %d`).
 - English was then shown to Richard beside the PT (the same artifact, `en_review`
   collection) for his read.
+- **The Steam store page is in all eight languages** (2026-10-10, issues #28 and #36):
+  `docs/steam/store_text/<locale>.md` (short description, About This Game, back-translation,
+  review notes), translated **from the English store text**, not the PT, by the same
+  translator-then-independent-reviewer pipeline. `steamworks/storepage_1357804_<steamlang>.json`
+  are the import files, built on Steamworks' own English export (Store Page > localization
+  export, JSON) with only the words swapped, so the layout is what Steamworks holds; Spanish
+  goes in both `spanish` and `latam`. **To change the store text**: export English again,
+  re-translate the `.md` files, rebuild the JSON on the fresh export. The import shows no
+  confirmation; check by switching the Description section's language.
 
 ### Portuguese Is the Source (2026-09-29, Richard)
 Richard rewrote 85 strings in Portuguese in an artifact (see memory `lake-pt-rewrite-artifact`);
