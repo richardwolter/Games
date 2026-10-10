@@ -6759,8 +6759,21 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
 - **Cut by caps** (`Demo.CAPS`, read by `Lake._level_cap`): every track stops short (Range 4,
   Strength 1, Catch 3, ...), so only the water round the island is worked. A capped row reads
   MAX; nothing says what is locked, by decision. `Demo.PRICES` overrides prices
-  (`Lake.cost_of`); **empty, so the demo runs on the full game's prices until its economy
-  pass** (the sim with a demo spec, then a logged run).
+  (`Lake.cost_of`), written by `docs/progression/price_demo.py --write`.
+- **Priced by the sim** (`price_demo.py`, outputs in `docs/progression/demo/`): the shop
+  model cut to the demo's caps, every level scheduled by minute 18 and priced at income times
+  a gap (12 s early to 40 s at minute 18), a bot buying the cheapest level. Converged: every
+  level by minute 18 in the sim (about 34k in all), the water in reach running dry at about
+  minute 25 (10% of the lake), so nothing is priced past what the reach can pay. Steering by
+  the bot's own purchase times oscillated, and the value bot hoarded, so neither is used.
+  **Calls for a logged demo run**; the 25 minutes is the sim plus a player's pace.
+- **`build_shop.py` reads the current economy** (same day): it still read `pollution` off
+  the trash `.tres` files, deleted 2026-10-01, and failed. A tier's pay and count now come
+  from `EconomyConfig.piece_prices` weighted by `tools/last_fill_economy.log`'s mix (re-run
+  `probe_fill_economy` if the fill changes). The full game's sim still clears in 50 min.
+- **Wishlist Now** (`DEMO_WISHLIST`): a water plank with gold motes in the main menu's top
+  right, left of the flag, and a door beside Back to menu at the end; both open
+  `Demo.STORE_URL`. Demo only.
 - **The finale** (`_demo_step`, `demo_bought_out`, `_end_demo`): the last level bought brings
   down one tornado (the run's first, 3 hits); when it ends, tamed or not, the farewell comes
   up with the demo's words (`DEMO_LINE_1/2`), the credits and a **Wishlist** door
@@ -6771,8 +6784,8 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
 - **Finds** are dealt only within `Demo.REACH` (9) tiles of the shelf and up to tier
   `Demo.FIND_TIER` (1), never under heavier rubbish; the rest are not dealt.
 - Machine drafts for the three new strings. All caps and reach first guesses.
-- **Open**: the demo economy (prices, the 25 minutes), what Continue does on a finished demo
-  save, the demo's Steam app id and depot. `test_lake`'s `_check_demo` guards the caps, the
+- **Continue on a finished demo** loads the lake as left, everything bought (Richard's call).
+- **Open**: a logged demo run to judge the 25 minutes, the demo's Steam app id and depot. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
 ### Archive

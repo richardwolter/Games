@@ -99,6 +99,8 @@ var _confirm: MenuConfirm
 ## The language chooser (2026-09-26): a flag in the top right corner, apart from the doors
 ## and from the settings, opening a board of flags.
 var _flag: PlankButton
+## The demo's Wishlist Now door (2026-10-09), in the top right beside the flag: the store page.
+var _wish: PlankButton
 var _languages: LanguageBoard
 ## Whether the doors answer. Not while the menu is fading either way: a plank pressed on its
 ## way out is a second answer to a question already answered.
@@ -153,6 +155,16 @@ func _ready() -> void:
 	_flag.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_flag.pressed.connect(_take.bind(&"language"))
 	add_child(_flag)
+	if Demo.on():
+		_wish = PlankButton.new()
+		_wish.name = &"Wishlist"
+		_wish.label = Text.DEMO_WISHLIST
+		_wish.size = PLANK
+		_wish.water = true
+		# Not accented: that is the door into the lake's alone. Gold motes say it instead.
+		_wish.pulse = 0.5
+		_wish.pressed.connect(_take.bind(&"wishlist"))
+		add_child(_wish)
 	Prefs.language_changed.connect(_on_language)
 
 	_settings = SettingsSkin.new()
@@ -239,6 +251,10 @@ func _lay_out() -> void:
 	_flag.flag = LanguageBoard.flag_of(Prefs.current_entry())
 	_flag.size = FLAG_BUTTON
 	_flag.position = Vector2(size.x - FLAG_INSET.x - FLAG_BUTTON.x, FLAG_INSET.y).floor()
+	if _wish != null:
+		_wish.label = Text.DEMO_WISHLIST
+		_wish.size = PLANK
+		_wish.position = Vector2(_flag.position.x - GAP - PLANK.x, FLAG_INSET.y).floor()
 	var shown: Array = []
 	for door: Dictionary in DOORS:
 		var key: StringName = door["key"]
@@ -305,7 +321,7 @@ func _take(key: StringName) -> void:
 	var asks := key == &"new" and has_run
 	if key == &"quit":
 		Sfx.ui(&"ui_close")
-	elif key in [&"settings", &"credits", &"how", &"language"] or asks:
+	elif key in [&"settings", &"credits", &"how", &"language", &"wishlist"] or asks:
 		# A question only; the start sound waits for the answer.
 		Sfx.ui(&"ui_click")
 	match key:
@@ -324,6 +340,8 @@ func _take(key: StringName) -> void:
 			_show_credits(true)
 		&"language":
 			_show_languages(true)
+		&"wishlist":
+			OS.shell_open(Demo.STORE_URL)
 		&"quit":
 			if quit_asked.get_connections().is_empty():
 				get_tree().quit()
@@ -479,5 +497,7 @@ func pad_focus() -> Array:
 		var plank: PlankButton = _planks[door["key"]]
 		if plank.visible:
 			out.append({"box": plank.get_rect(), "key": door["key"], "first": plank.accent})
+	if _wish != null:
+		out.append({"box": _wish.get_rect(), "key": &"wishlist"})
 	out.append({"box": _flag.get_rect(), "key": &"language"})
 	return out

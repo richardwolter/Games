@@ -9,7 +9,7 @@ class_name Demo
 extends RefCounted
 
 ## The store page the Wishlist door opens.
-const STORE_URL := "https://store.steampowered.com/app/5375170/"
+const STORE_URL := "https://store.steampowered.com/app/5375170/My_Dirty_Little_Lake/"
 ## Its own save, so a demo run never meets a full game's file.
 const SAVE_PATH := "user://my_dirty_little_lake_demo.save"
 
@@ -41,8 +41,26 @@ const REACH := 9.0
 const FIND_TIER := 1
 
 ## Prices the demo sets for itself, `track: [price_base, price_mult]`. A track missing here
-## keeps the full game's price. Empty until the demo's economy pass.
-const PRICES := {}
+## keeps the full game's price. Written by `docs/progression/price_demo.py --write`.
+const PRICES := {
+	&"net_width": [130, 1.88],
+	&"net_strength": [700, 3.47],
+	&"net_range": [110, 2.96],
+	&"reel": [130, 1.88],
+	&"net_hold": [95, 3.5],
+	&"boat_speed": [120, 2.23],
+	&"cargo": [95, 3.5],
+	&"boat_volley": [900, 2.49],
+	&"fleet": [160, 2.5],
+	&"dog_fetch": [850, 1.8],
+	&"dog_wait": [850, 2.2],
+	&"dog_strength": [1100, 2.2],
+	&"dog_count": [250, 2],
+	&"recycle_bonus": [75, 3.5],
+	&"bird_worth": [95, 3.5],
+	&"lucky_haul": [95, 3.5],
+	&"double_cast": [95, 3.5],
+}
 
 ## A test may switch the demo on by hand; otherwise the export's feature tag decides.
 static var forced := false

@@ -1,0 +1,70 @@
+{
+ "net_width": [
+  130,
+  1.88
+ ],
+ "net_strength": [
+  700,
+  3.47
+ ],
+ "net_range": [
+  110,
+  2.96
+ ],
+ "reel": [
+  130,
+  1.88
+ ],
+ "net_hold": [
+  95,
+  3.5
+ ],
+ "lucky_haul": [
+  95,
+  3.5
+ ],
+ "double_cast": [
+  95,
+  3.5
+ ],
+ "boat_speed": [
+  120,
+  2.23
+ ],
+ "cargo": [
+  95,
+  3.5
+ ],
+ "fleet": [
+  160,
+  2.5
+ ],
+ "boat_volley": [
+  900,
+  2.49
+ ],
+ "dog_fetch": [
+  850,
+  1.8
+ ],
+ "dog_wait": [
+  850,
+  2.2
+ ],
+ "dog_count": [
+  250,
+  2.0
+ ],
+ "dog_strength": [
+  1100,
+  2.2
+ ],
+ "recycle_bonus": [
+  75,
+  3.5
+ ],
+ "bird_worth": [
+  95,
+  3.5
+ ]
+}

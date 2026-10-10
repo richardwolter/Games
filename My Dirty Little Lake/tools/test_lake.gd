@@ -2217,6 +2217,19 @@ func _check_demo() -> void:
 	_check(int(_main.call(&"_level_cap", &"net_range")) == Demo.CAPS[&"net_range"],
 		"the demo caps Range", "")
 	for what: StringName in Lake.TRACKS:
+		_main.set(String(what) + "_level", 0)
+	var price: Array = Demo.PRICES[&"net_strength"]
+	_check(is_equal_approx(float(_main.call(&"cost_of", &"net_strength")), float(price[0])),
+		"the demo's own price", str(_main.call(&"cost_of", &"net_strength")))
+	var demo_total := 0.0
+	for what: StringName in Lake.TRACKS:
+		for level in int(Demo.CAPS.get(what, 0)):
+			_main.set(String(what) + "_level", level)
+			demo_total += float(_main.call(&"cost_of", what))
+	_check(demo_total > 10000.0 and demo_total < 60000.0, "the demo's whole shop costs a demo's worth",
+		str(round(demo_total)))
+	_check(Demo.STORE_URL.contains("5375170"), "the Wishlist door goes to the game's store page", "")
+	for what: StringName in Lake.TRACKS:
 		_main.set(String(what) + "_level", int(Demo.CAPS.get(what, 0)))
 	_check(bool(_main.call(&"demo_bought_out")), "every track at its demo cap is bought out", "")
 	_main.set("reel_level", int(Demo.CAPS[&"reel"]) - 1)

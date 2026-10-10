@@ -46,8 +46,26 @@ TIER_STEP = economy.get("tier_pay_step", 0.5)
 tiers = {}
 for f in glob.glob(f"{ROOT}/resources/trash/*.tres"):
     d = tres(f)
-    tiers.setdefault(int(d["tier"]), []).append(d["pollution"])
+    tiers.setdefault(int(d["tier"]), []).append(d.get("pollution", 0.0))
 pollution = {t: sum(v) / len(v) for t, v in tiers.items()}
+
+# Since 2026-10-01 a piece pays EconomyConfig.piece_prices (material * 5 + tier) and the kinds
+# carry no pollution, so a tier's pay and its count in the water are read off the fill probe
+# (tools/probe_fill_economy.tscn -> tools/last_fill_economy.log, "mix <material> t0..t4"):
+# the pieces of each material and tier in a fresh lake, DENSITY already in them.
+FILL = {}
+TIER_PAY = {}
+_prices = re.search(r"piece_prices = PackedFloat32Array\(([^)]*)\)",
+                    open(f"{ROOT}/resources/economy.tres", encoding="utf8").read())
+if _prices:
+    _prices = [float(x) for x in _prices.group(1).split(",")]
+    for line in open(f"{ROOT}/tools/last_fill_economy.log", encoding="utf8"):
+        m = re.match(r"^mix (\d) (.+)$", line.strip())
+        if m:
+            FILL[int(m.group(1))] = [int(x) for x in m.group(2).split()]
+    for t in sorted(tiers):
+        n = sum(FILL[k][t] for k in FILL)
+        TIER_PAY[t] = sum(FILL[k][t] * _prices[k * 5 + t] for k in FILL) / max(n, 1)
 
 # The lake holds DENSITY times the pieces the calibration probe counted (LakeGrid.DENSITY,
 # 2026-09-24): every stack past the island's ring is that many times deeper, and the strand is
@@ -56,6 +74,9 @@ DENSITY = 2
 STRAND = cal["strand"]
 UNITS = {int(t): n for t, n in cal["units_by_tier"].items()}
 UNITS = {t: (n - (STRAND if t == 0 else 0)) * DENSITY + (STRAND if t == 0 else 0) for t, n in UNITS.items()}
+if FILL:
+    UNITS = {t: sum(FILL[k][t] for k in FILL) for t in sorted(tiers)}
+    UNITS[0] += STRAND
 LAKE = sum(UNITS.values()) - STRAND
 LAKE_R = math.sqrt(40 * 34)
 ISLAND_R = math.sqrt(8 * 6.8) + 2.2
@@ -90,10 +111,12 @@ for t in sorted(tiers):
     pid = f"lake_t{t}"
     stats[f"k_units_t{t}"] = UNITS[t] - (STRAND if t == 0 else 0)
     pools[pid] = {"units": f"k_units_t{t}",
-                  "value": f"(piece_base_pay + {pollution[t]:.2f} * piece_filth_pay) * {1 + TIER_STEP * t:.2f}"}
+                  "value": f"{TIER_PAY[t]:.3f}" if TIER_PAY else
+                  f"(piece_base_pay + {pollution[t]:.2f} * piece_filth_pay) * {1 + TIER_STEP * t:.2f}"}
     catch_from.append({"pool": pid, "gate": f"net_power >= {t}", "share": "coverage"})
     access_terms.append(f"max(0, pool_{pid} - k_units_t{t} * (1 - coverage)) * (net_power >= {t})")
-pools["strand"] = {"units": STRAND, "value": f"piece_base_pay + {pollution[0]:.2f} * piece_filth_pay"}
+pools["strand"] = {"units": STRAND, "value": f"{TIER_PAY[0]:.3f}" if TIER_PAY else
+                   f"piece_base_pay + {pollution[0]:.2f} * piece_filth_pay"}
 catch_from.append({"pool": "strand", "share": "strand_reach"})
 access_terms.append("max(0, pool_strand - k_strand * (1 - strand_reach))")
 pools["box"] = {"units": 0}
