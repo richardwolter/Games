@@ -17,9 +17,9 @@ const SAVE_PATH := "user://my_dirty_little_lake_demo.save"
 ## its row reads "Not on Demo" (`Text.DEMO_LOCKED`).
 ## First guesses, for the demo's economy pass and Richard's logged run.
 const CAPS := {
-	&"net_width": 6,
+	&"net_width": 5,
 	&"net_strength": 1,
-	&"net_range": 4,
+	&"net_range": 5,
 	&"reel": 0,
 	&"net_hold": 3,
 	&"boat_speed": 5,
@@ -48,15 +48,16 @@ const TEASE_FROM := 14.0
 const TEASE_SHOWN := 0.4
 
 ## Prices the demo sets for itself, `track: [price_base, price_mult]`. A track missing here
-## keeps the full game's price. Written by `docs/progression/price_demo.py --write`.
+## keeps the full game's price. Written by `docs/progression/price_demo.py --write`, then
+## Range, Sailing, Capacity and Pigeons cut by hand (Richard, 2026-10-10): re-pin after a re-run.
 const PRICES := {
 	&"net_width": [140, 2.06],
 	&"net_strength": [1100, 3.47],
-	&"net_range": [110, 3.4],
+	&"net_range": [100, 2],
 	&"reel": [450, 1.18],
 	&"net_hold": [100, 3.5],
-	&"boat_speed": [130, 2.48],
-	&"cargo": [110, 3.4],
+	&"boat_speed": [130, 1.9],
+	&"cargo": [110, 2.3],
 	&"boat_volley": [160, 2.49],
 	&"fleet": [110, 3.5],
 	&"dog_fetch": [500, 1.8],
@@ -64,7 +65,7 @@ const PRICES := {
 	&"dog_strength": [1900, 2.2],
 	&"dog_count": [300, 2],
 	&"recycle_bonus": [1300, 1.61],
-	&"bird_worth": [1300, 1.8],
+	&"bird_worth": [250, 1.8],
 	&"lucky_haul": [100, 3.5],
 	&"double_cast": [100, 3.5],
 }
