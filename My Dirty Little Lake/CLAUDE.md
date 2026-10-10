@@ -1853,6 +1853,10 @@ shed's shelf has a door to the wash room.
   the shop in the HUD layer so nothing of the shop covers it. The corner plate is not drawn
   meanwhile and coins aim at the hung one (`coin_centre` reads `money_drawn_box`). One
   purse, by decision: no second figure drawn on the shop.
+  The lake asks `purse_box` **last** in `_update_hud`, after handing over rows and legend,
+  and `purse_box` lays the boards out first if the row count moved (`_lay_out_rows`): asked
+  before, on the opening frame it read the empty shop's one-row boards and hung the purse
+  over the net board's Range and Reel rows (2026-10-10).
 - **The wash plank stands clear of the last row** (`ShedRoom.WASH_UNDER_ROWS` 14, counted
   in `_scroll_by`'s span): under a single find its built frame and gold glow ran up into
   the row above.

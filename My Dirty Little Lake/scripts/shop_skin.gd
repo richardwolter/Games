@@ -612,16 +612,22 @@ func _process(delta: float) -> void:
 		if _sparkle <= 0.0:
 			_sparkling = &""
 		queue_redraw()
-	# The rows are set from outside, and how many there are is what the boards are sized by.
-	if _laid_rows != rows.size():
-		_laid_rows = rows.size()
-		_lay_out()
+	_lay_out_rows()
 	# Only when the boards would come out different. The lake hands over a fresh `rows`
 	# every frame the menu is open, but its contents only change when a level or the purse
 	# does — and repainting eleven priced rows to put back the same eleven prices is the
 	# most expensive way to do nothing.
 	if _painted != _paint_key():
 		queue_redraw()
+
+
+## The rows are set from outside, and how many there are is what the boards are sized by:
+## laid again whenever that count moved. Asked by `purse_box` too, which the lake calls in the
+## same frame it hands over the rows, before this control's own `_process` has run.
+func _lay_out_rows() -> void:
+	if _laid_rows != rows.size():
+		_laid_rows = rows.size()
+		_lay_out()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -1314,7 +1320,13 @@ static func bonus_star_at(panel: Rect2, words: Rect2, left: bool, across: float,
 ## upgrade menu"). The HUD's own money plate sits under the first board, so it is hung here
 ## instead: under the first board, centred on it, in the room between its foot and the
 ## pricing plate's side. `wanted` is the plate's own size. Empty until the boards are laid.
+##
+## Lays the boards out first if the rows changed (2026-10-10): on the frame the shop opens the
+## lake hands over the rows and asks for this before `_process` has run, and the boards it
+## read were still the empty shop's, one row each, so the purse hung over the net board's
+## fourth and fifth rows for that frame — the frame a probe photographs.
 func purse_box(wanted: Vector2) -> Rect2:
+	_lay_out_rows()
 	var first := Rect2()
 	for box: Rect2 in _boards.values():
 		if first.size.x <= 0.0 or box.position.x < first.position.x:

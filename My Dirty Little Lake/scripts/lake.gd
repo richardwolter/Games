@@ -7135,9 +7135,9 @@ func _update_hud() -> void:
 	_open_upgrades.note = Text.HUD_AVAILABLE % affordable
 	_skin.hint = _last_pieces_line()
 
-	# The purse hangs under the shop's first board while it is up, and goes home after.
-	_skin.purse_over = _shop_skin.purse_box(_skin.money_size()) if _menu_open else Rect2()
 	if not _menu_open:
+		# The purse goes home with the shop closed.
+		_skin.purse_over = Rect2()
 		return
 	_shop_skin.rows = _shop_rows()
 	# Read every frame the board is up, like the rows, so a language change reaches them.
@@ -7145,6 +7145,9 @@ func _update_hud() -> void:
 	_shop_skin.headings = ShopSkin.spoken(ShopSkin.HEADING_KEYS)
 	_shop_skin.tour_pad = Pad.is_pad()
 	_shop_skin.legend = _shop_legend()
+	# The purse hangs under the shop's first board while it is up: asked last, once the rows
+	# and the legend are handed over, since those are what the boards are laid out by.
+	_skin.purse_over = _shop_skin.purse_box(_skin.money_size())
 
 
 ## The one thing a filth meter cannot say: how much is left when the answer is "nearly
