@@ -169,6 +169,17 @@ FACE_CORNER = build_recycle_box.MID
 FACE_TOP = 2 * build_recycle_box.ART_TOP - 0.5
 FACE_TALL = float(build_recycle_box.WALL_TALL)
 FACE_MARGIN = (5.0, 3.0, 5.0, 4.0)  # in from the corner, down from the rim, in from the far edge, up from the foot
+## The lit face's room is measured off the box's own picture (2026-10-11, Richard: "it should
+## fit all the side but not surpass the limits"): the run of siding columns between the corner
+## boards, and the rows from under the rim to above the outline at the foot, less
+## EMBLEM_MARGIN px all round. A column is a corner board when one colour covers POST_SHARE of
+## its face rows (siding has a lap seam every board, so no tone holds a column). The emblem is
+## scaled to the largest size that fits; a whole step is taken instead when it is at least
+## EMBLEM_SNAP of that size, otherwise the piece is resampled nearest at the fitted size.
+## FACE_MARGIN is now the wrapped emblem's alone (a mockup option).
+EMBLEM_MARGIN = 1
+POST_SHARE = 0.75
+EMBLEM_SNAP = 0.9
 
 ## The sign (2026-09-13): a post carrying a bare plank. The runtime writes the yard's name
 ## on the plank (Dropoff.sign_text), which is what makes the name translatable; the plank's
@@ -384,23 +395,75 @@ def luma(c):
     return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
 
 
+def lit_face_room(crate):
+    """The lit face's free room, measured off the box picture, in face_of's (u, v) terms:
+    (u_lo, u_hi, v_lo, v_hi), the corner boards, the rim above, the outline and EMBLEM_MARGIN
+    left out. None if the face cannot be found."""
+    cp = crate.load()
+    w, h = crate.width, crate.height
+
+    def outline(x, y):
+        return any(not (0 <= x + dx < w and 0 <= y + dy < h) or cp[x + dx, y + dy][3] == 0
+                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+
+    columns = {}
+    for x in range(FACE_CORNER, w):
+        rows = [y for y in range(h)
+                if cp[x, y][3] > 0 and build_recycle_box.face_right(x + 0.5, y + 0.5) is not None
+                and not outline(x, y)]
+        if not rows:
+            continue
+        tones = {}
+        for y in rows:
+            tones[cp[x, y][:3]] = tones.get(cp[x, y][:3], 0) + 1
+        post = max(tones.values()) >= POST_SHARE * len(rows)
+        columns[x] = (post, rows)
+    # The longest run of siding columns between the boards.
+    best, run = [], []
+    for x in range(FACE_CORNER, w + 1):
+        if x in columns and not columns[x][0]:
+            run.append(x)
+            continue
+        if len(run) > len(best):
+            best = run
+        run = []
+    if not best:
+        return None
+    # Rows in face_of's terms: the face's first row has v in [0, 1).
+    firsts, lasts = [], []
+    for x in best:
+        _, top_row = face_of(x, False)
+        vs = [math.floor(y + 0.5 - top_row) for y in columns[x][1]]
+        firsts.append(min(vs))
+        lasts.append(max(vs))
+    m = EMBLEM_MARGIN
+    return (best[0] - FACE_CORNER + m, best[-1] - FACE_CORNER + 1 - m,
+            max(firsts) + m, min(lasts) + 1 - m)
+
+
 def carve_emblem(image, x0, y0, crate, sprite, wood, style, wrap):
     """Carve `sprite` into the box pasted at (x0, y0): laid on the lit face's parallelogram
-    (both front faces when `wrap`), sized to fill it inside FACE_MARGIN, then a groove of the
-    wood's darkest tone round it and a lit edge along its left and bottom."""
+    (both front faces when `wrap`), sized to the largest that fits the face's measured room
+    (lit_face_room), then a groove of the wood's darkest tone round it and a lit edge along
+    its left and bottom."""
     ink = sprite.getbbox()
     if ink is None:
         return
     sp = sprite.load()
     sw, sh = ink[2] - ink[0], ink[3] - ink[1]
-    left, top, right, bottom = FACE_MARGIN
-    u_lo = -(FACE_CORNER - right) if wrap else left
-    u_hi = FACE_CORNER - right
-    v_lo, v_hi = top, FACE_TALL - bottom
+    room = None if wrap else lit_face_room(crate)
+    if room is not None:
+        u_lo, u_hi, v_lo, v_hi = room
+    else:
+        left, top, right, bottom = FACE_MARGIN
+        u_lo = -(FACE_CORNER - right) if wrap else left
+        u_hi = FACE_CORNER - right
+        v_lo, v_hi = top, FACE_TALL - bottom
     k = min((u_hi - u_lo) / sw, (v_hi - v_lo) / sh)
-    # Whole steps where it fits: the rubbish is drawn at this grain too, so at one step the
-    # emblem is the piece's own pixels.
-    if k >= 1.0:
+    # A whole step where it is near enough the fitted size: the rubbish is drawn at this
+    # grain too, so at one step the emblem is the piece's own pixels. Otherwise the largest
+    # that fits, resampled nearest.
+    if k >= 1.0 and math.floor(k) >= EMBLEM_SNAP * k:
         k = float(math.floor(k))
     eu = (u_lo + u_hi) * 0.5 - sw * k * 0.5
     ev = (v_lo + v_hi) * 0.5 - sh * k * 0.5

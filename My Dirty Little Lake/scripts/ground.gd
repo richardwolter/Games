@@ -213,8 +213,22 @@ const FLOOR_FROM := WOOD_FROM - 1.0
 const FLOOR_SHARE := 0.03
 const FLOOR_PIECES := ["log0", "log1", "log_moss0", "log_moss1", "stick0", "stick1", "stick2",
 	"stick3", "stump"]
-const DRIFTWOOD_SHARE := 0.004
-const DRIFTWOOD_BAND := Vector2(0.6, 2.2)
+## The driftwood lies up the beach, past the rubbish washed up on it (2026-10-11, Richard:
+## "spread out a few more... make sure objects do not spawn underneath it or are hidden by
+## these wood logs"). `DRIFTWOOD_BAND` is where its foot may be, in tiles out of the water,
+## every corner of its drawing (grown `DRIFTWOOD_CLEAR` px) has to be sand, and its drawing
+## has to stay `LITTER_REACH` clear of every tile the strand or the beach's rubbish can hold
+## (`Iso.on_strand`, `Iso.BEACH_LITTER`), so no beach piece can lie on a log, whatever a
+## save holds. Flora, the beach tufts and the
+## animals' spots keep off it through `on_driftwood`. The share was 0.004 in a band from
+## 0.6 tiles and is about twice as many logs now.
+const DRIFTWOOD_SHARE := 0.12
+const DRIFTWOOD_BAND := Vector2(2.4, 4.2)
+const DRIFTWOOD_CLEAR := 6.0
+## Half the widest a washed-up piece is drawn round its tile's middle, world px: the strand
+## and beach rubbish are tier 0 and at most `LakeGrid.STRAND_WIDE` art px across, drawn at
+## 2, and a shore pair lies `LakeGrid.SHORE_APART` of a tile either side.
+const LITTER_REACH := 30.0
 const ROCKS := "res://assets/Forest Isometric Pack Free/Rocks/Slice %d.png"
 const ROCK_COUNT := 5
 const LEAVES := "res://assets/Forest Isometric Pack Free/Leaves/Slice %d.png"
@@ -324,6 +338,8 @@ var _tree_table: Dictionary = {}
 var _tree_art_cache: Dictionary = {}
 var _strips: Dictionary = {}
 var _one_x: Dictionary = {}
+## Every piece of driftwood's drawn box, world px (`_lay_driftwood`).
+var driftwood: Array[Rect2] = []
 
 
 ## The polygon the shader draws the ground on, and its material.
@@ -531,6 +547,7 @@ func _sow() -> void:
 		return
 	if layer != Layer.OUTSIDE:
 		return
+	driftwood.clear()
 	var span := _span()
 	# What each tile's middle is, asked once for the four passes below rather than once a
 	# pass: the ring is tens of thousands of tiles, and the shore-shape maths is most of
@@ -601,7 +618,7 @@ func _sow() -> void:
 					_litter_art(Vector2i(tx, ty), at, _floor_art(piece))
 			elif k == Kind.SAND and out >= DRIFTWOOD_BAND.x and out <= DRIFTWOOD_BAND.y:
 				if _hash(at.x * 3.1 - 5.0, at.y * 6.7 + 1.0) < DRIFTWOOD_SHARE:
-					_litter_art(Vector2i(tx, ty), at, _floor_art("driftwood"))
+					_lay_driftwood(Vector2i(tx, ty), at)
 
 	# The tufts on the beach, just past the lawn's line. Each is rolled a spot inside its
 	# tile rather than standing on the middle, so the scatter does not line up with the
@@ -623,7 +640,60 @@ func _sow() -> void:
 				continue
 			if _hash(at.x * 2.9 + 17.0, at.y * 7.1 - 3.0) > tuft_share:
 				continue
+			if on_driftwood(Iso.tile_to_world(at.x, at.y), 4.0):
+				continue
 			_litter(Vector2i(tx, ty), at)
+
+
+## One piece of driftwood at `at`, if its whole drawing is on sand above the rubbish's band
+## and clear of every log already down. See DRIFTWOOD_BAND.
+func _lay_driftwood(cell: Vector2i, at: Vector2) -> void:
+	var art := _floor_art("driftwood")
+	if art == null:
+		return
+	var foot := Iso.tile_to_world(at.x, at.y)
+	var size := Vector2(art.get_width(), art.get_height()) * _scale_of(art)
+	var box := Rect2(foot - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+	var wide := box.grow(DRIFTWOOD_CLEAR)
+	for corner: Vector2 in [wide.position, Vector2(wide.end.x, wide.position.y), wide.end,
+			Vector2(wide.position.x, wide.end.y), wide.get_center()]:
+		var t := Iso.world_to_tile(corner)
+		if kind_at(t.x, t.y) != Kind.SAND:
+			return
+	# Clear of every tile the beach's rubbish or the strand can hold, at the widest a piece
+	# there is drawn: so whatever a save holds, nothing lies on the wood.
+	var tile := Vector2i(cell)
+	for dx in range(-3, 4):
+		for dy in range(-3, 4):
+			var tx := tile.x + dx
+			var ty := tile.y + dy
+			var mid := Vector2(float(tx) + 0.5, float(ty) + 0.5)
+			if not (Iso.on_strand(tx, ty) or Iso.on_beach_at(mid, Iso.BEACH_LITTER.x, Iso.BEACH_LITTER.y)):
+				continue
+			var at_world := Iso.tile_to_world(mid.x, mid.y)
+			if Rect2(at_world - LITTER_REACH * Vector2(1.0, 1.4), LITTER_REACH * Vector2(2.0, 1.8)).intersects(wide):
+				return
+	for other: Rect2 in driftwood:
+		if other.grow(DRIFTWOOD_CLEAR * 2.0).intersects(box):
+			return
+	driftwood.append(box)
+	_litter_art(cell, at, art)
+
+
+## Whether a world point is on a piece of driftwood's drawing, grown by `grow` px.
+func on_driftwood(world: Vector2, grow: float = 0.0) -> bool:
+	for box: Rect2 in driftwood:
+		if box.grow(grow).has_point(world):
+			return true
+	return false
+
+
+## Whether a drawn box (world px) touches any piece of driftwood's drawing.
+func box_on_driftwood(box: Rect2) -> bool:
+	for wood: Rect2 in driftwood:
+		if wood.intersects(box):
+			return true
+	return false
 
 
 ## The island's tufts, on its grass and its sand alike.

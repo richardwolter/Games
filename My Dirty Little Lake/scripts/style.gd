@@ -471,6 +471,8 @@ static func write(
 ) -> Vector2:
 	if Glyphs.has_tokens(text):
 		return _write_glyphs(on, text, size_px, at, ink, align, within, alpha, cut_in)
+	if not cut_in and text.length() > 1 and text.contains(MONEY_MARK):
+		return _write_money(on, text, size_px, at, ink, align, within, alpha)
 	var face := font()
 	var span := face.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
 	if alpha <= 0.0:
@@ -524,6 +526,79 @@ static func measure(text: String, size_px: int) -> Vector2:
 	if Glyphs.has_tokens(text):
 		return Glyphs.measure(text, font(), size_px)
 	return font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
+
+
+## The money mark, written in green wherever it stands beside a figure (2026-10-11,
+## Richard: "$" in the figures' own gold read as one more digit). Every "$" a line holds is
+## inked by `money_ink`, the rest of the line in its own ink: the money plate, the spend
+## tag, every price tag, the Pigeons row and the pricing plate all go through `write`.
+const MONEY_MARK := "$"
+## The green the mark is drawn in, before it is matched to the figure's brightness: off the
+## pack's grass, the same family as `SAFE`.
+const MONEY_GREEN := Color(0.30, 0.86, 0.30)
+
+
+## The green `$` beside a figure inked `ink`: `MONEY_GREEN` taken towards white or black
+## until it is exactly as bright (relative luminance) as the figure, so the mark reads with
+## the same contrast as the number on every face it sits on, drawn back, glowing or fading
+## with it. Alpha is the figure's.
+static func money_ink(ink: Color) -> Color:
+	var want := ink.get_luminance()
+	var base := MONEY_GREEN
+	var lo := 0.0
+	var hi := 1.0
+	var towards := Color.WHITE if base.get_luminance() < want else Color.BLACK
+	for i in 18:
+		var mid := (lo + hi) * 0.5
+		var c := base.lerp(towards, mid)
+		if (c.get_luminance() < want) == (towards == Color.WHITE):
+			lo = mid
+		else:
+			hi = mid
+	var out := base.lerp(towards, (lo + hi) * 0.5)
+	out.a = ink.a
+	return out
+
+
+## A line holding the money mark: written run by run, each "$" in `money_ink`, the shade and
+## the alignment worked out for the whole line so nothing moves.
+static func _write_money(
+	on: CanvasItem, text: String, size_px: int, at: Vector2, ink: Color, align: int,
+	within: Rect2, alpha: float
+) -> Vector2:
+	var face := font()
+	var span := face.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
+	if alpha <= 0.0:
+		return span
+	var x := at.x
+	if within.size.x > 0.0:
+		x = within.position.x
+		if align == HORIZONTAL_ALIGNMENT_CENTER:
+			x = within.position.x + (within.size.x - span.x) * 0.5
+		elif align == HORIZONTAL_ALIGNMENT_RIGHT:
+			x = within.end.x - span.x
+	var green := money_ink(ink)
+	# Each run is put where the whole line, measured up to it, says it starts: the line's own
+	# kerning, so nothing moves against the line written in one go.
+	var start := 0
+	while start < text.length():
+		var mark := text.find(MONEY_MARK, start)
+		var stop := text.length() if mark < 0 else mark
+		if stop > start:
+			write(on, text.substr(start, stop - start), size_px, Vector2(x + _x_of(text.substr(0, start), size_px), at.y),
+				ink, HORIZONTAL_ALIGNMENT_LEFT, Rect2(), alpha)
+		if mark < 0:
+			break
+		write(on, MONEY_MARK, size_px, Vector2(x + _x_of(text.substr(0, mark), size_px), at.y),
+			green, HORIZONTAL_ALIGNMENT_LEFT, Rect2(), alpha)
+		start = mark + 1
+	return span
+
+
+static func _x_of(head: String, size_px: int) -> float:
+	if head.is_empty():
+		return 0.0
+	return font().get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
 
 
 ## A line carrying pad glyphs (`Glyphs.token`, issue #33): each run of words written the

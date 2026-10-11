@@ -246,15 +246,117 @@ def branch(seed, length, angle, thick):
     for (x, y) in body:
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             if (x + dx, y + dy) not in body: out[(x + dx, y + dy)] = (-2, "wood", 0)
-    x0, y0, w, h = bbox(out)
-    b0 = r.randint(x0 + w // 4, x0 + w // 2); b1 = b0 + r.randint(3, 5)
-    foot = {}
-    for (x, y) in out: foot[x] = max(foot.get(x, -99), y)
-    for (x, y) in list(out):
-        if b0 <= x <= b1 and y >= foot[x] - 2:
-            out[(x, y)] = (1 if y == foot[x] - 2 else 0, "ground", 0)
-    for x, fy in foot.items():
-        if hash2(x, seed, 5) > .35: out.setdefault((x, fy + 1), (-1, "ground", 0))
+    return bury_branch(out, r, seed)
+
+
+# How a branch lies in the sand, rolled per branch (Richard, 2026-10-11: "sand put over the
+# logs under water should be more random, they all look the same"). Odds of where the buried
+# stretch falls; "start" and "end" are the branch's left and right ends on the map.
+BURY_WHERE = (("start", .22), ("end", .22), ("both", .19), ("middle", .2), ("two", .1), ("none", .07))
+
+
+def bury_branch(out, r, seed):
+    """Sand over the branch: where the buried stretch falls, how long it is, how high and
+    lumpy the drift over it stands, whether a lit drift spills out in front and past the
+    tip, a dusting on the bark beside it, and where loose grains fall. All off the branch's
+    own `r`, after its body is drawn, so the wood is what it always was."""
+    foot, top = {}, {}
+    for (x, y) in out:
+        foot[x] = max(foot.get(x, -99), y); top[x] = min(top.get(x, 99), y)
+    xs = sorted(foot); x0, x1 = xs[0], xs[-1]; w = x1 - x0 + 1
+    pick = r.random(); where = BURY_WHERE[-1][0]
+    for name, odds in BURY_WHERE:
+        if pick < odds: where = name; break
+        pick -= odds
+
+    # Stretches as (first x, last x, which end is the branch's tip: -1 left, 1 right, 0 none).
+    def span(frac0, frac1):
+        return max(3, round(w * r.uniform(frac0, frac1)))
+    stretches = []
+    if where in ("start", "both"):
+        stretches.append((x0, x0 + span(.12, .45 if where == "start" else .3) - 1, -1))
+    if where in ("end", "both"):
+        stretches.append((x1 - span(.12, .45 if where == "end" else .3) + 1, x1, 1))
+    if where == "middle":
+        n = max(4, span(.15, .45)); s = r.randint(x0 + w // 6, max(x0 + w // 6, x1 - w // 6 - n + 1))
+        stretches.append((s, s + n - 1, 0))
+    if where == "two":
+        for half in (0, 1):
+            lo = x0 + half * w // 2 + 1; hi = x0 + (half + 1) * w // 2 - 2
+            n = min(span(.08, .2), max(3, hi - lo + 1)); s = r.randint(lo, max(lo, hi - n + 1))
+            stretches.append((s, s + n - 1, 0))
+
+    sand = {}                                       # what the burial lays down, over the wood
+
+    def lay(x, y, off, force=True):
+        if force or (x, y) not in out: sand[(x, y)] = (off, "ground", 0)
+
+    shade_odds = r.uniform(.25, .85)
+    near = []                                        # columns grains like to fall round
+    for (s0, s1, tip) in stretches:
+        s0, s1 = max(s0, x0), min(s1, x1)
+        n = s1 - s0 + 1
+        peak = r.choice((2, 2, 3, 3, 4, 5))
+        deep = r.random() < .25                      # the limb goes right under, a ridge over it
+        shape = r.uniform(.35, 1.3)                  # flat plateau .. pointed hump
+        ramp = r.uniform(.12, .6)                    # an end's rise towards the tip
+        lump = r.choice((0, .5, .9, 1.4)); freq = r.uniform(1.4, 4.0); ls = r.randrange(1 << 20)
+        speck = r.uniform(0, .25)
+        apron = r.random() < .55; apron_lit = r.random() < .55; apron_tall = r.choice((1, 1, 2, 3))
+        spill = r.randint(1, 3) if r.random() < .6 else 0
+        for x in range(s0 - spill, s1 + spill + 1):
+            t = (x - s0 + .5) / n
+            inside = s0 <= x <= s1
+            if tip == -1: p = smoothstep(0, ramp, 1 - t)
+            elif tip == 1: p = smoothstep(0, ramp, t)
+            else: p = math.sin(math.pi * max(0.0, min(1.0, t))) ** shape
+            if not inside:                           # the drift running off past the stretch
+                k = (s0 - x) if x < s0 else (x - s1)
+                p *= max(0.0, 1 - k / (spill + 1))
+            bump = (vnoise(x / freq, 0, ls) - .5) * 2 * lump
+            if x in foot:
+                hgt = foot[x] - top[x] + 1
+                most = hgt + 1 if (deep and inside) else max(1, hgt - 1)
+                d = max(1 if inside and .15 < p else 0, min(most, round(peak * (1.6 if deep else 1) * p + bump)))
+                fy = foot[x]
+            else:                                    # past the branch's own tip: a low mound
+                ref = x0 if x < x0 else x1
+                fy = foot[ref]
+                d = max(0, round((peak - abs(x - ref)) * p + bump * .5))
+            if d <= 0: continue
+            near.append(x)
+            line = fy - d
+            for y in range(line + 1, fy + 1):
+                if y == line + 1: off = 1
+                elif r.random() < speck: off = -1
+                else: off = 0
+                lay(x, y, off)
+            if apron:                                # sand heaped out in front of the stretch
+                a = max(0, min(apron_tall, round(apron_tall * p + bump * .5)))
+                for k in range(1, a + 1):
+                    if apron_lit: off = 1 if k < a else 0
+                    else: off = 0 if k < a else -1
+                    lay(x, fy + k, off)
+        # a dusting of sand on the bark just past each end of the stretch
+        for x in list(range(s0 - 4, s0)) + list(range(s1 + 1, s1 + 5)):
+            if x in foot and r.random() < .3:
+                ys = [y for y in range(top[x], foot[x] + 1) if (x, y) in out and out[(x, y)][1] == "wood"]
+                if ys: lay(x, r.choice(ys), 1)
+
+    out.update(sand)
+    for x in xs:                                     # the shaded row along the unburied underside
+        if (x, foot[x] + 1) not in out and hash2(x, seed, 5) < shade_odds:
+            out[(x, foot[x] + 1)] = (-1, "ground", 0)
+    grains = r.randint(0, 2 + w // 6)
+    for _ in range(grains):
+        if near and r.random() < .7:
+            gx = r.choice(near) + r.randint(-3, 3)
+        else:
+            gx = r.randint(x0 - 2, x1 + 2)
+        base = foot.get(gx, foot[min(xs, key=lambda q: abs(q - gx))])
+        gy = base + r.choice((-1, 1, 1, 2, 2, 3, 4))
+        if (gx, gy) in out: continue
+        out[(gx, gy)] = (r.choice((1, 1, 0, -1)), "rock" if r.random() < .2 else "ground", 0)
     return out
 
 

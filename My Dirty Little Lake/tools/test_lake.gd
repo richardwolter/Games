@@ -390,6 +390,7 @@ func _stage_build() -> void:
 	_check_signals(cam)
 	_check_cues()
 	_check_end_fixes()
+	_check_oct11_fixes()
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
@@ -9479,10 +9480,17 @@ func _stage_settings_shape() -> void:
 			carrying.append(String(line["label"]))
 	_check(carrying.is_empty(), "no label carries a key name", ", ".join(carrying))
 
+	# The sound rows and the screen rows wear two faces (2026-10-11, Richard), and the board
+	# draws each section on its own.
+	_check(not SettingsSkin.SOUND_FACE.is_equal_approx(SettingsSkin.SCREEN_FACE)
+		and source.contains("_row_face(false, true, SOUND_FACE)"),
+		"the sound rows and the screen rows are two colours", "")
+
 	# Every ink on the board, against the face it is actually drawn on.
-	var row := Style.BOARD_ROW
+	var row := SettingsSkin.SCREEN_FACE
 	var dead := row.lerp(Style.BOARD, 0.55)
 	var inks := {
+		"a sound row's label": [Style.BOARD_INK, SettingsSkin.SOUND_FACE],
 		"a row's label": [Style.BOARD_INK, row],
 		"a chooser's value": [SettingsSkin.VALUE_INK, row],
 		"a dead row's reading": [SettingsSkin.INK_SOFT, dead],
@@ -12407,6 +12415,118 @@ func _check_issue_29_sounds(sound: Sfx) -> void:
 	var said_at := lake_source.find("play_luck(lucky, double)", roll_at)
 	_check(roll_at >= 0 and fly_at > roll_at and said_at > fly_at,
 		"and the double's sound waits for the second net to fly", "")
+
+
+## Nine fixes (2026-10-11, `/grill-me` with Richard): the cast leaves the view on the
+## angler, the frogs are inked, the driftwood keeps off everything, "$" is green, the jet
+## rings a ferry's bell, the house's door lets the player out, the settings rows wear two
+## faces (in `_stage_settings_shape`).
+func _check_oct11_fixes() -> void:
+	# The camera: no lean out to the net, the thin landing margin.
+	var lake_src := FileAccess.get_file_as_string("res://scripts/lake.gd")
+	_check(not Lake.CAST_FOLLOW and Lake.LAND_INSET < Lake.LAND_INSET_FOLLOW
+		and lake_src.contains("CAST_LOOK if CAST_FOLLOW and"),
+		"a cast leaves the view on the angler unless the landing needs it", "")
+
+	# The frogs wear a black ring: every cell grew a pixel a side and holds pure black.
+	var frog := load("res://assets/wildlife/frog_green.png") as Texture2D
+	var inked := 0
+	if frog != null:
+		var img := frog.get_image()
+		if img.is_compressed():
+			img.decompress()
+		for x in range(0, mini(img.get_width(), 18)):
+			for y in range(0, mini(img.get_height(), 18)):
+				var c := img.get_pixel(x, y)
+				if c.a > 0.99 and c.r < 0.01 and c.g < 0.01 and c.b < 0.01:
+					inked += 1
+	_check(frog != null and int(Wildlife.FROG_CELL) == 18 and inked > 8,
+		"a frog's cell is 18 px and its picture is ringed in black", "%d black px" % inked)
+
+	# The driftwood: more of it, and nothing of the beach's rubbish, no plant, no animal's
+	# spot lying on or behind it.
+	var bank: Ground = null
+	for ground: Ground in _main.get(&"_grounds"):
+		if ground.layer == Ground.Layer.OUTSIDE:
+			bank = ground
+	if bank != null:
+		_check(bank.driftwood.size() >= 3, "the bank's beach has its driftwood", str(bank.driftwood.size()))
+		var under := []
+		for index in _grid.stacks.size():
+			var tx := index % Iso.COLS
+			var ty := index / Iso.COLS
+			if _grid.stacks[index].is_empty() or not (_grid.dry[index] == 1 or Iso.on_strand(tx, ty)):
+				continue
+			var at: Vector2 = _grid.surface_pos(index)
+			if bank.box_on_driftwood(Rect2(at - Vector2(16.0, 24.0), Vector2(32.0, 28.0))):
+				under.append(index)
+		_check(under.is_empty(), "no beach or strand piece lies on a log", str(under))
+		var flora: Flora = _main.get(&"_flora")
+		var on_wood := 0
+		for foot: Vector2 in flora.get(&"_foot"):
+			if bank.on_driftwood(foot, 4.0):
+				on_wood += 1
+		var wild: Wildlife = _main.get(&"_wildlife")
+		for spot: Dictionary in wild.get(&"_shore"):
+			if bank.on_driftwood(spot["land"], 4.0):
+				on_wood += 1
+		for spot: Dictionary in wild.get(&"_bird_spots"):
+			if bank.on_driftwood(spot["at"], 4.0):
+				on_wood += 1
+		_check(on_wood == 0, "no plant or animal's spot is on a log", str(on_wood))
+
+	# "$" is green, and as bright as the figure it stands by.
+	for ink: Color in [Style.PRICE_INK, Style.GOLD, Style.PAPER_INK, HudSkin.SPENT_INK]:
+		var green := Style.money_ink(ink)
+		_check(absf(green.get_luminance() - ink.get_luminance()) < 0.01
+			and green.g >= green.r and green.g >= green.b,
+			"the money mark is a green as bright as its figure", "%s for %s" % [green, ink])
+
+	# The jet on a ferry rings its bell once, puffs foam, and leaves it sailing.
+	_main.call(&"_set_wash", true)
+	var wash: WashRoom = _main.get(&"_wash")
+	var back := wash.backdrop() if wash != null else null
+	if back != null and not back.get(&"_hulls").is_empty():
+		var hull = back.get(&"_hulls")[0]
+		hull.wait = 0.0
+		hull.ding = 0.0
+		hull.x = back.size.x * 0.5
+		var puffs: int = (back.get(&"_puffs") as Array).size()
+		var box: Rect2 = back.hull_box(hull)
+		back.sprayed_at(box.get_center())
+		var rang: bool = hull.ding > 0.0
+		var puffed: bool = (back.get(&"_puffs") as Array).size() > puffs
+		hull.ding = 0.5
+		var again := (back.get(&"_puffs") as Array).size()
+		back.sprayed_at(box.get_center())
+		_check(box.size.x > 0.0 and rang and puffed and (back.get(&"_puffs") as Array).size() == again,
+			"the jet on a ferry rings its bell, puffs foam, and not again at once", str(box))
+	_main.call(&"_set_wash", false)
+
+	# The house's door: E in front of it leaves, away from it does not.
+	var room: ShedRoom = _main.get(&"_room")
+	_main.call(&"_set_shed", true)
+	var decor_kept: Array = room.decor.duplicate(true)
+	room.decor.clear()
+	var dogs_kept: Array = room.get(&"_dogs").duplicate()
+	room.get(&"_dogs").clear()
+	var span: Vector2 = room.call(&"_door_span")
+	var you_kept: Vector2 = room.get(&"_you_at")
+	room.set(&"_you_at", Vector2((span.x + span.y) * 0.5, ShedRoom.YOU_ENTRY))
+	var near := room.door_gap()
+	room.set(&"_you_at", Vector2(span.y + 6.0, 6.0))
+	var away := room.door_gap()
+	room.set(&"_you_at", Vector2((span.x + span.y) * 0.5, ShedRoom.YOU_ENTRY))
+	room.switch_near()
+	_check(near < INF and away == INF and not bool(_main.get(&"_shed_open")),
+		"E in front of the house's door leaves, away from it the door is out of reach",
+		"near %.2f away %s" % [near, away])
+	room.set(&"_you_at", you_kept)
+	room.decor.assign(decor_kept)
+	for dog in dogs_kept:
+		room.get(&"_dogs").append(dog)
+	if bool(_main.get(&"_shed_open")):
+		_main.call(&"_set_shed", false)
 
 
 func _check_end_fixes() -> void:

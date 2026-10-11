@@ -154,6 +154,12 @@ const BOB_PACE := 0.35
 ## size and half the speed on the screen. A ferry is about a tile and a half long; by
 ## `y_at`'s sums that is about a hundred canvas pixels twelve tiles out.
 const BOAT_LANES := [[26.0, 1.0, 30.0], [12.0, 2.0, 60.0]]
+## The jet on a ferry (`sprayed_at`): the least time between two of one hull's bells, how far
+## off its drawn picture the jet still counts, canvas px, and how much quieter the far lane's
+## bell is, dB. First guesses.
+const HULL_DING_GAP := 1.5
+const HULL_DING_SLACK := 2.0
+const HULL_DING_FAR_DB := -6.0
 ## The foam collar where a piece or a hull meets the water (Richard, same look: "it lacks
 ## the objects' foams"): the lake's own collar said in this grain — a torn row of whole foam
 ## pixels along the waterline and a thinner one under it, re-torn `FOAM_BEATS` times a
@@ -278,6 +284,8 @@ class Hull:
 	var x := 0.0
 	var way := 1.0
 	var wait := 0.0
+	## Seconds until the jet may ring this hull's bell again (`HULL_DING_GAP`).
+	var ding := 0.0
 
 
 class Bird:
@@ -487,6 +495,18 @@ func sprayed_at(point: Vector2) -> void:
 			var sound := Sfx.main()
 			if sound != null:
 				sound.room_coo()
+	# A ferry the jet lands on rings its bell (2026-10-11, Richard: "make the boat ding"),
+	# with the pigeons' foam puff where the water hits; it sails on. Once a hull per
+	# `HULL_DING_GAP`, and the far lane rings quieter. Reverses 2026-09-19's "the jet does
+	# nothing to the boats".
+	for hull in _hulls:
+		if hull.wait > 0.0 or hull.ding > 0.0 or not hull_box(hull).grow(HULL_DING_SLACK).has_point(point):
+			continue
+		hull.ding = HULL_DING_GAP
+		_puffs.append([point, 0.0, _roll.randi() % 100000])
+		var sound := Sfx.main()
+		if sound != null:
+			sound.room_bell(HULL_DING_FAR_DB if hull.lane == 0 else 0.0)
 	for dog in _dogs:
 		# Never less than the dog's own body: a far dog is small, but a jet on it is on it.
 		var reach := maxf(DOG_NEAR * _dog_tall(dog) / (DOG_SIZE / DOG_D.y), _dog_tall(dog) * 0.6)
@@ -513,6 +533,7 @@ func sprayed_at(point: Vector2) -> void:
 
 func _drive_hulls(delta: float) -> void:
 	for hull in _hulls:
+		hull.ding = maxf(hull.ding - delta, 0.0)
 		if hull.wait > 0.0:
 			hull.wait -= delta
 			continue
@@ -1055,6 +1076,20 @@ func _draw_afloat(lake: Rect2) -> void:
 		draw_texture_rect_region(art["sheet"], Rect2(at, span), kept)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		_draw_collar(at.x, at.x + span.x, at.y + span.y, grain, int(piece["kind"]) + int(at.x))
+
+
+## Where a hull's picture is drawn this frame, canvas px: what the jet has to land on to ring
+## its bell. Empty while it waits off screen.
+func hull_box(hull: Hull) -> Rect2:
+	var art := hull_art(hull.way)
+	if art.is_empty() or hull.wait > 0.0:
+		return Rect2()
+	var grain := float(BOAT_LANES[hull.lane][1])
+	var region: Rect2 = art["region"]
+	var anchor: Vector2 = art["anchor"]
+	var line := snappedf(y_at(float(BOAT_LANES[hull.lane][0])), PIXEL)
+	var corner := Vector2(snappedf(hull.x, PIXEL), line) - Vector2(anchor.x, region.size.y) * grain
+	return Rect2(corner, region.size * grain)
 
 
 func _draw_hull(hull: Hull, line: float) -> void:

@@ -673,13 +673,20 @@ func _draw() -> void:
 ##
 ## A row that cannot be used is drawn back towards the board, which is the one thing a face
 ## still says.
+##
+## **And the section says it too, since 2026-10-11** (Richard: "differentiate the sound boxes
+## colors from the screen settings"): the sound rows in `SOUND_FACE`, the screen rows in
+## `SCREEN_FACE`, the shop's own board hues (`ShopSkin.TONES` luck and net), under the same
+## carved headings. Colour adds to the headings rather than replacing them. Every word on
+## both clears 4.5:1 (worst: `INK_SOFT` on the screen rows, 4.95).
+const SOUND_FACE := Color(0.37, 0.21, 0.38)
+const SCREEN_FACE := Color(0.19, 0.33, 0.50)
 ## A colour under the pointer: the board's one hover wash.
 static func _washed(face: Color) -> Color:
 	return Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b, face.a)
 
 
-func _row_face(hovered: bool, live: bool) -> Color:
-	var face := Style.BOARD_ROW
+func _row_face(hovered: bool, live: bool, face: Color = SCREEN_FACE) -> Color:
 	if not live:
 		return face.lerp(Style.BOARD, 0.55)
 	if hovered:
@@ -789,7 +796,7 @@ func _draw_choice(box: Rect2, line: Dictionary) -> void:
 	if row == &"window_size":
 		_lines.append({"kind": &"value", "key": row, "row": row, "box": value})
 		if _hovered == row:
-			Style.plate(self, value.grow(SWELL), _washed(Style.BOARD_ROW))
+			Style.plate(self, value.grow(SWELL), _washed(SCREEN_FACE))
 	_draw_arrow(less, -1, _hovered == StringName(String(row) + "_less"))
 	_draw_arrow(more, 1, _hovered == StringName(String(row) + "_more"))
 	Style.write(
@@ -892,7 +899,7 @@ func _draw_sound(box: Rect2, line: Dictionary) -> void:
 	_lines.append({
 		"kind": &"slider", "key": level_key, "box": slider_box_of(groove), "groove": groove,
 	})
-	Style.plate(self, box, _row_face(false, true))
+	Style.plate(self, box, _row_face(false, true, SOUND_FACE))
 	_draw_label_and_switch(top, key, String(line["label"]))
 	draw_rect(groove.grow(1.0), Style.SEAM, true)
 	draw_rect(groove, Style.FRAME_SHADOW, true)

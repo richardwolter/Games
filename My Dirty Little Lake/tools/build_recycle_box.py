@@ -190,7 +190,9 @@ def hut_wall(u, v, lit, seed):
 	face = 2 if lit else 1
 	off = (row * 7 + face * 3) % H_.SEG
 	seg, pu = (ui + off) // H_.SEG, (ui + off) % H_.SEG
-	r = random.Random(hash((seed, face, row, seg)) & 0xFFFFFFFF)
+	# Seeded off the file's own hash, not Python's: `hash()` of a tuple holding a string is
+	# salted per run, so every build reshuffled the boards (found 2026-10-11).
+	r = random.Random(int(hash01(seed, face, row, seg) * 10007) * 7919 + row * 131 + seg)
 	tone = r.uniform(-H_.TONE, H_.TONE)
 	gx, gl = r.randint(3, 12), r.randint(3, 7)
 	knot = r.randint(3, 20) if r.random() < 0.18 else None

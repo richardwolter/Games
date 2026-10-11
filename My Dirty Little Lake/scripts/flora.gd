@@ -567,6 +567,9 @@ func _sow() -> void:
 						continue
 					if kind == "forest" and _under_a_prop(Iso.tile_to_world(at.x, at.y)):
 						continue
+					# Nothing grows under or behind the driftwood (2026-10-11).
+					if _on_driftwood(Iso.tile_to_world(at.x, at.y)):
+						continue
 					var water := _water_beside(at, kind)
 					if water < 0:
 						continue
@@ -628,6 +631,18 @@ func _kind_at(at: Vector2) -> String:
 	if shelf > PAD_OUT.y + 1.5 and out > PAD_OUT.y + 2.5 and _noise(at / OPEN_CELL) > OPEN_AT:
 		return "open"
 	return ""
+
+
+func _on_driftwood(world: Vector2) -> bool:
+	for ground in grounds:
+		if ground.layer == Ground.Layer.OUTSIDE and ground.on_driftwood(world, DRIFTWOOD_CLEAR):
+			return true
+	return false
+
+
+## How far a plant's foot keeps off a piece of driftwood's drawing, world px: a plant's
+## picture rises from its foot, so this is roughly a tall flower's height.
+const DRIFTWOOD_CLEAR := 14.0
 
 
 func _under_a_prop(world: Vector2) -> bool:

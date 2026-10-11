@@ -39,9 +39,10 @@ const SCALE := 2.0
 ## it keeps going, at full strength. `_in_view`.
 const VIEW_MARGIN := 48.0
 const BROOD_VIEW_MARGIN := 160.0
-## A frog cell is 16 painted px square (the pack halved); feet on row 15, column 8.
-const FROG_CELL := 16.0
-const FROG_FOOT := Vector2(8.0, 15.0)
+## A frog cell is 18 painted px square: the pack halved to 16, then grown a pixel a side for
+## its black outline (2026-10-11, tools/build_wildlife.py `ink_cells`); feet on row 16, column 9.
+const FROG_CELL := 18.0
+const FROG_FOOT := Vector2(9.0, 16.0)
 ## Frogs are drawn 1.2x smaller than their art's grain (2026-10-06, Richard), sitting,
 ## hopping and swimming: drawn smaller, not rebaked, picked off tools/last_shrink_sheet.png
 ## (the rebake lost the face and mangled the swimming shape). Fractional pixels, accepted.
@@ -653,6 +654,8 @@ func _cross(from: Vector2, dir: Vector2, near: float, far: float, f: Callable) -
 func _add_shore(land: Vector2, water: Vector2, normal: Vector2, side: String) -> void:
 	if Iso.in_shed(land.x, land.y, Iso.SHED_COVER + 0.6):
 		return
+	if _on_wood(Iso.tile_to_world(land.x, land.y)):
+		return
 	if Pump.covers(land, 1.0):
 		return
 	# Nor at the beehive (2026-09-30): it stands well inside the lawn today, so this never
@@ -677,6 +680,18 @@ func _add_shore(land: Vector2, water: Vector2, normal: Vector2, side: String) ->
 
 func _shore_clean(spot: Dictionary) -> bool:
 	return grid.water_state(int(spot["index"])) == 0
+
+
+## Is a world point on a piece of the bank's driftwood, or within `grow` px of it
+## (2026-10-11): no animal is given a spot there, and no print is left on the wood.
+func _on_wood(at: Vector2, grow: float = WOOD_CLEAR) -> bool:
+	for g in grounds:
+		if g.layer == Ground.Layer.OUTSIDE and g.on_driftwood(at, grow):
+			return true
+	return false
+
+
+const WOOD_CLEAR := 10.0
 
 
 ## Is this world point on the beach its shore spot is on: dry, and not far up it.
@@ -2317,6 +2332,8 @@ func _find_bird_spots() -> void:
 func _bird_ground(at: Vector2, side: String) -> bool:
 	if _wet(at):
 		return false
+	if _on_wood(at):
+		return false
 	if side == "bank":
 		return _on_sand(at, "bank")
 	var tile := Iso.world_to_tile(at)
@@ -2822,6 +2839,8 @@ func _age_tracks(delta: float) -> void:
 
 ## Sand, of either shore, and dry: the only ground that takes a print.
 func _sandy(at: Vector2) -> bool:
+	if _on_wood(at, 0.0):
+		return false
 	var tile := Iso.world_to_tile(at)
 	if Iso.island_fraction(tile.x, tile.y) < 1.5:
 		return Iso.past_shelf(tile) < -0.1 and Iso.lawn_depth(tile) < -0.2

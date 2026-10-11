@@ -143,6 +143,13 @@ const ART_PIXEL := 2.0
 const CAST_LOOK := 0.45
 const LOOK_SPEED := 3.4
 
+## Whether a cast leans the view out towards the net at all (2026-10-11, Richard: "a bit
+## dizzying", a trial). Off, the view stays on the angler through the throw, the landing
+## and the haul, and moves only when the net would come down off screen: then as far as
+## `LAND_INSET` needs to get the whole mouth in, and back as the net is reeled home. On, it is
+## the old follow, `CAST_LOOK` of the way out to the net and framed inside the wider margin.
+const CAST_FOLLOW := false
+
 ## How far in from the window's edges the net has to be when it comes down on the water, as
 ## a fraction of the view's half-width and half-height. `CAST_LOOK` puts the view most of
 ## the way out to the net but not all of it, and on a long cast most of the way is not
@@ -156,7 +163,11 @@ const LOOK_SPEED := 3.4
 ## up over the first `FRAME_BY` of the flight on a smoothstep. Until 2026-10-05 the flying
 ## net also pushed the camera the last of the way if the ease had fallen behind, and that
 ## push was one of the jolts; the spring in `_glide_to` now gets there on its own.
-const LAND_INSET := 0.25
+const LAND_INSET_FOLLOW := 0.25
+const LAND_INSET_STILL := 0.08
+## With the follow off the margin is thin: the view moves only for a net that would land at
+## the window's edge or past it, not for every net in the outer quarter (`CAST_FOLLOW`).
+const LAND_INSET := LAND_INSET_FOLLOW if CAST_FOLLOW else LAND_INSET_STILL
 const FRAME_BY := 0.6
 
 ## The most the view may travel on the way home, in world pixels a second.
@@ -5516,7 +5527,7 @@ func _drive_view(delta: float) -> void:
 	# one pair of hands. While a cast is out it drifts off them and onto the net.
 	_cast_look = lerpf(
 		_cast_look,
-		CAST_LOOK if _net.state != CastNet.State.IDLE else 0.0,
+		CAST_LOOK if CAST_FOLLOW and _net.state != CastNet.State.IDLE else 0.0,
 		_ease(LOOK_SPEED, delta)
 	)
 	# Walking asks for the view back too. Panning is for looking at the lake, and the moment

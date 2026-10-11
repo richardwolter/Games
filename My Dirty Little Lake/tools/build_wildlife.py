@@ -9,9 +9,9 @@ drawing's own edge) so a rule-built duck stands beside a pack frog without being
 another game.
 
 Writes:
-  assets/wildlife/frog_green.png, frog_brown.png  the pack's top half, halved to cells
-      16x16 (the pack is drawn at twice the game's grain; at the game's 2 a whole frog
-      stood as tall as the angler),
+  assets/wildlife/frog_green.png, frog_brown.png  the pack's top half, halved to 16x16
+      (the pack is drawn at twice the game's grain; at the game's 2 a whole frog stood as
+      tall as the angler), then inked a pixel outside in black in cells of 18x18,
       8 rows (S, SE, E, NE, N, NW, W, SW) x 16 columns (idle 0-2, croak 3-6, jump 7-10,
       hop 11-15), recoloured
   assets/wildlife/critters.png + critters.json    turtles, ducks, ducklings, swim shadows:
@@ -116,7 +116,34 @@ def recolour_frog(colour: str) -> Image.Image:
                 po[x, y] = FOAM
             else:
                 po[x, y] = table[key]
-    return halve(out)
+    return ink_cells(halve(out), FROG_CELL)
+
+
+# The land frogs wear the rubbish's and the pigeons' black outline (2026-10-11): one pixel of
+# pure black OUTSIDE the silhouette, edge-on (tools/ink_pigeons.py's rule), laid after the
+# halving and the recolour. The feet stand on a cell's bottom row, so every cell grows a pixel
+# a side to hold the ring: 16 to 18, the frog at (1, 1) in it (wildlife.gd FROG_CELL and
+# FROG_FOOT follow). The swim shadow and the frog seen under the water are not inked.
+FROG_CELL = 16
+INK = (0, 0, 0, 255)
+
+
+def ink_cells(img: Image.Image, cell: int) -> Image.Image:
+    cols, rows = img.width // cell, img.height // cell
+    big = cell + 2
+    out = Image.new("RGBA", (cols * big, rows * big), (0, 0, 0, 0))
+    for r in range(rows):
+        for k in range(cols):
+            piece = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+            piece.paste(img.crop((k * cell, r * cell, (k + 1) * cell, (r + 1) * cell)), (1, 1))
+            a = piece.load()
+            ring = [(x, y) for y in range(big) for x in range(big) if a[x, y][3] == 0 and any(
+                0 <= x + dx < big and 0 <= y + dy < big and a[x + dx, y + dy][3] > 0
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+            for p in ring:
+                a[p] = INK
+            out.alpha_composite(piece, (k * big, r * big))
+    return out
 
 
 def halve(img: Image.Image) -> Image.Image:
@@ -769,8 +796,9 @@ def pack() -> None:
     big.alpha_composite(sand, (0, tall * 2))
     big.alpha_composite(sheet.resize((wide * 4, tall * 4), Image.NEAREST))
     for i, colour in enumerate(("green", "brown")):
-        strip = Image.new("RGBA", (256, 128), mix(GRASS_LIGHT, SAND, 0.5))
+        strip = Image.new("RGBA", frogs[colour].size, mix(GRASS_LIGHT, SAND, 0.5))
         strip.alpha_composite(frogs[colour])
+        strip = strip.crop((0, 0, 256, 128))
         big.alpha_composite(strip.resize((1024, 512), Image.NEAREST).crop((0, 0, wide * 4, 512)), (0, tall * 4 + i * 512))
     big.save(SHEET_PNG)
     print(f"wrote {OUT_DIR}: frogs, critters {wide}x{tall} ({len(items)} pictures); contact {SHEET_PNG}")

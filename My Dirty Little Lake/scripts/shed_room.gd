@@ -500,6 +500,11 @@ const PLACE_WALL := WALL_ROWS * CELL
 ## in and no way out but a cross in the corner. The door is where they came in, and it is
 ## what the room is oriented around — the wall is the north side, so the door is in it.
 const DOOR_WIDE := 0.7
+## How close to the door E leaves the house, in cells from the back wall's foot, and how far
+## past the opening's edges it still counts. The player is stood `YOU_ENTRY` out on the way
+## in, so the spot they arrive on is in reach.
+const DOOR_REACH := 2.8
+const DOOR_SIDE := 0.5
 const DOOR_TALL := 1.0
 const DOOR_ALONG := 0.5
 
@@ -1075,6 +1080,17 @@ func _toned(art: Image) -> Image:
 				continue
 			out.set_pixel(x, y, Style.figure_tone(pixel))
 	return out
+
+
+## How far the player's feet are from the doorway, in cells, or INF when they are not in
+## front of it: across the opening (`_door_span`, a little either side) and within
+## `DOOR_REACH` of the back wall's foot. Where E leaves the house (`switch_near`).
+func door_gap() -> float:
+	var span := _door_span()
+	if _you_at.x < span.x - DOOR_SIDE or _you_at.x > span.y + DOOR_SIDE:
+		return INF
+	var gap := _you_at.distance_to(Vector2(clampf(_you_at.x, span.x, span.y), 0.0))
+	return gap if gap <= DOOR_REACH else INF
 
 
 ## Where the door stands, in cells across the floor: its two edges. Worked back from the
@@ -2173,6 +2189,12 @@ func switch_near() -> bool:
 	if rest >= 0 and _dog_on(rest, dog):
 		# The dog lying on the piece is part of it: E lies down beside it, not pets it.
 		dog_gap = INF
+	# The door is one more thing E can use, the nearest winning as for the rest: E in front
+	# of it leaves the house (2026-10-11, Richard).
+	var door_gap := door_gap()
+	if door_gap < switch_gap and door_gap < dog_gap and door_gap < rest_gap:
+		close_asked.emit()
+		return true
 	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
 		rest_on(rest)
 		return true
@@ -3748,6 +3770,15 @@ func _draw_prompt(floor_box: Rect2) -> void:
 	if rest >= 0 and _dog_on(rest, dog):
 		# The dog lying on the piece is part of it: E lies down beside it, not pets it.
 		dog_gap = INF
+	var door_gap := door_gap()
+	if door_gap < switch_gap and door_gap < dog_gap and door_gap < rest_gap:
+		# The door is what E would use: the key goes over the doorway.
+		var step := float(CELL * _zoom())
+		var span := _door_span()
+		_draw_key(floor_box.position + Vector2(
+			(span.x + span.y) * 0.5 * step, -minf(_door_size().y, _wall_tall()) * 0.5
+		))
+		return
 	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
 		# A seat, a bed or a bookcase is what E would use: the key goes over it.
 		at = rest
@@ -3767,6 +3798,11 @@ func _draw_prompt(floor_box: Rect2) -> void:
 			(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
 			float(int(row["cell"][1])) * _zoom() - PROMPT_LIFT
 		)
+	_draw_key(over)
+
+
+## The interact key's chip, centred on `over`.
+func _draw_key(over: Vector2) -> void:
 	var side := 18.0
 	var box := Rect2(over - Vector2(side, side) * 0.5, Vector2(side, side))
 	var glyph := Glyphs.lone(Binds.shown(&"interact", Pad.is_pad()))

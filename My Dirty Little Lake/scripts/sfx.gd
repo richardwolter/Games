@@ -729,6 +729,16 @@ func room_coo() -> void:
 	_from_room = false
 
 
+## The wash room's ferry, rung by the jet (2026-10-11): the fleet's own bell, `db` under its
+## mix, through the room's door like the bark and the coo. Never over a bell still sounding.
+func room_bell(db: float = 0.0) -> void:
+	if is_playing(&"ferry_bell"):
+		return
+	_from_room = true
+	play(&"ferry_bell", db)
+	_from_room = false
+
+
 ## The first player in a pool with nothing playing, or null.
 func _idle(pool: Array[AudioStreamPlayer]) -> AudioStreamPlayer:
 	for voice in pool:

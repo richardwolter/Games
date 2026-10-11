@@ -821,7 +821,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   angler and net as before. Return only — the throw is not capped, by the issue's own rule.
   The cost: a max-range haul at the top of the reel track is over in under a second and the
   view then pans home for 3-5 s. `HOME_SPEED` is the one knob for that.
-  **Landing is framed, not centred** (`LAND_INSET` 0.25, `_framed_on`): the follow point is
+  **Landing is framed, not centred** (`LAND_INSET` 0.25, `_framed_on`; 0.08 with no follow since 2026-10-11, see Nine Fixes): the follow point is
   pulled on towards the net, only as far as it needs to go, until the whole mouth is inside
   the window's middle 75% — taken up over the first `FRAME_BY` (0.6) of the flight towards
   where the net will land, and the flying net itself pushes the view the last of the way if
@@ -1104,7 +1104,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   Richard, `_stage_settings_shape`): the same pass the upgrades shop had, over the one board
   that had drifted furthest from it. **Layout, wording and ink only** — no row was added or
   removed and nothing any row does moved.
-  - **One plate face for every row, under carved headings.** The board carried three faces —
+  - **One plate face for every row, under carved headings** (superseded 2026-10-11: two faces, see Nine Fixes). The board carried three faces —
     `ROW_SOUND` for the sound rows, `ROW_SCREEN` for the screen rows, `ROW_SAVE` for the
     buttons — and since the section headings were cut on 2026-09-11 those colours were the
     only thing saying where a section ended. The shop had just gone the other way, so the
@@ -4377,6 +4377,50 @@ Every mechanic a player meets mid-run is named the first time it happens.
   panel (`fitted_size`, `MONEY_PAD`). The coin stays.
 - `test_lake` guards all four.
 
+### Nine Fixes (2026-10-11, `/grill-me` with Richard)
+- **A cast leaves the view on the angler, a trial** (`Lake.CAST_FOLLOW` false, Richard: the
+  follow was "a bit dizzying"): no `CAST_LOOK` lean. The view moves only when the net would
+  come down off screen, as far as `LAND_INSET` (now `LAND_INSET_STILL` 0.08, was 0.25) needs
+  to get the whole mouth in, and back as the net is reeled home. `CAST_FOLLOW` true is the
+  old follow, whole, with `LAND_INSET_FOLLOW`.
+- **The land frogs wear a one-pixel black ring** (`build_wildlife.py` `ink_cells`, the
+  pigeons' rule): their sheets' cells went 16 to 18 px (`Wildlife.FROG_CELL`, `FROG_FOOT`
+  (9, 16)), so the frog stands where it did. Not the swimming shadow, not the dived frog.
+- **The pier emblems fill the box's lit face** (`build_piers.py` `lit_face_room`): the room
+  between the corner posts, under the rim and above the outline, measured off the built box,
+  less `EMBLEM_MARGIN` 1 px; scaled to fit (x1.4 to x1.8, fractional nearest, `EMBLEM_SNAP`).
+  The shaded face keeps the recycle mark. `build_recycle_box.py` seeds its siding off its own
+  `hash01` now: Python's `hash()` reshuffled the boards on every build.
+- **Every sunken branch is buried its own way** (`build_lakebed.py` `bury_branch`,
+  `BURY_WHERE`): one end, the other, both, the middle, two patches or none, each with its
+  own length, drift height and lumps, spill, apron and grains, off the branch's own seed.
+- **Twice the driftwood, and nothing under or behind it** (`Ground._lay_driftwood`, 2 logs
+  to 4): a log's foot in `DRIFTWOOD_BAND` 2.4-4.2 tiles out, all its drawing on sand, and
+  `LITTER_REACH` clear of every tile the strand or the beach's rubbish can hold, so no piece
+  lies on a log whatever a save holds. `Ground.on_driftwood` keeps the beach tufts, Flora
+  (`DRIFTWOOD_CLEAR`), the animals' shore and bird spots and the sand prints off it.
+  Supersedes `DRIFTWOOD_SHARE` 0.004 and the 0.6-2.2 band in The Wood and the Pack Plants.
+- **"$" is green** (`Style.write` -> `_write_money`, `money_ink`, `MONEY_GREEN`): every "$"
+  in a line, the rest in the line's ink, the green matched to the figure's own luminance so
+  it reads with the number's contrast on every face (drawn back, glowing, the red spend tag).
+  The money plate, the spend tag, every price tag, the Pigeons row, the pricing plate, the
+  hose's tag and "$ Bonus" all go through it.
+- **The jet rings a ferry's bell** (`WashBackdrop.sprayed_at`, `hull_box`, `HULL_DING_*`,
+  `Sfx.room_bell`): once a hull per 1.5 s, the far lane 6 dB quieter, the pigeons' foam puff
+  where it hits; the boat sails on. **Supersedes** "the jet does nothing to ... the boats".
+- **E in front of the house's door leaves** (`ShedRoom.door_gap`, `DOOR_REACH` 2.8 cells
+  from the back wall's foot, `DOOR_SIDE` 0.5): one more candidate for E, the nearest
+  winning, with the key chip over the doorway; it closes the room through `close_asked`, the
+  shut-door sound and all. **Supersedes** "E no longer leaves the shed" (Sitting, Lying and
+  Reading) for the doorway; E anywhere else still does not.
+- **The settings board's sound rows and screen rows wear two faces**
+  (`SettingsSkin.SOUND_FACE` plum, `SCREEN_FACE` blue, the shop's `TONES` for luck and net),
+  under the same headings. **Supersedes "One plate face for every row"** (2026-09-17); every
+  word still clears 4.5:1 (worst 4.95).
+- All numbers first guesses. `test_lake`'s `_check_oct11_fixes` guards the camera switch, the
+  frog ring, the driftwood rules, the money green, the bell and the door;
+  `_stage_settings_shape` the two faces.
+
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
 the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
@@ -4943,7 +4987,7 @@ fern, mushroom, beach grass, reeds, cattails and plain/yellow lilies.
   shared box, 2 px gutter; `_pack_props` lays a strip into the atlas whole.
 - **The wood's floor from a new game** (`FLOOR_SHARE` 0.03 of open forest-floor tiles past
   `FLOOR_FROM`, never on a tree's tile): logs, mossy logs, sticks, a stump; and driftwood
-  now and then on the bank's beach (`DRIFTWOOD_SHARE`). At 1x (`Ground._one_x`,
+  now and then on the bank's beach (`DRIFTWOOD_SHARE`; placed by rule since 2026-10-11, see Nine Fixes). At 1x (`Ground._one_x`,
   `_scale_of`). `assets/trees/floor.png`.
 - **The pack's plants grow back with cleaning** (`tools/build_flora.py` `pack_plants`, the
   `pk_*`/`shrub_pk_*` entries): flowers, flower beds, bushes, fern, leafy plants, mushrooms,
@@ -5495,7 +5539,7 @@ A find is washed before the shed will have it. The one named exception to the sc
     wait out of sight (`BOAT_WAIT`), back the other way. No cargo, no foam, no bell.
     **Drawn over the far bank's strip**: under it, the far hull sailed with its sail behind
     the sand.
-  - **The jet does nothing to the lake, the boats or the rubbish, by decision** (a foam
+  - **The jet does nothing to the lake, the boats or the rubbish, by decision** (the boats superseded 2026-10-11: a bell, see Nine Fixes) (a foam
     splash, pushed rubbish and a rung bell were offered).
   - Dogs drew 26-54 px tall and read "too small in comparison": `DOG_TALL` 36-72.
   - `shot_pump` forces two hulls, one each way on each lane, because which way a bow points
@@ -7302,7 +7346,7 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
   (`switch_near`, `_draw_prompt`), measured from the foot's middle like a switch. **Any walk
   key, E again, the piece going away** (picked up or turned) **or leaving the shed** gets up,
   at once, where the player stood before (`stand_up`, `_rest_from`). Nothing is saved.
-- **E no longer leaves the shed** (Richard, same day): it is the room's own verb in there,
+- **E no longer leaves the shed** (Richard, same day; but for the doorway since 2026-10-11, see Nine Fixes): it is the room's own verb in there,
   and only Escape and the cross close the room (`Lake._unhandled_input`'s interact).
 - **The strips are built by rule** (`tools/build_rest_frames.py`, psd-extract venv python,
   project root, then `slice_character.gd` and a reimport): `sit_south` and `sit_north` (rest
