@@ -15,14 +15,15 @@ extends Node2D
 ## Tiles per second, set against the run frames (2026-10-11, the walk-pacing pass): the planted
 ## boot of the run sheet moves STEP_PX art pixels a frame, the figure is drawn one world pixel
 ## to one of art, and a tile walked sideways on screen is SIDEWAYS world pixels, so
-## STEP_PX / RUN_FRAME / SIDEWAYS (2.86) is the speed at which the boots do not skate at all.
+## STEP_PX / RUN_FRAME / SIDEWAYS (2.38) is the speed at which the boots do not skate at all.
 ## It was 5.4, two to five times what the legs stepped; then 1.91 and 2.29 planted, which
 ## Richard found too slow outside; then 3.5 on 0.02 s legs, and then, his call again, slower
-## legs and a quicker pace: 4.0 on 0.024, which skates the boots about two thirds. A frame
-## held under 0.02 s is quicker than the screen draws them, so planting it is not on offer.
+## legs and a quicker pace: 4.0 on 0.024, then 4.4 ("a little bit more"), which skates the
+## boots about four fifths. A frame held under 0.02 s is quicker than the screen draws them,
+## so planting this pace is not on offer.
 const STEP_PX := 2.59
 const SIDEWAYS := 45.254834
-const WALK_SPEED := 4.0
+const WALK_SPEED := 4.4
 
 ## How long it takes to reach WALK_SPEED from a standstill, and to shed it again, in seconds.
 ##
@@ -157,9 +158,11 @@ const IDLE_FRAME := 0.24
 const RUN_FRAME := 0.024
 const CAST_FRAME := 0.04
 
-## Where in the run cycle a foot comes down, as fractions of it: frames 3 and 10 of the
-## fourteen (2 and 7 of the eleven-frame loops), where the figure's head is lowest. A footstep sound fires on each (2026-09-15).
-const FOOTFALLS := [0.21, 0.71]
+## Where in the run cycle a footstep sounds, as fractions of it. Both feet come down in a loop,
+## at frames 3 and 10 of the fourteen (2 and 7 of the eleven-frame loops), and a step sounded
+## on each until 2026-10-11; on the quick run frames that was six a second, a patter (Richard:
+## "too many"), so only the first foot is heard now.
+const FOOTFALLS := [0.21]
 
 ## How far past the water's drawn edge the boots have to be before they count as in it, in
 ## world pixels (`step_surface`). Measured out from the edge rather than back up the beach
