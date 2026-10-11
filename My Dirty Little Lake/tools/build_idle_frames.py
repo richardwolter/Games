@@ -39,6 +39,17 @@ LEGS = {
     'west': {'ref': 2, 'rows': 8},
 }
 
+# Strips whose legs change stance between frames, with a basket or a pouch hanging over the
+# leg rows: every frame wears the `ref` frame's trousers and boots, the bottom `rows`, hung
+# under its chest, and keeps everything else it drew there. North's legs stood one way in
+# frames 1-5 and another in 6-9 (Richard picked 1-5's, 2026-10-11).
+SWAPPED = {
+    'north': {
+        'ref': 2, 'rows': 12, 'body': (30, 36), 'waist': (29, 38), 'waist_right': 17,
+        'waist_from_ref': (5, 6, 7, 8),
+    },
+}
+
 # Strips whose boots are already the same pixels every frame, the body still over them: only
 # pinned. South's slid only because each frame was centred on an ink box the basket swings.
 PINNED = ('south',)
@@ -73,6 +84,9 @@ TROUSER_LIGHTS = {(168, 181, 196), (204, 212, 220), (182, 190, 206), (222, 222, 
 TROUSER_DARK = (62, 76, 108, 255)
 TROUSER_MID = (76, 95, 126, 255)
 TROUSER_LIGHT = (95, 120, 142, 255)
+# A knuckle's shade the hands use and the lists above do not.
+KNUCKLE = {(227, 124, 79)}
+BOOT_NAVY = {(37, 39, 53), (23, 24, 36)}
 OUTLINE = (0, 0, 0)
 CLEAR = (0, 0, 0, 0)
 
@@ -408,6 +422,124 @@ def build_planted(direction):
     return out, feet
 
 
+def leg_parts(cell, top, span=None):
+    """Which pixels of a frame from row `top` down are its legs: the trousers, the boot-brown
+    parts that reach the ground rows, and the outline touching only those. Only inside the
+    columns `span` when given: the basket beside the legs holds a catch in the trousers' own
+    blues."""
+    px = cell.load()
+    w, h = cell.size
+    lo, hi = span if span else (0, w)
+    g = foot(cell)[1]
+    legs = {
+        (x, y) for y in range(top, h) for x in range(max(lo, 0), min(hi, w))
+        if solid(px[x, y]) and (px[x, y][:3] in TROUSERS or px[x, y][:3] in TROUSER_LIGHTS)
+    }
+    # North shades its boots and the gap between its legs in navies no other leg uses.
+    brown = {
+        (x, y) for y in range(top, h) for x in range(max(lo, 0), min(hi, w))
+        if solid(px[x, y]) and (px[x, y][:3] in BOOTS or px[x, y][:3] in BOOT_NAVY)
+    }
+    for part in parts(brown):
+        if max(y for _, y in part) >= g - 5:
+            legs |= part
+    other = {
+        (x, y) for y in range(top, h) for x in range(w)
+        if solid(px[x, y]) and px[x, y][:3] != OUTLINE and (x, y) not in legs
+    }
+    rim = set()
+    for y in range(top, h):
+        for x in range(w):
+            if not solid(px[x, y]) or px[x, y][:3] != OUTLINE:
+                continue
+            near = [(x + dx, y + dy) for dx, dy in NEIGHBOURS]
+            if any(n in legs for n in near) and not any(n in other for n in near):
+                rim.add((x, y))
+    return legs | rim
+
+
+def build_swapped(direction):
+    plan = SWAPPED[direction]
+    src = Image.open(original(direction)).convert('RGBA')
+    bounds, cells = cells_of(src)
+    ref = cells[plan['ref']]
+    g = foot(ref)[1]
+    top = g + 1 - plan['rows']
+    # The legs' columns are the soles' and a pixel more: the ref's own basket holds a
+    # catch in the trousers' blues too.
+    soles = ref.crop((0, g, ref.width, g + 1)).getbbox()
+    legs = Image.new('RGBA', ref.size, CLEAR)
+    for x, y in leg_parts(ref, top, (soles[0] - 1, soles[2] + 1)):
+        legs.putpixel((x, y), ref.getpixel((x, y)))
+    outline(legs)
+    legs_toe = foot(legs)[0]
+    box = legs.getbbox()
+    # Hung under each frame's body, matched on `body` rows (north's belt and pouch: its arms go
+    # up in the last frames and the chest rows matched the arms): a frame's own feet are where
+    # its stance put them.
+    chest = torso_at(cells, plan['ref'], plan['body'])
+    out = Image.new('RGBA', src.size, CLEAR)
+    feet = []
+    # The ref's waist: its rows `waist`, from the belt's left outline to the pouch's right
+    # side, `waist_right` columns right of the toe (past it the ref's basket touches it).
+    belt_row = plan['waist'][0] + 2
+    lo = min(x for x in range(soles[0] - 3, ref.width) if solid(ref.getpixel((x, belt_row))))
+    waist_box = (lo, plan['waist'][0], foot(ref)[0] + plan['waist_right'] + 1, plan['waist'][1])
+    waist = ref.crop(waist_box)
+    # The ref's hand hangs at its left hip: the tip of it, and the outline round it, would
+    # be left on the waist of a frame whose hands are up.
+    wp = waist.load()
+    for y in range(waist.height):
+        for x in range(waist.width):
+            if solid(wp[x, y]) and (wp[x, y][:3] in SKIN or wp[x, y][:3] in KNUCKLE):
+                wp[x, y] = CLEAR
+    trim(waist)
+    for y in range(waist.height):
+        last = waist.width - 1
+        if solid(wp[last, y]) and wp[last, y][:3] != OUTLINE and wp[last - 1, y][:3] == OUTLINE:
+            wp[last, y] = CLEAR
+    for i, ((l, _), cell, dx) in enumerate(zip(bounds, cells, chest)):
+        frame = Image.new('RGBA', cell.size, CLEAR)
+        frame.alpha_composite(legs, (max(dx, 0), 0), (max(-dx, 0), 0))
+        own = cell.copy()
+        # Two pixels past the borrowed legs: a frame's own stance stood up to that much wider.
+        for x, y in leg_parts(cell, top, (box[0] + dx - 2, box[2] + dx + 2)):
+            own.putpixel((x, y), CLEAR)
+        frame.alpha_composite(own)
+        # A frame drawn stretched up (arms raised) stands its belt and its pouch a row higher
+        # and one row deep: it wears the ref's waist instead, from the vest's hem down to the
+        # pouch's foot, so the belt and pouch never move.
+        if i in plan.get('waist_from_ref', ()):
+            before = frame.copy()
+            fp = frame.load()
+            for y in range(waist_box[1], waist_box[3]):
+                for x in range(waist_box[0] + dx, waist_box[2] + dx):
+                    if 0 <= x < frame.width:
+                        fp[x, y] = CLEAR
+            frame.alpha_composite(legs, (max(dx, 0), 0), (max(-dx, 0), 0))
+            frame.alpha_composite(waist, (waist_box[0] + dx, waist_box[1]))
+            # What the borrowed waist leaves empty keeps the frame's own pixel: the edge of a
+            # hand held at the hip, which cleared, left a gap in its outline.
+            bp = before.load()
+            for y in range(waist_box[1], waist_box[3]):
+                for x in range(waist_box[0] + dx, waist_box[2] + dx):
+                    if 0 <= x < frame.width and not solid(fp[x, y]) and solid(bp[x, y]):
+                        fp[x, y] = bp[x, y]
+            # The pouch's own edge: the column past the waist is the ref's basket, not taken.
+            edge = waist_box[2] + dx
+            for y in range(waist_box[1], waist_box[3]):
+                inside = fp[edge - 1, y] if 0 < edge <= frame.width else CLEAR
+                if edge < frame.width and not solid(fp[edge, y]) and solid(inside) and inside[:3] != OUTLINE:
+                    fp[edge, y] = OUTLINE + (255,)
+        trim(frame, top - 1, g - 1, {
+            (x + dx, y) for y in range(legs.height) for x in range(legs.width)
+            if solid(legs.getpixel((x, y))) and legs.getpixel((x, y))[:3] == OUTLINE
+        })
+        feet.append([legs_toe + dx, g])
+        out.alpha_composite(frame, (l, 0))
+    return out, feet
+
+
 def build_pinned(direction):
     # The art is not touched, so no original is kept beside it.
     src = Image.open(os.path.join(DIR, 'idle_%s.png' % direction)).convert('RGBA')
@@ -528,9 +660,11 @@ def main(argv):
         i = argv.index('--out')
         out_dir = argv[i + 1]
         argv = argv[:i] + argv[i + 2:]
-    for direction in argv or list(LEGS) + list(MIRRORED) + list(PINNED):
+    for direction in argv or list(LEGS) + list(MIRRORED) + list(PINNED) + list(SWAPPED):
         if direction in MIRRORED:
             image, feet = build_mirrored(direction)
+        elif direction in SWAPPED:
+            image, feet = build_swapped(direction)
         elif direction in PINNED:
             image, feet = build_pinned(direction)
         else:
