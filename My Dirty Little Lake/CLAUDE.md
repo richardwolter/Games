@@ -3107,6 +3107,54 @@ of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
   poses), the separately drawn straw hat (`straw_hat.png`, `slice_hat.gd`, per-frame head
   marks) and the F9 sheet toggle. Don't bring back a worn hat: the art has one.
 
+### The Angler Planted, and the Line in Loops (2026-10-11, `/grill-me` with Richard)
+Every change was approved off an animated preview (`tools/char_preview/`, git-ignored)
+before it touched the game. **Supersedes "Frames are centred on their ink"** for the idles.
+- **The idle feet stay put.** Centred on its ink box, a frame whose arm, hat or basket swung
+  out moved the figure under the feet. `tools/build_idle_frames.py` writes each idle strip
+  with `idle_<dir>_feet.json` beside it (the planted boot's toe, per cell), and
+  `tools/slice_character.gd` pins any strip with a feet file on it: the frame's ink box is
+  the first's moved by its toe. **Read from the builder, not the pixels**: east's basket
+  reaches the ground row and a measured toe was the basket's. The painted strips are kept as
+  `<strip>_orig.png` and are what every run reads.
+  - **West**: every frame wears frame 3's legs. **South**: only pinned, its boots were
+    already one drawing. **North**: frame 3's legs (the frames 1-5 stance), hung under the
+    belt, and frames 6-9 (arms up, body stretched) wear frame 3's vest hem, belt and pouch so
+    neither rises; frame 3's hand at the hip is left out of it.
+  - **East wears west's lower body mirrored**: trousers, boots, the belt bag (at the back of
+    the hip, under the net bundle, and again where west wears it, in the gap under the
+    basket's handle) and west's front pouch on its strap; west's hand lifted out and the hip
+    filled in the trousers' tones. East keeps its body, basket and the hand on it, drawn over.
+    In frames 1-3, where the hand hangs low, basket and hand are lifted clear of the boots;
+    in 4-9 the arm is raised and the basket stays as drawn (lifting tore the handle off the
+    hand; a shorter basket lost its shape), so it covers the back boot's top by 1-3 rows.
+- **East's cast in west's trousers and boots** (`tools/build_cast_east.py`): the paler blue
+  ramp onto west's tones, white/grey glints to trouser light or outline, and west's front and
+  back boots (each cut from its own box, outlined, mirrored) on every foot; in the stride
+  (frames 9-16) the front boot is planted forward on the back one's sole row, and in frame 16
+  the back boot goes under the leg's end. Frames 1-4 still have no boots: the basket hangs
+  to the ground over both feet there.
+- **The line hauled in hangs in loops from the net hand** (`CastNet` "coils", `CoilLayer`,
+  `COIL_*`): one loop per `COIL_EVERY` (22) px reeled since the net was furthest out, up to
+  `COIL_MOST` (6), fanning alternately, tucked away over `COIL_TUCK` (0.15 s) once home.
+  Drawing only, the rope's bargain. **The rope runs into the same hand**:
+  `Angler.net_hand()` reads the cast frame's grip from `assets/character_grips.json`
+  (`tools/build_grips.py`: east and south follow the hand on the basket, west the front hand,
+  north the right hand, a hand out of sight held where last seen; **south hangs the loops on
+  the net pouch itself**, which swings out to the right on the throw). Facing north the loops
+  draw behind the body. The double cast's helper net neither coils nor uses the hand.
+- **Bringing the net home clears the rope layer** (`_come_home`): an idle net that has not
+  moved is not redrawn (`_repaint`), and the haul's last line stayed lying by the feet. It
+  had always been there, hidden inside the torso while the rope ended at `rod_tip`.
+- **Pipeline after a re-cut**: `build_idle_frames.py` and `build_cast_east.py` (base python
+  with the psd-extract site-packages, from the project root), then `slice_character.gd`, then
+  `build_grips.py`, then reimport. Probes: `tools/shot_coils.tscn` (desktop build, own save:
+  four hauls close up, `tools/film/coils/`), `build_grips.py --sheet` (the marks,
+  `tools/last_grips_<pose>.png`). `test_lake` guards the rope on the net hand, the loops, no
+  rope left lying, the tuck and a grip for every cast frame.
+- **Out of scope, by decision**: run, pet, sit, lie and read frames; hand-over-hand reel
+  frames; a held reeling pose (the throw keeps looping and the loops follow it).
+
 ### The Ferry (`scripts/boat.gd`, sheet: `assets/boat_sail_frames.png`)
 The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a 16-heading
 128 px sheet, credit @Pixel_Salvaje), cut for the lake by `tools/build_boat_sheet.py`

@@ -677,4 +677,5 @@ def main(argv):
         print('wrote', path)
 
 
-main(sys.argv[1:])
+if __name__ == '__main__':
+    main(sys.argv[1:])
