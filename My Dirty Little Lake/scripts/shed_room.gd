@@ -543,12 +543,13 @@ const YOU_TALL := 3.9
 ## What the figure's scale is rounded to, in screen pixels per pixel of art.
 const YOU_STEP := 0.5
 ## Cells a second, and how long a run frame is held at that pace (2026-10-11): the house keeps
-## the pace it always had (Richard, after it went to 9.4 with the lake's quicker legs), and its
-## legs are slowed to plant at it: the boot moves Angler.STEP_PX art pixels a frame and an art
-## pixel is YOU_TALL over the figure's 43 art pixels of cell. The frames step with the ground
-## covered (`_you_stride`); at the old 0.05 s frame the boots skated half again too fast.
+## the pace it always had (Richard, after it went to 9.4 with the lake's quicker legs), on legs
+## of its own. Planted at 7.0 would be 0.034 s a frame (the boot moves Angler.STEP_PX art
+## pixels a frame, an art pixel being YOU_TALL over the figure's 43); Richard asked for slower
+## legs, so 0.04, which skates the boots about a fifth. The frames step with the ground covered
+## (`_you_stride`).
 const YOU_SPEED := 7.0
-const YOU_RUN_FRAME := Angler.STEP_PX * YOU_TALL / 43.0 / YOU_SPEED
+const YOU_RUN_FRAME := 0.04
 const YOU_STEP_MOST := 0.7
 
 ## How far the player stands in front of the door when the room opens, in cells. Just onto

@@ -11040,12 +11040,14 @@ func _check_walk_weight() -> void:
 func _check_walk_pacing() -> void:
 	var dt := 1.0 / 60.0
 	var planted := Angler.STEP_PX / Angler.RUN_FRAME / Angler.SIDEWAYS
-	_check(Angler.RUN_FRAME >= 0.02 and Angler.WALK_SPEED >= planted
-		and Angler.WALK_SPEED < planted * 1.25, "the angler walks near his boots' pace",
+	# Richard's trade, not a plant: the legs no quicker than the screen draws, the pace under the
+	# 5.4 that skated the boots fivefold, and no more than twice what the legs step.
+	_check(Angler.RUN_FRAME >= 0.02 and Angler.WALK_SPEED < 5.4
+		and Angler.WALK_SPEED < planted * 2.0, "the angler's pace stays near his boots'",
 		"%.2f against %.2f planted" % [Angler.WALK_SPEED, planted])
 	var house := Angler.STEP_PX * ShedRoom.YOU_TALL / 43.0 / ShedRoom.YOU_RUN_FRAME
-	_check(is_equal_approx(house, ShedRoom.YOU_SPEED) and ShedRoom.YOU_SPEED <= 7.0,
-		"in the house he walks at his boots' pace", "%.2f" % ShedRoom.YOU_SPEED)
+	_check(ShedRoom.YOU_SPEED <= 7.0 and ShedRoom.YOU_SPEED < house * 1.5,
+		"in the house his pace stays near his boots'", "%.2f against %.2f" % [ShedRoom.YOU_SPEED, house])
 	var walk := DogArt.pace(&"walk", Dog.HEIGHT) / Angler.SIDEWAYS
 	var run := DogArt.pace(&"run", Dog.HEIGHT) / Angler.SIDEWAYS
 	_check(absf(walk - Dog.WALK_SPEED) < 0.01 and absf(run - Dog.RUN_SPEED) < 0.02,

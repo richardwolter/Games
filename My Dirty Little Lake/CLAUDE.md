@@ -3164,10 +3164,10 @@ off the sheets, filmed at measured / -15% / +15% (`tools/shot_stride.tscn`, desk
 water and runs on grass" (the swim wore the walk frames).
 - **Speed gives, cadence holds** (Richard's call, over faster legs), except the angler, whose
   zero-slide speed at the old 0.05 s frame measured about 1 tile/s: his run frame went to
-  **0.02 s** and his walk to **3.5 tiles/s** (`Angler.STEP_PX` 2.59 art px a frame, `SIDEWAYS`
-  45.25 world px a tile walked sideways on screen). Planted at 0.02 is 2.86; **3.5 skates the
-  boots about a fifth, by Richard's call** after 1.91 and then 2.29 (both planted) read too
-  slow outside. Legs cannot go quicker: a frame held under 0.02 s is faster than 60 fps.
+  **0.024 s** and his walk to **4.0 tiles/s** (`Angler.STEP_PX` 2.59 art px a frame, `SIDEWAYS`
+  45.25 world px a tile walked sideways on screen). Planted at 0.024 is 2.38; **4.0 skates the
+  boots about two thirds, by Richard's call** after 1.91, 2.29 (planted) and 3.5 on 0.02 s
+  legs: slower legs, quicker pace. A frame held under 0.02 s is faster than 60 fps.
   Dogs: walk **0.55**, run **2.5**, swim **1.75** (seven tenths of the run), from
   `DogArt.WALK_STEP` / `RUN_STEP` (sheet px a frame) through `DogArt.pace(name, height)`.
   `TRIP_MOST` 26 to 39 and `STRAND_TRIP_MOST` 60 to 90 s with the slower swim. Accepted:
@@ -3195,13 +3195,13 @@ water and runs on grass" (the swim wore the walk frames).
   `tools/slice_character.gd`'s `keep` (east and south 11 frames, west and north 14); south
   0-10 picked off three candidates. Footfalls stay fractions of the loop.
 - **Everyone who draws these frames walks at their pace**: shed angler `YOU_SPEED` 7.0 cells/s
-  as always, its own `YOU_RUN_FRAME` (0.034 s) slowed to plant at it (Richard: slower inside), shed dog `DOG_SPEED` 3.1 (was 2.6), the shop's DOGS card at `DogArt.pace` for its
+  as always, on its own `YOU_RUN_FRAME` 0.04 s (planted would be 0.034; Richard: slower legs), shed dog `DOG_SPEED` 3.1 (was 2.6), the shop's DOGS card at `DogArt.pace` for its
   height (was a roll of 70-120 px/s), and the wash room's hounds **wander on the walk** at its
   pace (about today's 140 px/s near) **and bolt on the gallop** at its, much faster (Richard's
   pick; they galloped at a trot's speed). `DOG_BOLT` is gone.
 - **Out of scope, by decision**: wildlife (the turtle already paces by ground), frame times
   other than the angler's run, new art, prices. `HOME_SPEED` and `NUDGE_SPEED` 2.2 unchanged (under
-  the angler's 3.5; the nudge is sideways off his walk, so it was left).
+  the angler's 4.0; the nudge is sideways off his walk, so it was left).
 - `test_lake`'s `_check_walk_pacing` guards the speeds against the strides, the loop lengths,
   the run stepping with the ground, a blocked push running in place, the dog's legs, a dog put
   somewhere stepping nothing, and the swim on the gallop.
