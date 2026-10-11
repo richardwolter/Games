@@ -12,15 +12,16 @@
 class_name Angler
 extends Node2D
 
-## Tiles per second. Matched to the run frames, not chosen on its own (2026-10-11, the
-## walk-pacing pass): the planted boot of the run sheet moves STEP_PX art pixels a frame, the
-## figure is drawn one world pixel to one of art, and a tile walked sideways on screen is
-## SIDEWAYS world pixels, so STEP_PX / RUN_FRAME / SIDEWAYS is the speed at which the boots
-## do not skate. Richard picked it off `tools/shot_stride.tscn`. It was 5.4 (and 3.2 before
-## that), which ran the ground under the feet two to five times faster than they stepped.
+## Tiles per second, set against the run frames (2026-10-11, the walk-pacing pass): the planted
+## boot of the run sheet moves STEP_PX art pixels a frame, the figure is drawn one world pixel
+## to one of art, and a tile walked sideways on screen is SIDEWAYS world pixels, so
+## STEP_PX / RUN_FRAME / SIDEWAYS (2.86) is the speed at which the boots do not skate at all.
+## It was 5.4, two to five times what the legs stepped; then 1.91 and 2.29 planted, which
+## Richard found too slow outside. 3.5 skates the boots about a fifth, by his call: a frame
+## held under 0.02 s is quicker than the screen draws them, so the legs cannot go faster.
 const STEP_PX := 2.59
 const SIDEWAYS := 45.254834
-const WALK_SPEED := STEP_PX / RUN_FRAME / SIDEWAYS
+const WALK_SPEED := 3.5
 
 ## How long it takes to reach WALK_SPEED from a standstill, and to shed it again, in seconds.
 ##
@@ -148,10 +149,11 @@ const SIDE_FAVOUR := 0.5
 ## The run is held RUN_FRAME at full walking pace and no longer by the clock: its frames step
 ## with the ground the angler actually covers (`_stride`), so easing in, gliding to a stop and
 ## sliding along a wall all step as far as they go. 0.05 until 2026-10-11, quickened with the
-## walk slowed to meet it: 0.03 at first, then 0.025 (Richard: "a bit faster"). East and south loop eleven frames, west and north fourteen
-## (`tools/slice_character.gd`'s `keep`).
+## walk slowed to meet it: 0.03 at first, 0.025, then 0.02 with the walk raised past what that
+## plants (see WALK_SPEED). East and south loop eleven frames, west and north fourteen
+## (`tools/slice_character.gd`'s `keep`). The house holds its own (`ShedRoom.YOU_RUN_FRAME`).
 const IDLE_FRAME := 0.24
-const RUN_FRAME := 0.025
+const RUN_FRAME := 0.02
 const CAST_FRAME := 0.04
 
 ## Where in the run cycle a foot comes down, as fractions of it: frames 3 and 10 of the

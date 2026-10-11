@@ -542,12 +542,13 @@ const YOU_ART := Angler.ART
 const YOU_TALL := 3.9
 ## What the figure's scale is rounded to, in screen pixels per pixel of art.
 const YOU_STEP := 0.5
-## Cells a second, matched to the run frames the way the lake's walk is (2026-10-11): the
-## planted boot moves Angler.STEP_PX art pixels a frame, an art pixel is YOU_TALL over the
-## figure's 43 art pixels of cell, and the frames step with the ground covered (`_you_stride`).
-## It was 7.0, which at the old 0.05 s run frame skated the boots half again as fast as they
-## stepped.
-const YOU_SPEED := Angler.STEP_PX * YOU_TALL / 43.0 / Angler.RUN_FRAME
+## Cells a second, and how long a run frame is held at that pace (2026-10-11): the house keeps
+## the pace it always had (Richard, after it went to 9.4 with the lake's quicker legs), and its
+## legs are slowed to plant at it: the boot moves Angler.STEP_PX art pixels a frame and an art
+## pixel is YOU_TALL over the figure's 43 art pixels of cell. The frames step with the ground
+## covered (`_you_stride`); at the old 0.05 s frame the boots skated half again too fast.
+const YOU_SPEED := 7.0
+const YOU_RUN_FRAME := Angler.STEP_PX * YOU_TALL / 43.0 / YOU_SPEED
 const YOU_STEP_MOST := 0.7
 
 ## How far the player stands in front of the door when the room opens, in cells. Just onto
@@ -1248,7 +1249,7 @@ func _you_shown(floor_box: Rect2) -> Dictionary:
 	if not _you_poses.has(pose):
 		return {}
 	var frames: Array = _you_poses[pose]
-	var held := Angler.RUN_FRAME if walking else Angler.IDLE_FRAME
+	var held := YOU_RUN_FRAME if walking else Angler.IDLE_FRAME
 	var index := posmod(int((_you_stride if walking else _you_age) / held), frames.size())
 	if petting:
 		index = mini(int(_you_pet / Angler.PET_TIME * frames.size()), frames.size() - 1)
