@@ -6913,8 +6913,14 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
 M3 Nov 1, M4 (release candidate up for Valve's review) **Nov 6**, M5 Nov 16.
 - **`tools/steampipe/upload_game.bat`** (double-click `preview_game.bat` for a dry run) uploads
   `build/windows/` in place to app **5375170**, depot **5375171**, through
-  `app_build_5375170.vdf`. Export the "Windows" preset from the editor first; the script never
-  exports. Default: nothing goes live, Richard sets the build live by hand.
+  `app_build_5375170.vdf`. **It exports the game itself**: empties `build/windows/`, runs the
+  Desktop Godot `--headless --export-release "Windows"` (about 7 s; log in
+  `build/steampipe/export_windows.log`) and checks the exe and pck came out. The DLL-copy errors
+  in that log while the editor is open are the editor's lock and harmless (the export matched
+  an editor export byte for byte). Default: nothing goes live, Richard sets the build live by
+  hand. First build 25858709 (commit 412af57) is live on default and beta.
+- **Price** (2026-10-10): **US$4.99, 15% off at launch** (Nov 16-30), Richard's pick off
+  `docs/steam/pricing.md`. Regional prices and the Winter Sale are open there.
   **`upload_game.bat beta`** writes `app_build_5375170_beta.tmp.vdf` (`SetLive "beta"`,
   git-ignored) and uploads that; the `beta` branch is created once in Steamworks.
 - **Both upload scripts copy `addons/godotsteam/license.md` beside the exe as

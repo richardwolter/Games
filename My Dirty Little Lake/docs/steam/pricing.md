@@ -1,5 +1,8 @@
 # Steam Pricing — My Dirty Little Lake
 
+> **Decided by Richard, 2026-10-10: US$4.99, 15% launch discount (Nov 16-30).** Regional
+> prices, the Winter Sale and the length line on the store page are still open.
+
 Researched 2026-10-10 for the 2026-11-16 launch (app 5375170). Prices and review counts
 were read from the Steam store API (US and BR storefronts) the same day.
 

@@ -1,18 +1,21 @@
 @echo off
-rem Uploads build\windows to the game's Steam depot (app 5375170, depot 5375171).
+rem Exports the game and uploads it to its Steam depot (app 5375170, depot 5375171).
 rem   upload_game.bat           upload; set it live by hand in Steamworks
 rem   upload_game.bat beta      upload and set it live on the "beta" branch
-rem   upload_game.bat preview   list what would go up, upload nothing
-rem Export the "Windows" preset from the editor first: this uploads the folder as it is.
-rem It copies GodotSteam's licence beside the exe (MIT: it travels with the DLL) and refuses
-rem a folder holding steam_appid.txt, which is for dev runs only.
+rem   upload_game.bat preview   export and list what would go up, upload nothing
+rem It empties build\windows, exports the "Windows" preset (release) into it with the Desktop
+rem Godot, copies GodotSteam's licence beside the exe (MIT: it travels with the DLL) and refuses
+rem a folder holding steam_appid.txt, which is for dev runs only. Export log: build\steampipe.
 rem steamcmd asks for the password and Steam Guard code itself; the login is cached after.
 setlocal
 
 set "HERE=%~dp0"
 set "STEAMCMD=C:\Users\Administrador\Desktop\Steam\sdk\tools\ContentBuilder\builder\steamcmd.exe"
+set "GODOT=C:\Users\Administrador\Desktop\Godot_v4.7.1-stable_win64.exe"
+set "PROJECT=%HERE%..\.."
 set "VDF=%HERE%app_build_5375170.vdf"
 set "CONTENT=%HERE%..\..\build\windows"
+set "OUTPUT=%HERE%..\..\build\steampipe"
 set "LICENSE=%HERE%..\..\addons\godotsteam\license.md"
 set "ACCOUNT=fxknox"
 
@@ -20,28 +23,33 @@ if not exist "%STEAMCMD%" (
 	echo steamcmd not found at %STEAMCMD%
 	goto fail
 )
-if not exist "%CONTENT%\MyDirtyLittleLake.exe" (
-	echo No MyDirtyLittleLake.exe in build\windows. Export the "Windows" preset first.
-	goto fail
-)
-if not exist "%CONTENT%\MyDirtyLittleLake.pck" (
-	echo No MyDirtyLittleLake.pck in build\windows. Export the "Windows" preset first.
-	goto fail
-)
-if exist "%CONTENT%\steam_appid.txt" (
-	echo build\windows holds steam_appid.txt. It is for dev runs only: delete it and run again.
-	goto fail
-)
-if exist "%CONTENT%\LakeCleanup.exe" (
-	echo build\windows still holds the old LakeCleanup.exe and .pck. Delete them and run again.
+if not exist "%GODOT%" (
+	echo Godot not found at %GODOT%
 	goto fail
 )
 if not exist "%LICENSE%" (
 	echo GodotSteam licence not found at %LICENSE%
 	goto fail
 )
+if not exist "%OUTPUT%" mkdir "%OUTPUT%"
+
+echo Exporting the "Windows" preset into build\windows...
+if exist "%CONTENT%" rmdir /s /q "%CONTENT%"
+mkdir "%CONTENT%"
+"%GODOT%" --headless --path "%PROJECT%" --export-release "Windows" "%CONTENT%\MyDirtyLittleLake.exe" --log-file "%OUTPUT%\export_windows.log" >nul 2>&1
+if not exist "%CONTENT%\MyDirtyLittleLake.exe" (
+	echo Export made no MyDirtyLittleLake.exe. See build\steampipe\export_windows.log.
+	goto fail
+)
+if not exist "%CONTENT%\MyDirtyLittleLake.pck" (
+	echo Export made no MyDirtyLittleLake.pck. See build\steampipe\export_windows.log.
+	goto fail
+)
+if exist "%CONTENT%\steam_appid.txt" (
+	echo build\windows holds steam_appid.txt. It is for dev runs only: check the export filters.
+	goto fail
+)
 copy /y "%LICENSE%" "%CONTENT%\GodotSteam_LICENSE.md" >nul
-if not exist "%HERE%..\..\build\steampipe" mkdir "%HERE%..\..\build\steampipe"
 
 for /f %%i in ('git -C "%HERE%." rev-parse --short HEAD 2^>nul') do set "COMMIT=%%i"
 if not defined COMMIT set "COMMIT=nogit"
