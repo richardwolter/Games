@@ -2094,11 +2094,12 @@ func _lay_rope(
 		return
 	_rope.near = near
 	_rope.far = far
-	# Level with this node, always: being its child still draws it after the net sprite, and
-	# the angler (z 9) is drawn over it whichever way they face. The rope starts inside the
-	# figure's outline, so the body hides its cut end and it reads as coming out of the hands.
-	# Drawn over the figure, that square end showed on the front of the body.
-	_rope.z_index = z_index
+	# Over the angler, as the loops are: it runs into the net hand (`Angler.net_hand`), which
+	# is in front of the body, and under the figure the line passed behind the very hand
+	# hauling it (Richard, 2026-10-11). Facing away the hands are in front of the body and the
+	# rope goes behind it. The helper net's rope still ends inside the figure (`rod_tip`) and
+	# stays level with this node, so the body hides its cut end.
+	_rope.z_index = z_index + (2 if not helper and angler != null and angler.call(&"_view") != &"north" else 0)
 	_rope.line = line
 	_rope.queue_redraw()
 

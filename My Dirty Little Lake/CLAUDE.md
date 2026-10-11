@@ -3141,8 +3141,9 @@ before it touched the game. **Supersedes "Frames are centred on their ink"** for
   `Angler.net_hand()` reads the cast frame's grip from `assets/character_grips.json`
   (`tools/build_grips.py`: east and south follow the hand on the basket, west the front hand,
   north the right hand, a hand out of sight held where last seen; **south hangs the loops on
-  the net pouch itself**, which swings out to the right on the throw). Facing north the loops
-  draw behind the body. The double cast's helper net neither coils nor uses the hand.
+  the net pouch itself**, which swings out to the right on the throw). Rope and loops draw
+  over the figure, behind it only facing north. **Supersedes "The Net Sorts With The Angler"**
+  for the angler's rope: it was under the figure so the body hid its cut end in the chest. The double cast's helper net neither coils nor uses the hand.
 - **Bringing the net home clears the rope layer** (`_come_home`): an idle net that has not
   moved is not redrawn (`_repaint`), and the haul's last line stayed lying by the feet. It
   had always been there, hidden inside the torso while the rope ended at `rod_tip`.
