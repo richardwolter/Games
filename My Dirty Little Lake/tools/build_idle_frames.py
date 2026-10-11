@@ -39,6 +39,10 @@ LEGS = {
     'west': {'ref': 2, 'rows': 8},
 }
 
+# Strips whose boots are already the same pixels every frame, the body still over them: only
+# pinned. South's slid only because each frame was centred on an ink box the basket swings.
+PINNED = ('south',)
+
 # East: west's lower body mirrored. `rows` is how far up from the boot it is taken (the row
 # under the belt down); `ground` the row the boots stand on in east's cells; `nudge` moves the
 # legs across under the body, in pixels, by eye.
@@ -404,6 +408,13 @@ def build_planted(direction):
     return out, feet
 
 
+def build_pinned(direction):
+    # The art is not touched, so no original is kept beside it.
+    src = Image.open(os.path.join(DIR, 'idle_%s.png' % direction)).convert('RGBA')
+    _, cells = cells_of(src)
+    return src, [list(foot(cell)) for cell in cells]
+
+
 def build_mirrored(direction):
     plan = MIRRORED[direction]
     donor_dir = plan['from']
@@ -517,8 +528,13 @@ def main(argv):
         i = argv.index('--out')
         out_dir = argv[i + 1]
         argv = argv[:i] + argv[i + 2:]
-    for direction in argv or list(LEGS) + list(MIRRORED):
-        image, feet = build_mirrored(direction) if direction in MIRRORED else build_planted(direction)
+    for direction in argv or list(LEGS) + list(MIRRORED) + list(PINNED):
+        if direction in MIRRORED:
+            image, feet = build_mirrored(direction)
+        elif direction in PINNED:
+            image, feet = build_pinned(direction)
+        else:
+            image, feet = build_planted(direction)
         path = os.path.join(out_dir or DIR, 'idle_%s.png' % direction)
         image.save(path)
         with open(os.path.join(out_dir or DIR, 'idle_%s_feet.json' % direction), 'w', newline='\n') as f:
