@@ -3164,7 +3164,8 @@ off the sheets, filmed at measured / -15% / +15% (`tools/shot_stride.tscn`, desk
 water and runs on grass" (the swim wore the walk frames).
 - **Speed gives, cadence holds** (Richard's call, over faster legs), except the angler, whose
   zero-slide speed at the old 0.05 s frame measured about 1 tile/s: his run frame went to
-  **0.03 s** and his walk to **1.91 tiles/s** (`Angler.STEP_PX` 2.59 art px a frame,
+  **0.025 s** and his walk to **2.29 tiles/s** (0.03 and 1.91 at first, then Richard: "a bit
+  faster") (`Angler.STEP_PX` 2.59 art px a frame,
   `SIDEWAYS` 45.25 world px a tile walked sideways on screen, `WALK_SPEED` derived from them).
   Dogs: walk **0.55**, run **2.5**, swim **1.75** (seven tenths of the run), from
   `DogArt.WALK_STEP` / `RUN_STEP` (sheet px a frame) through `DogArt.pace(name, height)`.
@@ -3182,14 +3183,14 @@ water and runs on grass" (the swim wore the walk frames).
   three and south's likewise, so the front leg took one step twice a loop. Cut by
   `tools/slice_character.gd`'s `keep` (east and south 11 frames, west and north 14); south
   0-10 picked off three candidates. Footfalls stay fractions of the loop.
-- **Everyone who draws these frames walks at their pace**: shed angler `YOU_SPEED` 7.8 cells/s
+- **Everyone who draws these frames walks at their pace**: shed angler `YOU_SPEED` 9.4 cells/s
   (was 7.0), shed dog `DOG_SPEED` 3.1 (was 2.6), the shop's DOGS card at `DogArt.pace` for its
   height (was a roll of 70-120 px/s), and the wash room's hounds **wander on the walk** at its
   pace (about today's 140 px/s near) **and bolt on the gallop** at its, much faster (Richard's
   pick; they galloped at a trot's speed). `DOG_BOLT` is gone.
 - **Out of scope, by decision**: wildlife (the turtle already paces by ground), frame times
-  other than the angler's run, new art, prices. `HOME_SPEED` and `NUDGE_SPEED` 2.2 (still over
-  the angler's 1.91) unchanged.
+  other than the angler's run, new art, prices. `HOME_SPEED` and `NUDGE_SPEED` 2.2 unchanged (just
+  under the angler's 2.29 now; the nudge is sideways off his walk, so it was left).
 - `test_lake`'s `_check_walk_pacing` guards the speeds against the strides, the loop lengths,
   the run stepping with the ground, a blocked push running in place, the dog's legs, a dog put
   somewhere stepping nothing, and the swim on the gallop.

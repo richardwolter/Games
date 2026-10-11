@@ -148,10 +148,10 @@ const SIDE_FAVOUR := 0.5
 ## The run is held RUN_FRAME at full walking pace and no longer by the clock: its frames step
 ## with the ground the angler actually covers (`_stride`), so easing in, gliding to a stop and
 ## sliding along a wall all step as far as they go. 0.05 until 2026-10-11, quickened with the
-## walk slowed to meet it. East and south loop eleven frames, west and north fourteen
+## walk slowed to meet it: 0.03 at first, then 0.025 (Richard: "a bit faster"). East and south loop eleven frames, west and north fourteen
 ## (`tools/slice_character.gd`'s `keep`).
 const IDLE_FRAME := 0.24
-const RUN_FRAME := 0.03
+const RUN_FRAME := 0.025
 const CAST_FRAME := 0.04
 
 ## Where in the run cycle a foot comes down, as fractions of it: frames 3 and 10 of the

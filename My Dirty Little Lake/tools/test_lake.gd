@@ -11040,7 +11040,7 @@ func _check_walk_weight() -> void:
 func _check_walk_pacing() -> void:
 	var dt := 1.0 / 60.0
 	_check(is_equal_approx(Angler.WALK_SPEED, Angler.STEP_PX / Angler.RUN_FRAME / Angler.SIDEWAYS)
-		and absf(Angler.WALK_SPEED - 1.91) < 0.02, "the angler walks at his boots' pace",
+		and absf(Angler.WALK_SPEED - 2.29) < 0.02, "the angler walks at his boots' pace",
 		"%.3f" % Angler.WALK_SPEED)
 	var walk := DogArt.pace(&"walk", Dog.HEIGHT) / Angler.SIDEWAYS
 	var run := DogArt.pace(&"run", Dog.HEIGHT) / Angler.SIDEWAYS
