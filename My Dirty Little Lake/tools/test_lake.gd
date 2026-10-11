@@ -11046,7 +11046,7 @@ func _check_walk_pacing() -> void:
 		and Angler.WALK_SPEED < planted * 2.5, "the angler's pace stays near his boots'",
 		"%.2f against %.2f planted" % [Angler.WALK_SPEED, planted])
 	var house := Angler.STEP_PX * ShedRoom.YOU_TALL / 43.0 / ShedRoom.YOU_RUN_FRAME
-	_check(ShedRoom.YOU_SPEED <= 7.0 and ShedRoom.YOU_SPEED < house * 1.5,
+	_check(ShedRoom.YOU_SPEED <= 7.7 and ShedRoom.YOU_SPEED < house * 1.5,
 		"in the house his pace stays near his boots'", "%.2f against %.2f" % [ShedRoom.YOU_SPEED, house])
 	var walk := DogArt.pace(&"walk", Dog.HEIGHT) / Angler.SIDEWAYS
 	var run := DogArt.pace(&"run", Dog.HEIGHT) / Angler.SIDEWAYS

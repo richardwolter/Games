@@ -15,13 +15,14 @@ extends Node2D
 ## Tiles per second, set against the run frames (2026-10-11, the walk-pacing pass): the planted
 ## boot of the run sheet moves STEP_PX art pixels a frame, the figure is drawn one world pixel
 ## to one of art, and a tile walked sideways on screen is SIDEWAYS world pixels, so
-## STEP_PX / RUN_FRAME / SIDEWAYS (2.38) is the speed at which the boots do not skate at all.
+## STEP_PX / RUN_FRAME / SIDEWAYS (1.91) is the speed at which the boots do not skate at all.
 ## It was 5.4, two to five times what the legs stepped; then 1.91 and 2.29 planted, which
 ## Richard found too slow outside; then 3.5 on 0.02 s legs, and then, his call again, slower
 ## legs and a quicker pace: 4.0 on 0.024, then 4.4 ("a little bit more"), then 5.3 on the same
 ## legs (2026-10-11, Richard: "make the player a bit faster"), which skates the boots a good
-## deal. A frame held under 0.02 s is quicker than the screen draws them, so planting this
-## pace is not on offer.
+## deal; then both brought down a fifth, 4.2 on 0.03 s legs (Richard: the legs fit the pace
+## at 5.3, both too quick). A frame held under 0.02 s is quicker than the screen draws them,
+## so planting the quicker paces was never on offer.
 ##
 ## **The pace is the same on screen every way** (same day, Richard: up/down felt slower). It
 ## was a speed in tiles, and on the 2:1 grid a tile walked up the screen is half as tall as one
@@ -31,7 +32,7 @@ extends Node2D
 ## animals still walk in tiles.
 const STEP_PX := 2.59
 const SIDEWAYS := 45.254834
-const WALK_SPEED := 5.3
+const WALK_SPEED := 4.2
 ## WALK_SPEED in world (screen) pixels a second, whichever way the walk goes.
 const PACE := WALK_SPEED * SIDEWAYS
 
@@ -155,10 +156,10 @@ const SIDE_FAVOUR := 0.5
 ## with the ground the angler actually covers (`_stride`), so easing in, gliding to a stop and
 ## sliding along a wall all step as far as they go. 0.05 until 2026-10-11, quickened with the
 ## walk slowed to meet it: 0.03 at first, 0.025, 0.02, then 0.024 with the walk raised past
-## what that plants (see WALK_SPEED). East and south loop eleven frames, west and north fourteen
+## what that plants (see WALK_SPEED), then 0.03 with the walk taken down with it. East and south loop eleven frames, west and north fourteen
 ## (`tools/slice_character.gd`'s `keep`). The house holds its own (`ShedRoom.YOU_RUN_FRAME`).
 const IDLE_FRAME := 0.24
-const RUN_FRAME := 0.024
+const RUN_FRAME := 0.03
 const CAST_FRAME := 0.04
 
 ## Where in the run cycle a footstep sounds, as fractions of it. Both feet come down in a loop,

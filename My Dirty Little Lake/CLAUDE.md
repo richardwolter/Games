@@ -3169,7 +3169,9 @@ water and runs on grass" (the swim wore the walk frames).
   boots about four fifths, by Richard's call** after 1.91, 2.29 (planted), 3.5 on 0.02 s legs
   and 4.0: slower legs, quicker pace. A frame held under 0.02 s is faster than 60 fps.
   **Then 5.3 on the same 0.024 s legs** (`/grill-me` with Richard, same day: "make the player
-  a bit faster").
+  a bit faster"), **then both down a fifth: 4.2 tiles/s on 0.03 s legs** (Richard: the legs
+  fit the pace at 5.3, both too quick). Same ratio of pace to legs. **The house went 7.0 to
+  7.7 cells/s on its 0.04 s legs** (10% quicker, legs untouched).
   **The angler's pace is the same on screen every way** (same pass, Richard: up/down felt
   slower). It was a speed in tiles, and a tile walked up the 2:1 screen is half as tall as one
   walked across, so up/down went at half the screen speed. `WALK_SPEED` is now the sideways
@@ -3206,7 +3208,7 @@ water and runs on grass" (the swim wore the walk frames).
   three and south's likewise, so the front leg took one step twice a loop. Cut by
   `tools/slice_character.gd`'s `keep` (east and south 11 frames, west and north 14); south
   0-10 picked off three candidates. Footfalls stay fractions of the loop, one a loop since the same day.
-- **Everyone who draws these frames walks at their pace**: shed angler `YOU_SPEED` 7.0 cells/s
+- **Everyone who draws these frames walks at their pace**: shed angler `YOU_SPEED` 7.7 cells/s (7.0 until the same day)
   as always, on its own `YOU_RUN_FRAME` 0.04 s (planted would be 0.034; Richard: slower legs), shed dog `DOG_SPEED` 3.1 (was 2.6), the shop's DOGS card at `DogArt.pace` for its
   height (was a roll of 70-120 px/s), and the wash room's hounds **wander on the walk** at its
   pace (about today's 140 px/s near) **and bolt on the gallop** at its, much faster (Richard's

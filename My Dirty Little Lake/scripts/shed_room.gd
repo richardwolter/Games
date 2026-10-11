@@ -547,8 +547,8 @@ const YOU_STEP := 0.5
 ## of its own. Planted at 7.0 would be 0.034 s a frame (the boot moves Angler.STEP_PX art
 ## pixels a frame, an art pixel being YOU_TALL over the figure's 43); Richard asked for slower
 ## legs, so 0.04, which skates the boots about a fifth. The frames step with the ground covered
-## (`_you_stride`).
-const YOU_SPEED := 7.0
+## (`_you_stride`). Then 7.7 on the same legs (Richard, same day: 10% quicker indoors).
+const YOU_SPEED := 7.7
 const YOU_RUN_FRAME := 0.04
 const YOU_STEP_MOST := 0.7
 
