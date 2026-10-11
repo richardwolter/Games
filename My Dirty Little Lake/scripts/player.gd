@@ -18,29 +18,32 @@ extends Node2D
 ## STEP_PX / RUN_FRAME / SIDEWAYS (2.38) is the speed at which the boots do not skate at all.
 ## It was 5.4, two to five times what the legs stepped; then 1.91 and 2.29 planted, which
 ## Richard found too slow outside; then 3.5 on 0.02 s legs, and then, his call again, slower
-## legs and a quicker pace: 4.0 on 0.024, then 4.4 ("a little bit more"), which skates the
-## boots about four fifths. A frame held under 0.02 s is quicker than the screen draws them,
-## so planting this pace is not on offer.
+## legs and a quicker pace: 4.0 on 0.024, then 4.4 ("a little bit more"), then 5.3 on the same
+## legs (2026-10-11, Richard: "make the player a bit faster"), which skates the boots a good
+## deal. A frame held under 0.02 s is quicker than the screen draws them, so planting this
+## pace is not on offer.
+##
+## **The pace is the same on screen every way** (same day, Richard: up/down felt slower). It
+## was a speed in tiles, and on the 2:1 grid a tile walked up the screen is half as tall as one
+## walked across it, so up and down went at half the screen speed of left and right. WALK_SPEED
+## is now the sideways figure, and every heading moves `PACE` screen pixels a second: up and
+## down cover twice the ground of left and right. The angler only, by decision: the dogs and the
+## animals still walk in tiles.
 const STEP_PX := 2.59
 const SIDEWAYS := 45.254834
-const WALK_SPEED := 4.4
+const WALK_SPEED := 5.3
+## WALK_SPEED in world (screen) pixels a second, whichever way the walk goes.
+const PACE := WALK_SPEED * SIDEWAYS
 
-## How long it takes to reach WALK_SPEED from a standstill, and to shed it again, in seconds.
-##
-## Instant used to read like a cursor rather than a person: the boots were at full speed on
-## the frame a key went down and dead stopped on the frame it came up. A tenth of a second of
-## give either way is short enough that placing the angler for a cast still feels immediate,
-## and long enough that starting and stopping reads as a body with some heft to move.
-const ACCEL_TIME := 0.12
-const ACCEL := WALK_SPEED / ACCEL_TIME
 ## A little weight in the walk (2026-09-26, Richard: "slips a little bit"): the velocity takes
 ## SLIP_TIME to swing onto a new heading at full pace, so a turn curves rather than snapping,
 ## and STOP_TIME to come to rest, so letting go glides a few pixels. The sprite faces the new
-## input at once; only the body lags.
+## input at once; only the body lags. Eased on the screen, in pixels a second squared, so a
+## turn from across to up takes as long as one from up to across.
 const SLIP_TIME := 0.1
-const SLIP_ACCEL := WALK_SPEED / SLIP_TIME
+const SLIP_ACCEL := PACE / SLIP_TIME
 const STOP_TIME := 0.09
-const STOP_ACCEL := WALK_SPEED / STOP_TIME
+const STOP_ACCEL := PACE / STOP_TIME
 
 ## How far out the character may walk past the water's drawn edge, in world pixels.
 ##
@@ -218,18 +221,18 @@ var crate_tile := Vector2.INF
 
 var _time: float = 0.0
 var _step: float = 0.0
-## The run's own clock, in seconds of walking at full pace: advanced by the ground the angler
-## covers over WALK_SPEED, so the boots stay planted at any pace. Pushing into something that
+## The run's own clock, in seconds of walking at full pace: advanced by the screen pixels the
+## angler covers over PACE, so the legs keep one rhythm whichever way he goes. Pushing into something that
 ## will not let him past runs on the clock instead: legs going, nowhere to go (Richard's call).
 var _stride: float = 0.0
 ## The run frame the last footfall check saw, so a frame held for several draws steps once.
 var _run_frame: int = -1
 
-## Tiles a second, eased towards WALK_SPEED (or zero) rather than snapped to it. See
-## ACCEL_TIME.
+## The pace on screen, in sideways tiles a second (screen pixels over SIDEWAYS), so it reads
+## against WALK_SPEED, WADE_LEAST and GLIDE_LEAST whichever way the walk goes.
 var _speed: float = 0.0
-## The walk as a velocity, tiles a second: eased towards what the input asks rather than set
-## to it, so a turn curves and letting go glides. `_speed` is its length. See SLIP_TIME.
+## The walk as a velocity, tiles a second: eased on the screen towards what the input asks
+## rather than set to it, so a turn curves and letting go glides. See SLIP_TIME.
 var _vel := Vector2.ZERO
 
 ## The dust and splash the boots kick up, handed over by the level like `splash`. Null until
@@ -757,12 +760,11 @@ func _process(delta: float) -> void:
 		)
 	if push == Vector2.ZERO:
 		_step = 0.0
-		_vel = _vel.move_toward(Vector2.ZERO, STOP_ACCEL * delta)
-		_speed = _vel.length()
+		_ease_vel(Vector2.ZERO, STOP_ACCEL * delta)
 		if _speed > 0.0:
 			var from := tile_pos
 			_move_by(_vel * delta)
-			_stride += tile_pos.distance_to(from) / WALK_SPEED
+			_stride += _on_screen(tile_pos - from).length() / PACE
 			_place()
 			_leave_print()
 			_footfall()
@@ -779,22 +781,34 @@ func _process(delta: float) -> void:
 	_cast_time = -1.0
 
 	# Read in screen space and turned into tile space, so "press right" walks right on
-	# screen rather than along a diagonal the player cannot see.
-	var step := Iso.world_to_tile(push.normalized() * Iso.TILE_W).normalized()
-	facing = step
-	_vel = _vel.move_toward(step * WALK_SPEED, SLIP_ACCEL * delta)
-	_speed = _vel.length()
+	# screen rather than along a diagonal the player cannot see, at PACE on screen every way.
+	var way := push.normalized()
+	facing = Iso.world_to_tile(way * Iso.TILE_W).normalized()
+	_ease_vel(way * PACE, SLIP_ACCEL * delta)
 	var from := tile_pos
 	_move_by(_vel * delta)
-	var moved := tile_pos.distance_to(from)
+	var moved := _on_screen(tile_pos - from).length()
 	# Blocked: the step went less than half as far as the push asked. Run in place.
-	_stride += delta if moved < _speed * delta * 0.5 else moved / WALK_SPEED
+	_stride += delta if moved < _speed * SIDEWAYS * delta * 0.5 else moved / PACE
 	_step += delta
 	_place()
 	_leave_print()
 	_footfall()
 	_kick_feet(delta)
 	_repaint()
+
+
+## The velocity eased towards `want` (screen pixels a second) by at most `by`, on the screen,
+## and handed back in tiles. `_speed` follows.
+func _ease_vel(want: Vector2, by: float) -> void:
+	var on_screen := _on_screen(_vel).move_toward(want, by)
+	_vel = Iso.world_to_tile(on_screen)
+	_speed = on_screen.length() / SIDEWAYS
+
+
+## A move in tiles as world (screen) pixels.
+static func _on_screen(tiles: Vector2) -> Vector2:
+	return Iso.tile_to_world(tiles.x, tiles.y)
 
 
 ## One step of the walk: straight on where the ground allows it, slid along what is in the way

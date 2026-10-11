@@ -11041,9 +11041,9 @@ func _check_walk_pacing() -> void:
 	var dt := 1.0 / 60.0
 	var planted := Angler.STEP_PX / Angler.RUN_FRAME / Angler.SIDEWAYS
 	# Richard's trade, not a plant: the legs no quicker than the screen draws, the pace under the
-	# 5.4 that skated the boots fivefold, and no more than twice what the legs step.
+	# 5.4 that skated the boots fivefold, and no more than two and a half times what they step.
 	_check(Angler.RUN_FRAME >= 0.02 and Angler.WALK_SPEED < 5.4
-		and Angler.WALK_SPEED < planted * 2.0, "the angler's pace stays near his boots'",
+		and Angler.WALK_SPEED < planted * 2.5, "the angler's pace stays near his boots'",
 		"%.2f against %.2f planted" % [Angler.WALK_SPEED, planted])
 	var house := Angler.STEP_PX * ShedRoom.YOU_TALL / 43.0 / ShedRoom.YOU_RUN_FRAME
 	_check(ShedRoom.YOU_SPEED <= 7.0 and ShedRoom.YOU_SPEED < house * 1.5,
@@ -11074,9 +11074,36 @@ func _check_walk_pacing() -> void:
 	for i in 20:
 		_angler.call(&"_process", dt)
 	var stepped: float = float(_angler.get(&"_stride")) - stride
-	var moved: float = _angler.tile_pos.distance_to(start)
-	_check(moved > 0.0 and absf(stepped - moved / Angler.WALK_SPEED) < 0.001,
-		"the run steps with the ground covered", "%.4f against %.4f" % [stepped, moved / Angler.WALK_SPEED])
+	var moved_tiles := _angler.tile_pos - start
+	var moved: float = Iso.tile_to_world(moved_tiles.x, moved_tiles.y).length()
+	_check(moved > 0.0 and absf(stepped - moved / Angler.PACE) < 0.001,
+		"the run steps with the screen covered", "%.4f against %.4f" % [stepped, moved / Angler.PACE])
+	# The same pace on screen every way (2026-10-11, Richard: up/down felt slower): a second's
+	# walk across and a second's walk up the screen cover the same pixels, the up one twice the
+	# tiles, and the legs step the same in both.
+	var paces := {}
+	# East of the island's middle: open lawn across and down, clear of the hut, crate and pump.
+	for way: Vector2 in [Vector2.RIGHT, Vector2.DOWN]:
+		_angler.stand_at(Iso.ISLAND_CENTRE + Vector2(3.0, -3.0))
+		var at: Vector2 = _angler.tile_pos
+		_angler.walk_to = Iso.world_to_tile(Iso.tile_to_world(at.x, at.y) + way * 400.0)
+		for i in 12:
+			_angler.call(&"_process", dt)
+		var s0: float = _angler.get(&"_stride")
+		var p0: Vector2 = _angler.tile_pos
+		for i in 4:
+			_angler.call(&"_process", dt)
+		var d: Vector2 = _angler.tile_pos - p0
+		paces[way] = [Iso.tile_to_world(d.x, d.y).length() / (4.0 * dt), d.length() / (4.0 * dt),
+			float(_angler.get(&"_stride")) - s0]
+	_angler.walk_to = Vector2.INF
+	var across: Array = paces[Vector2.RIGHT]
+	var up: Array = paces[Vector2.DOWN]
+	_check(absf(across[0] - Angler.PACE) < 2.0 and absf(up[0] - Angler.PACE) < 2.0
+		and absf(up[1] / across[1] - 2.0) < 0.05 and absf(up[2] - across[2]) < 0.001,
+		"across and up the screen walk at one screen pace, the legs at one rhythm",
+		"across %.1f px/s %.2f t/s, up %.1f px/s %.2f t/s, legs %.4f / %.4f"
+			% [across[0], across[1], up[0], up[1], across[2], up[2]])
 	# A push into the water's edge makes no ground and runs in place.
 	_angler.walk_to = Iso.ISLAND_CENTRE + Vector2(40.0, 40.0)
 	for i in 600:

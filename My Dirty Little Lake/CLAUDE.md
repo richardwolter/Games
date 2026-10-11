@@ -3168,6 +3168,16 @@ water and runs on grass" (the swim wore the walk frames).
   45.25 world px a tile walked sideways on screen). Planted at 0.024 is 2.38; **4.4 skates the
   boots about four fifths, by Richard's call** after 1.91, 2.29 (planted), 3.5 on 0.02 s legs
   and 4.0: slower legs, quicker pace. A frame held under 0.02 s is faster than 60 fps.
+  **Then 5.3 on the same 0.024 s legs** (`/grill-me` with Richard, same day: "make the player
+  a bit faster").
+  **The angler's pace is the same on screen every way** (same pass, Richard: up/down felt
+  slower). It was a speed in tiles, and a tile walked up the 2:1 screen is half as tall as one
+  walked across, so up/down went at half the screen speed. `WALK_SPEED` is now the sideways
+  figure and every heading moves `Angler.PACE` (about 240) screen px a second, up/down covering
+  twice the ground; the slip and stop ease on the screen (`_ease_vel`), `_speed` reads in
+  sideways tiles a second, and the run's stride counts screen px over `PACE`, so the legs keep
+  one rhythm every way. **The angler outside only, by decision**: the house's square cells were
+  already even, and the dogs and animals still walk in tiles.
   **One footstep sound a loop**, the first foot's (`FOOTFALLS`): two a loop was six a second on
   these legs, a patter (Richard: "too many").
   Dogs: walk **0.55**, run **2.5**, swim **1.75** (seven tenths of the run), from
