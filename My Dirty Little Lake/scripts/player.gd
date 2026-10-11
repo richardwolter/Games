@@ -120,6 +120,8 @@ const HEIGHT := 40.0
 
 ## The cut sheet. tools/slice_character.gd writes it from art_source/Character_Sprite_Sheet.psd.
 const ART := "res://assets/character.json"
+## The net hand in every cast frame, in the frame's cell (`tools/build_grips.py`).
+const GRIPS := "res://assets/character_grips.json"
 
 ## What takes the raw sheet's colour down into the game's own. Its numbers are uniforms, so
 ## they can be turned while the game is running.
@@ -234,6 +236,8 @@ var _poses := {}
 ## Counts up for the whole haul, and _pose() wraps it, so the throw repeats while the net is
 ## dragged home and only end_cast() drops it back to idle.
 var _cast_time := -1.0
+## `GRIPS` as read: pose name -> one [x, y] a frame.
+var _grips := {}
 
 ## How long a cast holds the angler still, in seconds — long enough to see the throw play
 ## out before the boots are free again. Tune by feel; this is a first guess.
@@ -470,6 +474,8 @@ func _load_art() -> bool:
 	if image == null:
 		return false
 	_sheet = ImageTexture.create_from_image(image)
+	var read: Variant = JSON.parse_string(FileAccess.get_file_as_string(GRIPS)) if FileAccess.file_exists(GRIPS) else null
+	_grips = read if read is Dictionary else {}
 
 	for name: String in book["poses"]:
 		var frames: Array = []
@@ -481,6 +487,10 @@ func _load_art() -> bool:
 				"ink": Rect2(ink[0], ink[1], ink[2], ink[3]),
 			})
 		_poses[StringName(name)] = frames
+		var grips: Array = _grips.get(name, [])
+		for i in mini(grips.size(), frames.size()):
+			var at: Array = grips[i]
+			(frames[i] as Dictionary)["grip"] = Vector2(at[0], at[1])
 		# Each pose stands on its own lowest foot row: the north strips end two rows higher
 		# than the south ones, and one row for all left the north figure above its shadow.
 		var foot := 0.0
@@ -651,6 +661,17 @@ const HAND_HEIGHT := 0.36
 ## It is the hands now — see HAND_REACH.
 func rod_tip() -> Vector2:
 	return position + _screen_facing() * HAND_REACH + Vector2(0.0, -HEIGHT * HAND_HEIGHT)
+
+
+## The hand the net was thrown from, where the drawn frame has it: the rope runs into it and the
+## line hauled in hangs from it in loops (`CastNet`). Only the cast frames know it
+## (`tools/build_grips.py`); any other frame, and a figure with no art, gives `rod_tip`.
+func net_hand() -> Vector2:
+	var sunk := _wading()
+	var shown := _frame(sunk, 0.0 if sunk > 0.0 else LAND_SINK, true)
+	if shown.is_empty() or shown["grip"] == null:
+		return rod_tip()
+	return position + (shown["box"] as Rect2).position + (shown["grip"] as Vector2) * float(shown["scale"])
 
 
 ## The way the figure faces, as a direction on the screen rather than on the tile plane.
@@ -1081,7 +1102,7 @@ func _frame(sunk: float, land_shift: float, buried := false) -> Dictionary:
 		),
 		size
 	)
-	return {"region": region, "box": box, "scale": scale, "ink": ink}
+	return {"region": region, "box": box, "scale": scale, "ink": ink, "grip": frame.get("grip", null)}
 
 
 ## The figure as it was blocked in before there were any sprites of it: kept because the art

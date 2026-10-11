@@ -1086,12 +1086,16 @@ func _stage_net_ring() -> void:
 	var thrown := _net.cast_to(_water_near_angler())
 	var worst := 0.0
 	var frames := 0
+	var most_loops := 0.0
+	var off_hand := 0.0
 	while thrown and _net.state != CastNet.State.IDLE and frames < 600:
 		_net.call(&"_process", 1.0 / 60.0)
 		frames += 1
+		most_loops = maxf(most_loops, float(_net.get(&"_coil_loops")))
 		var rope: PackedVector2Array = _net.get(&"_rope_now")
 		if rope.size() < 2:
 			continue
+		off_hand = maxf(off_hand, rope[0].distance_to(_angler.net_hand()))
 		var head := rope[0]
 		var foot := rope[rope.size() - 1]
 		var along := foot - head
@@ -1102,6 +1106,23 @@ func _stage_net_ring() -> void:
 	_check(thrown and _net.state == CastNet.State.IDLE and worst < 80.0,
 		"the rope hangs off the net for a whole cast without flying apart",
 		"%d frames, %.1f px off the line at worst" % [frames, worst])
+	_check(off_hand < 0.5, "the rope runs into the net hand all cast", "%.2f px off" % off_hand)
+	_check(most_loops > 0.0 and most_loops <= CastNet.COIL_MOST,
+		"the line hauled in hangs in loops, no more than the most", "%.2f loops" % most_loops)
+	var rope_layer: Node = _net.get_node(^"Rope")
+	_check((rope_layer.get(&"line") as PackedVector2Array).is_empty(),
+		"no rope is left lying once the net is home", "")
+	for i in int(ceil(CastNet.COIL_TUCK * 60.0)) + 1:
+		_net.call(&"_process", 1.0 / 60.0)
+	_check(is_zero_approx(float(_net.get(&"_coil_loops"))), "the loops are tucked away once home",
+		"%.2f left" % float(_net.get(&"_coil_loops")))
+	var grips: Dictionary = _angler.get(&"_grips")
+	var whole := 0
+	for dir: String in ["east", "west", "south", "north"]:
+		var frames_of: Array = (_angler.get(&"_poses") as Dictionary).get(StringName("cast_" + dir), [])
+		if (grips.get("cast_" + dir, []) as Array).size() == frames_of.size() and not frames_of.is_empty():
+			whole += 1
+	_check(whole == 4, "every cast frame knows its net hand", "%d of 4 poses" % whole)
 
 	_net.state = CastNet.State.IDLE
 	_net.catch.resize(0)

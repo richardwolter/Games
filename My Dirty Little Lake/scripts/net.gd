@@ -492,7 +492,39 @@ class RopeLayer extends Node2D:
 		CastNet._draw_rope(self, line)
 
 
+## The line taken in on the haul, hanging from the hands in loops rather than vanishing into
+## them (2026-10-11, Richard: the rope going into the hand read as magic). One loop for every
+## `COIL_EVERY` px the net has come in since it was furthest out, up to `COIL_MOST`, the newest
+## growing in as the line comes; when the net is home they are tucked away over `COIL_TUCK`.
+## Drawing only, the rope's bargain: nothing reads them back.
+class CoilLayer extends Node2D:
+	## Where the loops hang from (the hands), how many there are (a fraction is the newest
+	## part-grown), how much of their size is left as they are tucked away, and the clock.
+	var hand := Vector2.ZERO
+	var loops := 0.0
+	var size := 1.0
+	var time := 0.0
+
+	func _draw() -> void:
+		if loops <= 0.0 or size <= 0.0:
+			return
+		var whole := int(loops)
+		for k in range(whole + 1):
+			var grown := 1.0 if k < whole else loops - float(whole)
+			if grown <= 0.0:
+				continue
+			CastNet._draw_rope(self, CastNet.coil_points(hand, k, grown * size, time))
+
+
 var _rope: RopeLayer
+var _coils: CoilLayer
+## How far out the line has been since the throw, in world px, and what is left of the tuck
+## once the net is home (seconds, under nought when none is running).
+var _line_most := 0.0
+var _coil_loops := 0.0
+var _tuck_left := -1.0
+## The net hand, from the angler's feet, as last seen in a cast frame.
+var _coil_hand := Vector2.ZERO
 
 
 ## The mesh, on a layer of its own with the net's shader on it: the first child, so it draws
@@ -912,6 +944,10 @@ func _ready() -> void:
 	_rope.name = &"Rope"
 	_rope.z_as_relative = false
 	add_child(_rope)
+	_coils = CoilLayer.new()
+	_coils.name = &"Coils"
+	_coils.z_as_relative = false
+	add_child(_coils)
 	_rim = CatchRim.new()
 	_rim.name = &"CatchRim"
 	add_child(_rim)
@@ -1003,6 +1039,9 @@ func cast_to(where: Vector2) -> bool:
 	# A fresh throw is a fresh rope: laid straight from the hands to the net on the first
 	# frame rather than the last cast's chain being dragged across the lake to the new one.
 	_rope_now.resize(0)
+	_line_most = 0.0
+	_coil_loops = 0.0
+	_tuck_left = -1.0
 	# The angler's own throw — only ever a flourish: the net still flies on this same line at
 	# this same speed either way, see Angler.start_cast().
 	if not helper:
@@ -1099,6 +1138,7 @@ func _process(delta: float) -> void:
 	# After the net has moved and before anything is drawn, so the rope hangs off where the
 	# net is this frame rather than where it was.
 	_drive_rope(delta)
+	_drive_coils(delta)
 	_chime_at_finds()
 	_repaint()
 
@@ -1454,7 +1494,13 @@ func _take_from(reach: Array[int], dug: Dictionary = {}) -> int:
 
 func _come_home() -> void:
 	_lucky_age = -1.0
+	if _coil_loops > 0.0:
+		_tuck_left = COIL_TUCK
 	state = State.IDLE
+	# The rope off the layer now: an idle net that has not moved is not redrawn (`_repaint`),
+	# and the last line of the haul stayed lying by the angler's feet.
+	_lay_rope(PackedVector2Array())
+	queue_redraw()
 	tile_pos = angler.tile_pos
 	luck_power = 0
 	luck_hold = 0
@@ -1965,6 +2011,79 @@ const ROPE_TWIST := Color(0.36, 0.23, 0.12, 1.0)
 const ROPE_PITCH := 4.0
 
 
+## Rope taken in a loop, in world px, and the most loops shown.
+const COIL_EVERY := 22.0
+const COIL_MOST := 6.0
+## How long the loops take to be tucked away once the net is home.
+const COIL_TUCK := 0.15
+## A loop's drop below the hands and its width, in world px, the first loop's; every later
+## loop hangs `COIL_DEEPER` lower and `COIL_WIDER` wider, so the bundle fans out.
+const COIL_DROP := 7.0
+const COIL_WIDE := 4.5
+const COIL_DEEPER := 1.3
+const COIL_WIDER := 1.1
+## Each loop hangs swung this far, radians, off the one before, to one side then the other,
+## so the bundle fans and each loop's line shows.
+const COIL_FAN := 0.16
+## How far the loops swing, radians, and how fast.
+const COIL_SWING := 0.12
+const COIL_SWING_RATE := 2.6
+
+
+## Count the loops: the line the net has come in since it was furthest out, at `COIL_EVERY` a
+## loop. The angler's own net only; the double cast's helper is thrown from nobody's hands.
+func _drive_coils(delta: float) -> void:
+	if _coils == null:
+		return
+	_coils.time += delta
+	if helper or angler == null:
+		_coils.loops = 0.0
+		_coils.queue_redraw()
+		return
+	if state != State.IDLE:
+		_coil_hand = angler.net_hand() - angler.position
+		var out := angler.net_hand().distance_to(_line_end(draw_at()))
+		_line_most = maxf(_line_most, out)
+		var taken := maxf(_line_most - out, 0.0) if state == State.REELING or _coil_loops > 0.0 else 0.0
+		_coil_loops = maxf(_coil_loops, minf(taken / COIL_EVERY, COIL_MOST))
+		_coils.size = 1.0
+	elif _tuck_left > 0.0:
+		_tuck_left = maxf(_tuck_left - delta, 0.0)
+		_coils.size = _tuck_left / COIL_TUCK
+		if _tuck_left <= 0.0:
+			_coil_loops = 0.0
+	else:
+		_coil_loops = 0.0
+	_coils.loops = _coil_loops
+	# Home, the figure is back in its idle frames, which know no net hand: the loops are tucked
+	# away where the hand last was.
+	_coils.hand = angler.position + _coil_hand
+	# In front of the figure, but behind it facing away: the hands are in front of the body
+	# there, and the loops must not hang over the back (Richard, 2026-10-11).
+	_coils.z_index = z_index + (0 if angler.call(&"_view") == &"north" else 2)
+	_coils.queue_redraw()
+
+
+## One loop of coiled line, `k` loops into the bundle, `grown` of the way round (the newest
+## is still being laid), hanging from `hand` as a teardrop: pinched at the hands, round at the
+## foot, swinging a little on `time`.
+static func coil_points(hand: Vector2, k: int, grown: float, time: float) -> PackedVector2Array:
+	var drop := (COIL_DROP + COIL_DEEPER * k) * clampf(grown, 0.0, 1.0)
+	var wide := (COIL_WIDE + COIL_WIDER * k) * clampf(grown, 0.0, 1.0)
+	var fan := COIL_FAN * ceilf(k * 0.5) * (1.0 if k % 2 == 1 else -1.0)
+	var lean := sin(time * COIL_SWING_RATE + k * 0.6) * COIL_SWING + fan
+	var out := PackedVector2Array()
+	var steps := 18
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		var a := TAU * t
+		# A teardrop: the sides close in to nothing at the top, where it hangs from the hands.
+		var x := sin(a) * wide * 0.5 * sin(a * 0.5)
+		var y := (1.0 - cos(a)) * 0.5 * drop
+		out.append(hand + Vector2(x, y).rotated(lean))
+	return out
+
+
 ## Hand the rope layer this frame's rope and bridle. An empty line takes the lot away.
 func _lay_rope(
 	line: PackedVector2Array,
@@ -1996,7 +2115,9 @@ func _drive_rope(delta: float) -> void:
 		_rope_now.resize(0)
 		_rope_taut = 0.0
 		return
-	var head := angler.rod_tip()
+	# From the hand the net was thrown from, as the frame draws it (2026-10-11): the line is
+	# reeled into that hand, and hangs from it in loops (`_drive_coils`).
+	var head := angler.net_hand() if not helper else angler.rod_tip()
 	var foot := _line_end(draw_at())
 	if (
 		_rope_now.size() != ROPE_POINTS
