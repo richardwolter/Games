@@ -4383,9 +4383,15 @@ Every mechanic a player meets mid-run is named the first time it happens.
   come down off screen, as far as `LAND_INSET` (now `LAND_INSET_STILL` 0.08, was 0.25) needs
   to get the whole mouth in, and back as the net is reeled home. `CAST_FOLLOW` true is the
   old follow, whole, with `LAND_INSET_FOLLOW`.
+  **Second pass the same day** (Richard: "much more subtle in all zooms, specially near"):
+  the view takes only a share of that move (`_cast_frame_share`: `CAST_FRAME_FAR` 0.6 at
+  zoom `CAST_FRAME_ZOOM_FAR` 1/3, down to `CAST_FRAME_NEAR` 0.2 at `MAX_ZOOM`, on the zoom's
+  logarithm), so zoomed in a long cast lands partly past the window's edge, and it moves on
+  a slower spring (`CAST_GLIDE_TIME` 0.6 s) from the throw until it is home.
 - **The land frogs wear a one-pixel black ring** (`build_wildlife.py` `ink_cells`, the
   pigeons' rule): their sheets' cells went 16 to 18 px (`Wildlife.FROG_CELL`, `FROG_FOOT`
   (9, 16)), so the frog stands where it did. Not the swimming shadow, not the dived frog.
+  **And frogs draw 1.2x smaller again** (`FROG_DRAWN` 1/1.44), sitting and swimming.
 - **The pier emblems fill the box's lit face** (`build_piers.py` `lit_face_room`): the room
   between the corner posts, under the rim and above the outline, measured off the built box,
   less `EMBLEM_MARGIN` 1 px; scaled to fit (x1.4 to x1.8, fractional nearest, `EMBLEM_SNAP`).
@@ -4394,20 +4400,35 @@ Every mechanic a player meets mid-run is named the first time it happens.
 - **Every sunken branch is buried its own way** (`build_lakebed.py` `bury_branch`,
   `BURY_WHERE`): one end, the other, both, the middle, two patches or none, each with its
   own length, drift height and lumps, spill, apron and grains, off the branch's own seed.
-- **Twice the driftwood, and nothing under or behind it** (`Ground._lay_driftwood`, 2 logs
-  to 4): a log's foot in `DRIFTWOOD_BAND` 2.4-4.2 tiles out, all its drawing on sand, and
-  `LITTER_REACH` clear of every tile the strand or the beach's rubbish can hold, so no piece
-  lies on a log whatever a save holds. `Ground.on_driftwood` keeps the beach tufts, Flora
+- **15 driftwood logs round the bank, and nothing under or behind them**
+  (`Ground._lay_driftwood`; 2 logs before, 4 in the first pass the same day): a log's foot in
+  `DRIFTWOOD_BAND` 1.0-4.2 tiles out, every corner of its drawing on dry sand
+  (`DRIFTWOOD_DRY`), two logs `DRIFTWOOD_APART` 150 px. **The rubbish keeps off the logs**:
+  the fill drops a strand or beach tile within `Ground.LITTER_CLEAR` of one after rolling it
+  (`LakeGrid.keep_off`, so the tiles past it roll what they did), and a save's piece there is
+  moved to the nearest free shore tile of its kind on load (`LakeGrid.move_off`). The first
+  pass kept the logs above every tile rubbish could wash up on instead, which left room only
+  on one stretch of the south bank. `Ground.on_driftwood` keeps the beach tufts, Flora
   (`DRIFTWOOD_CLEAR`), the animals' shore and bird spots and the sand prints off it.
   Supersedes `DRIFTWOOD_SHARE` 0.004 and the 0.6-2.2 band in The Wood and the Pack Plants.
-- **"$" is green** (`Style.write` -> `_write_money`, `money_ink`, `MONEY_GREEN`): every "$"
-  in a line, the rest in the line's ink, the green matched to the figure's own luminance so
-  it reads with the number's contrast on every face (drawn back, glowing, the red spend tag).
+- **"$" is the palette's grass** (`Style.write` -> `_write_money`, `money_ink`): every "$"
+  in a line, the rest in the line's ink. `MONEY_LIGHT` (`grass_light` x1.7) beside a pale
+  figure, `MONEY_DARK` (`grass_dark`) beside dark ink on paper, dimmed with a figure drawn
+  back. **Second pass the same day** (Richard: the first green "does not fit the palette",
+  and beside the bonus's pale figure it came out white): it was a pure green matched to the
+  figure's luminance, so the whiter the figure the whiter the "$".
   The money plate, the spend tag, every price tag, the Pigeons row, the pricing plate, the
   hose's tag and "$ Bonus" all go through it.
 - **The jet rings a ferry's bell** (`WashBackdrop.sprayed_at`, `hull_box`, `HULL_DING_*`,
   `Sfx.room_bell`): once a hull per 1.5 s, the far lane 6 dB quieter, the pigeons' foam puff
   where it hits; the boat sails on. **Supersedes** "the jet does nothing to ... the boats".
+- **Capybara pairs keep room and turn cleanly** (`Wildlife.CAPY_GAP` 36 px, was 14 back
+  and 8 aside; `_turn_with`): the follower keeps its distance on the side it is on, leaning
+  round towards behind (`CAPY_BEHIND_PULL`), where a fixed spot behind the lead swung to its
+  other side whenever the lead turned and walked the follower through it. Every land
+  animal's heading is eased (`TURN_RATE`) and its view held until the heading is clearly
+  another (`VIEW_IN` 1.6, `VIEW_OUT` 0.9; facing past `FACE_LEAST`): read off each frame's
+  step, a sidestep flipped it side on, head on and back, and the views are not one size.
 - **E in front of the house's door leaves** (`ShedRoom.door_gap`, `DOOR_REACH` 2.8 cells
   from the back wall's foot, `DOOR_SIDE` 0.5): one more candidate for E, the nearest
   winning, with the key chip over the doorway; it closes the room through `close_asked`, the

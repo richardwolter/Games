@@ -46,7 +46,8 @@ const FROG_FOOT := Vector2(9.0, 16.0)
 ## Frogs are drawn 1.2x smaller than their art's grain (2026-10-06, Richard), sitting,
 ## hopping and swimming: drawn smaller, not rebaked, picked off tools/last_shrink_sheet.png
 ## (the rebake lost the face and mangled the swimming shape). Fractional pixels, accepted.
-const FROG_DRAWN := 1.0 / 1.2
+## **1.2x smaller again** (2026-10-11, Richard), so 1.44x under the art's grain in all.
+const FROG_DRAWN := 1.0 / 1.44
 const FROG_ART := SCALE * FROG_DRAWN
 
 ## How many of each at a fully clean lake; `ceil(most * stage)` from the first clean water.
@@ -777,7 +778,7 @@ func _reckon() -> void:
 			var spot: Dictionary = bank[_rng.randi_range(0, bank.size() - 1)]
 			var lead := _new_land(&"capy", spot)
 			var follower := _new_land(&"capy", spot)
-			follower["at"] = (lead["at"] as Vector2) + Vector2(CAPY_BEHIND, CAPY_BESIDE)
+			follower["at"] = (lead["at"] as Vector2) + Vector2(CAPY_GAP, 0.0)
 			follower["lead"] = lead
 			_critters_on_land.append(lead)
 			_critters_on_land.append(follower)
@@ -1396,11 +1397,17 @@ const PATROL_INLAND := 1.2
 ## A snake keeps to `SNAKE_RANGE` tiles of its spot, and a fright sends it `SNAKE_AWAY` tiles.
 const SNAKE_RANGE := 1.6
 const SNAKE_AWAY := Vector2(1.4, 2.4)
-## A capybara pair: the follower keeps `CAPY_BEHIND` px behind and `CAPY_BESIDE` beside its
-## lead, catching up at a run past `CAPY_CATCH_UP`. Each rest the lead may set off for the
-## island (`CAPY_VISIT_ODDS`), stays `CAPY_STAY` seconds and swims home.
-const CAPY_BEHIND := 14.0
-const CAPY_BESIDE := 8.0
+## A capybara pair: the follower keeps `CAPY_GAP` px from its lead, on whichever side it is
+## already, drifting round towards behind (`CAPY_BEHIND_PULL`), and catches up at a run past
+## `CAPY_CATCH_UP`. Each rest the lead may set off for the island (`CAPY_VISIT_ODDS`), stays
+## `CAPY_STAY` seconds and swims home.
+##
+## **Kept on its own side, not put behind** (2026-10-11, Richard: "bugging between each
+## other, let them breathe"): its place used to be a fixed spot behind the lead, 14 px back
+## and 8 aside, so a lead turning round swung the place to its other side and the follower
+## walked straight through it. 36 px apart now, about a body and a half.
+const CAPY_GAP := 36.0
+const CAPY_BEHIND_PULL := 0.5
 const CAPY_CATCH_UP := 40.0
 const CAPY_GO := 10.0
 const CAPY_STOP := 2.0
@@ -1861,8 +1868,7 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 				_rest(c)
 			return
 		c["stuck"] = 0.0
-		c["facing"] = Flock.facing_of(at, next) if absf(next.x - at.x) > 0.05 else float(c["facing"])
-		c["view"] = _view_of(next - at)
+		_turn_with(c, next - at, delta)
 		c["at"] = next
 		c["walked"] = float(c["walked"]) + at.distance_to(next)
 		c["step_px"] = float(c.get("step_px", 0.0)) + at.distance_to(next)
@@ -1872,6 +1878,42 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 				_track(next)
 	if kind == &"capy":
 		_capy_water(c)
+
+
+## Turn an animal to the way it is walking, `step` this frame: its heading eased
+## (`TURN_RATE`), its view held until the heading is clearly another one (`VIEW_IN`,
+## `VIEW_OUT`) and its facing kept until the heading has a clear sideways part
+## (`FACE_LEAST`). Read straight off each frame's step, a sidestep round a tree or a lead
+## turning flipped a capybara side on, head on and back from frame to frame, and the
+## pictures are not one size (2026-10-11, Richard: "bugged when they change direction").
+func _turn_with(c: Dictionary, step: Vector2, delta: float) -> void:
+	if step.length_squared() < 0.0001:
+		return
+	var heading: Vector2 = c.get("heading", step.normalized())
+	heading = heading.lerp(step.normalized(), 1.0 - exp(-TURN_RATE * delta))
+	if heading.length_squared() < 0.0001:
+		heading = step.normalized()
+	heading = heading.normalized()
+	c["heading"] = heading
+	var view := String(c.get("view", "side"))
+	var across := absf(heading.x)
+	var down := absf(heading.y)
+	if view == "side":
+		if down > across * VIEW_IN:
+			view = "front" if heading.y > 0.0 else "back"
+	elif down < across * VIEW_OUT:
+		view = "side"
+	else:
+		view = "front" if heading.y > 0.0 else "back"
+	c["view"] = view
+	if across > FACE_LEAST:
+		c["facing"] = Flock.facing_of(Vector2.ZERO, heading)
+
+
+const TURN_RATE := 6.0
+const VIEW_IN := 1.6
+const VIEW_OUT := 0.9
+const FACE_LEAST := 0.3
 
 
 ## The view a walk shows: side on, or straight down or up the screen (a capybara and the
@@ -2075,11 +2117,15 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 	var at: Vector2 = c["at"]
 	var lat: Vector2 = lead["at"]
 	var back := Vector2(float(lead["facing"]), 0.0)
-	# Behind and beside its lead, or the first of the other places round it that is clear of
-	# the trees, the rocks and the buildings; the lead's own spot last.
+	# `CAPY_GAP` from its lead on the side it is on, leaning round towards behind, or the
+	# first place turned from there that is clear of the trees, the rocks and the buildings;
+	# the lead's own spot last.
+	var side := at - lat
+	var way := (side.normalized() if side.length() > 1.0 else back) + back * CAPY_BEHIND_PULL
+	way = way.normalized() if way.length() > 0.01 else back
 	var goal := lat
-	for off: Vector2 in [back * CAPY_BEHIND + Vector2(0.0, CAPY_BESIDE), back * CAPY_BEHIND - Vector2(0.0, CAPY_BESIDE),
-			back * CAPY_BEHIND * 1.4, -back * CAPY_BEHIND + Vector2(0.0, CAPY_BESIDE)]:
+	for turn: float in [0.0, 0.6, -0.6, 1.2, -1.2, PI]:
+		var off := way.rotated(turn) * Vector2(CAPY_GAP, CAPY_GAP * 0.5)
 		if lead.get("trip", false) or not _blocked(c, lat + off):
 			goal = lat + off
 			break
@@ -2093,8 +2139,7 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 		var speed := float(KINDS[&"capy"]["run"]) if gap > CAPY_CATCH_UP else float(KINDS[&"capy"]["walk"]) * CAPY_KEEP_UP
 		speed *= 1.25 if lead.get("trip", false) else 1.0
 		var next := _step_to(c, goal, speed * delta, bool(lead.get("trip", false)))
-		c["facing"] = Flock.facing_of(at, next) if absf(next.x - at.x) > 0.05 else float(c["facing"])
-		c["view"] = _view_of(next - at)
+		_turn_with(c, next - at, delta)
 		c["step_px"] = float(c.get("step_px", 0.0)) + at.distance_to(next)
 		c["at"] = next
 		c["state"] = Land.MOVE

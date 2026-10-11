@@ -533,31 +533,25 @@ static func measure(text: String, size_px: int) -> Vector2:
 ## inked by `money_ink`, the rest of the line in its own ink: the money plate, the spend
 ## tag, every price tag, the Pigeons row and the pricing plate all go through `write`.
 const MONEY_MARK := "$"
-## The green the mark is drawn in, before it is matched to the figure's brightness: off the
-## pack's grass, the same family as `SAFE`.
-const MONEY_GREEN := Color(0.30, 0.86, 0.30)
+## The mark's two greens, off the palette's grass (2026-10-11, second pass, Richard: the
+## first green "does not fit the palette", and over the bonus's pale figure it was drawn near
+## white): `grass_light` lifted 1.7, the aim ring's own lift taken a step further, for a
+## figure in a pale ink on a dark face; `grass_dark` for a figure in dark ink on paper.
+## Written as numbers, like the rest of `Style`: a palette retune means re-picking them.
+const MONEY_LIGHT := Color(0.726, 0.899, 0.427)
+const MONEY_DARK := Color(0.196, 0.341, 0.114)
 
 
-## The green `$` beside a figure inked `ink`: `MONEY_GREEN` taken towards white or black
-## until it is exactly as bright (relative luminance) as the figure, so the mark reads with
-## the same contrast as the number on every face it sits on, drawn back, glowing or fading
-## with it. Alpha is the figure's.
+## The green `$` beside a figure inked `ink`: `MONEY_LIGHT` by a pale ink and `MONEY_DARK` by
+## a dark one (`SHADE_UNDER`, the shade's own line). Drawn back with its figure: a figure
+## dimmer than the price's own gold takes the green down with it, and no figure brighter
+## than that lifts it, so the bonus's pale figure keeps a green mark. Alpha is the figure's.
 static func money_ink(ink: Color) -> Color:
-	var want := ink.get_luminance()
-	var base := MONEY_GREEN
-	var lo := 0.0
-	var hi := 1.0
-	var towards := Color.WHITE if base.get_luminance() < want else Color.BLACK
-	for i in 18:
-		var mid := (lo + hi) * 0.5
-		var c := base.lerp(towards, mid)
-		if (c.get_luminance() < want) == (towards == Color.WHITE):
-			lo = mid
-		else:
-			hi = mid
-	var out := base.lerp(towards, (lo + hi) * 0.5)
-	out.a = ink.a
-	return out
+	var lum := ink.get_luminance()
+	if lum <= SHADE_UNDER:
+		return Color(MONEY_DARK, ink.a)
+	var dim := clampf(lum / PRICE_INK.get_luminance(), 0.4, 1.0)
+	return Color(MONEY_LIGHT.r * dim, MONEY_LIGHT.g * dim, MONEY_LIGHT.b * dim, ink.a)
 
 
 ## A line holding the money mark: written run by run, each "$" in `money_ink`, the shade and

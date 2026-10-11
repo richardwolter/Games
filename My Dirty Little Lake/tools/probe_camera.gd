@@ -278,8 +278,11 @@ func _report() -> void:
 		_land_frac.x, _land_frac.y, _land_extent])
 	_check(_peak[1] <= Lake.HOME_SPEED * 1.02 and _peak[2] <= Lake.HOME_SPEED * 1.02,
 		"the view came home no faster than HOME_SPEED", "")
-	_check(_land_frac.x + _land_extent <= allowed + _land_slack
-		and _land_frac.y + _land_extent <= allowed + _land_slack,
+	# Only with the old follow (`Lake.CAST_FOLLOW`): without it the view takes only a share of
+	# the framing move (2026-10-11, Richard), and a long cast zoomed in lands past the edge on
+	# purpose. The figure is still printed above.
+	_check(not Lake.CAST_FOLLOW or (_land_frac.x + _land_extent <= allowed + _land_slack
+		and _land_frac.y + _land_extent <= allowed + _land_slack),
 		"the net came down inside the landing margin",
 		"%.2f allowed, one step of the throw over it" % allowed)
 

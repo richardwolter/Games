@@ -213,22 +213,31 @@ const FLOOR_FROM := WOOD_FROM - 1.0
 const FLOOR_SHARE := 0.03
 const FLOOR_PIECES := ["log0", "log1", "log_moss0", "log_moss1", "stick0", "stick1", "stick2",
 	"stick3", "stump"]
-## The driftwood lies up the beach, past the rubbish washed up on it (2026-10-11, Richard:
-## "spread out a few more... make sure objects do not spawn underneath it or are hidden by
-## these wood logs"). `DRIFTWOOD_BAND` is where its foot may be, in tiles out of the water,
-## every corner of its drawing (grown `DRIFTWOOD_CLEAR` px) has to be sand, and its drawing
-## has to stay `LITTER_REACH` clear of every tile the strand or the beach's rubbish can hold
-## (`Iso.on_strand`, `Iso.BEACH_LITTER`), so no beach piece can lie on a log, whatever a
-## save holds. Flora, the beach tufts and the
-## animals' spots keep off it through `on_driftwood`. The share was 0.004 in a band from
-## 0.6 tiles and is about twice as many logs now.
-const DRIFTWOOD_SHARE := 0.12
-const DRIFTWOOD_BAND := Vector2(2.4, 4.2)
+## The driftwood lies on the bank's beach (2026-10-11, Richard: "spread out a few more...
+## make sure objects do not spawn underneath it or are hidden by these wood logs"; second
+## pass the same day: "at least 6 more"). `DRIFTWOOD_BAND` is where its foot may be, in tiles
+## out of the water, every corner of its drawing (grown `DRIFTWOOD_CLEAR` px) has to be dry
+## sand, and two logs keep `DRIFTWOOD_APART`. The rubbish keeps off the logs rather than the
+## logs off the rubbish: the fill skips a strand or beach tile within `LITTER_CLEAR` of one
+## (`LakeGrid.keep_off`), and a save's piece there is moved to the nearest free shore tile
+## (`LakeGrid._move_off`). Keeping the logs above every tile rubbish could wash up on put
+## them all on one stretch of the south bank. Flora, the beach tufts and the
+## animals' spots keep off it through `on_driftwood`. 15 logs round the bank, from 2 in
+## the first cut and 4 in the second.
+const DRIFTWOOD_SHARE := 0.04
+const DRIFTWOOD_BAND := Vector2(1.0, 4.2)
 const DRIFTWOOD_CLEAR := 6.0
-## Half the widest a washed-up piece is drawn round its tile's middle, world px: the strand
-## and beach rubbish are tier 0 and at most `LakeGrid.STRAND_WIDE` art px across, drawn at
-## 2, and a shore pair lies `LakeGrid.SHORE_APART` of a tile either side.
-const LITTER_REACH := 30.0
+## How far out of the water every corner of a log's drawing has to be, tiles: on the dry
+## sand, not over the waterline.
+const DRIFTWOOD_DRY := 0.4
+## How far round a tile's middle a washed-up piece is kept off a log's drawing, world px
+## (`LakeGrid.keep_off`): the strand and beach rubbish are tier 0, at most
+## `LakeGrid.STRAND_WIDE` px across at the rubbish's grain, drifted and paired about a third
+## of a tile off the middle.
+const LITTER_CLEAR := 26.0
+## How far apart two logs' middles are kept, world px: so they spread round the bank rather
+## than lining up along the one stretch of beach wide enough to take them.
+const DRIFTWOOD_APART := 150.0
 const ROCKS := "res://assets/Forest Isometric Pack Free/Rocks/Slice %d.png"
 const ROCK_COUNT := 5
 const LEAVES := "res://assets/Forest Isometric Pack Free/Leaves/Slice %d.png"
@@ -658,23 +667,10 @@ func _lay_driftwood(cell: Vector2i, at: Vector2) -> void:
 	for corner: Vector2 in [wide.position, Vector2(wide.end.x, wide.position.y), wide.end,
 			Vector2(wide.position.x, wide.end.y), wide.get_center()]:
 		var t := Iso.world_to_tile(corner)
-		if kind_at(t.x, t.y) != Kind.SAND:
+		if kind_at(t.x, t.y) != Kind.SAND or out_of_water(t.x, t.y) < DRIFTWOOD_DRY:
 			return
-	# Clear of every tile the beach's rubbish or the strand can hold, at the widest a piece
-	# there is drawn: so whatever a save holds, nothing lies on the wood.
-	var tile := Vector2i(cell)
-	for dx in range(-3, 4):
-		for dy in range(-3, 4):
-			var tx := tile.x + dx
-			var ty := tile.y + dy
-			var mid := Vector2(float(tx) + 0.5, float(ty) + 0.5)
-			if not (Iso.on_strand(tx, ty) or Iso.on_beach_at(mid, Iso.BEACH_LITTER.x, Iso.BEACH_LITTER.y)):
-				continue
-			var at_world := Iso.tile_to_world(mid.x, mid.y)
-			if Rect2(at_world - LITTER_REACH * Vector2(1.0, 1.4), LITTER_REACH * Vector2(2.0, 1.8)).intersects(wide):
-				return
 	for other: Rect2 in driftwood:
-		if other.grow(DRIFTWOOD_CLEAR * 2.0).intersects(box):
+		if other.get_center().distance_to(box.get_center()) < DRIFTWOOD_APART:
 			return
 	driftwood.append(box)
 	_litter_art(cell, at, art)

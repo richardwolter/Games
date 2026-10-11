@@ -2057,6 +2057,13 @@ static func _up_bin(k: int, slots: int) -> int:
 ##
 ## Its own generator, seeded off the lake's, so adding the strand line leaves the rest of the
 ## fill exactly as it was rolled.
+## Whether a shore tile's rubbish would lie on something drawn on the beach, index -> bool:
+## the bank's driftwood (2026-10-11, `Ground.LITTER_CLEAR`), handed in by the lake before the
+## fill. The strand and the beach skip such a tile (`_strand`), and a save's piece on one is
+## moved off it (`move_off`). Unset, nothing is kept off anything.
+var keep_off: Callable
+
+
 func _strand(lake_seed: int) -> void:
 	var small: Array[int] = []
 	for i in defs.size():
@@ -2080,6 +2087,9 @@ func _strand(lake_seed: int) -> void:
 			stack.append(small[rng.randi_range(0, small.size() - 1)])
 			if rng.randf() < STRAND_TWO:
 				stack.append(small[rng.randi_range(0, small.size() - 1)])
+			# Rolled first and dropped after, so the tiles past it roll what they always did.
+			if keep_off.is_valid() and bool(keep_off.call(index_of(tx, ty))):
+				continue
 			stacks[index_of(tx, ty)] = stack
 
 
@@ -2376,6 +2386,7 @@ func restore(saved: Array) -> bool:
 		stacks[index] = PackedInt32Array(saved[index])
 		emerge[index] = 0.0
 		shove[index] = Vector2.ZERO
+	move_off()
 	_emerging.resize(0)
 	_clear_rise()
 	_shoved.resize(0)
@@ -2383,6 +2394,45 @@ func restore(saved: Array) -> bool:
 	_dirty = true
 	queue_redraw()
 	return true
+
+
+## A shore tile's rubbish that `keep_off` refuses goes to the nearest empty shore tile it
+## does not, within `MOVE_OFF_REACH` tiles: a save written before the driftwood it now lies
+## under. Nothing is lost: with nowhere to go, it stays.
+const MOVE_OFF_REACH := 6
+
+
+func move_off() -> int:
+	if not keep_off.is_valid():
+		return 0
+	var moved := 0
+	for index in stacks.size():
+		if shore[index] != 1 or stacks[index].is_empty() or not bool(keep_off.call(index)):
+			continue
+		var tx := index % Iso.COLS
+		var ty := index / Iso.COLS
+		var best := -1
+		var best_gap := INF
+		for dx in range(-MOVE_OFF_REACH, MOVE_OFF_REACH + 1):
+			for dy in range(-MOVE_OFF_REACH, MOVE_OFF_REACH + 1):
+				var x := tx + dx
+				var y := ty + dy
+				if x < 0 or y < 0 or x >= Iso.COLS or y >= Iso.ROWS:
+					continue
+				var to := index_of(x, y)
+				if shore[to] != 1 or not stacks[to].is_empty() or dry[to] != dry[index]:
+					continue
+				var gap := float(dx * dx + dy * dy)
+				if gap < best_gap and not bool(keep_off.call(to)):
+					best_gap = gap
+					best = to
+		if best >= 0:
+			stacks[best] = stacks[index]
+			stacks[index] = PackedInt32Array()
+			moved += 1
+	if moved > 0:
+		_dirty = true
+	return moved
 
 
 ## How a tile's visible piece lies on the water: turned, drifted, sized and facing. One

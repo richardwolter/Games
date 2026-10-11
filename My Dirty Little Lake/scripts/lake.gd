@@ -168,6 +168,18 @@ const LAND_INSET_STILL := 0.08
 ## With the follow off the margin is thin: the view moves only for a net that would land at
 ## the window's edge or past it, not for every net in the outer quarter (`CAST_FOLLOW`).
 const LAND_INSET := LAND_INSET_FOLLOW if CAST_FOLLOW else LAND_INSET_STILL
+## With the follow off, the view takes only a share of the move framing the net asks for
+## (2026-10-11, second pass, Richard: "much more subtle in all zooms, specially near"):
+## `CAST_FRAME_FAR` at the far end of the zoom, falling to `CAST_FRAME_NEAR` at `MAX_ZOOM`,
+## so zoomed in a long cast lands partly past the window's edge rather than the lake sliding
+## under the player. And it moves on a slower spring, `CAST_GLIDE_TIME`, from the throw until
+## the view is home, with no stiffening over the throw.
+const CAST_FRAME_FAR := 0.6
+const CAST_FRAME_NEAR := 0.2
+const CAST_GLIDE_TIME := 0.6
+## The zoom `CAST_FRAME_FAR` is read at: the far stop on 1080p. A number rather than the
+## window's own far stop, so the share is the same at a zoom on every screen.
+const CAST_FRAME_ZOOM_FAR := 1.0 / 3.0
 const FRAME_BY := 0.6
 
 ## The most the view may travel on the way home, in world pixels a second.
@@ -1321,6 +1333,12 @@ func _ready() -> void:
 		_sheets = null
 	_grid.sheets = _sheets
 	_mark("sheets")
+	# The bank's driftwood is down by now: the beach's and the strand's rubbish keep off it.
+	for ground: Ground in _grounds:
+		if ground.layer == Ground.Layer.OUTSIDE:
+			_grid.keep_off = func(index: int) -> bool:
+				var mid := Iso.tile_to_world(float(index % Iso.COLS) + 0.5, float(index / Iso.COLS) + 0.5)
+				return ground.on_driftwood(mid, Ground.LITTER_CLEAR)
 	_grid.build(_all_defs(), _level_seed(), _fills_the_lake())
 	_mark("grid build")
 	_hide_treasures()
@@ -5605,7 +5623,9 @@ func _drive_view(delta: float) -> void:
 		# A throw closes on its landing a little quicker as it flies, so a short one still
 		# comes down framed; eased in, so the stiffening is not itself a jolt.
 		var time := FOLLOW_TIME
-		if _net.state == CastNet.State.FLYING:
+		if not CAST_FOLLOW and (_net.state != CastNet.State.IDLE or _homing):
+			time = CAST_GLIDE_TIME
+		elif _net.state == CastNet.State.FLYING:
 			time = lerpf(FOLLOW_TIME, THROW_TIME, clampf(_net.cast_progress() / CastNet.THROW_SHARE, 0.0, 1.0))
 		_glide_to(_clamped_view(_watching()), _home_cap, delta, time)
 
@@ -6273,14 +6293,26 @@ func _watching() -> Vector2:
 				_throw_from = _camera.position
 				_throw_out = _homing
 			var flown := _net.cast_progress() / CastNet.THROW_SHARE
-			var framed := _framed_on(_throw_from if _throw_out else at + _pan, _net.target)
+			var from := _throw_from if _throw_out else at + _pan
+			var framed := from.lerp(_framed_on(from, _net.target), _cast_frame_share())
 			return _throw_from.lerp(framed, smoothstep(0.0, FRAME_BY, flown))
 		CastNet.State.SETTLED, CastNet.State.REELING:
-			return _framed_on(at + _pan, _net.tile_pos)
+			return (at + _pan).lerp(_framed_on(at + _pan, _net.tile_pos), _cast_frame_share())
 		CastNet.State.IDLE:
 			if _aim.at != Vector2.INF:
 				at = _pad_framed(at)
 	return at + _pan
+
+
+## How much of the framing move a cast takes: all of it with the follow on, and with it off
+## `CAST_FRAME_FAR` at the far end of the zoom down to `CAST_FRAME_NEAR` at `MAX_ZOOM`,
+## measured in the zoom's logarithm so each stop is a step.
+func _cast_frame_share() -> float:
+	if CAST_FOLLOW:
+		return 1.0
+	var far := CAST_FRAME_ZOOM_FAR
+	var t := clampf((log(maxf(_camera.zoom.x, 0.01)) - log(far)) / (log(MAX_ZOOM) - log(far)), 0.0, 1.0)
+	return lerpf(CAST_FRAME_FAR, CAST_FRAME_NEAR, t)
 
 
 ## `at`, leaned out towards the pad's reticle until the ghost mouth under it is inside the

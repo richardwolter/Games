@@ -12427,6 +12427,15 @@ func _check_oct11_fixes() -> void:
 	_check(not Lake.CAST_FOLLOW and Lake.LAND_INSET < Lake.LAND_INSET_FOLLOW
 		and lake_src.contains("CAST_LOOK if CAST_FOLLOW and"),
 		"a cast leaves the view on the angler unless the landing needs it", "")
+	var cam_zoom: Vector2 = (_main.get_node(^"Camera") as Camera2D).zoom
+	(_main.get_node(^"Camera") as Camera2D).zoom = Vector2.ONE * Lake.MAX_ZOOM
+	var near_share: float = _main.call(&"_cast_frame_share")
+	(_main.get_node(^"Camera") as Camera2D).zoom = Vector2.ONE * Lake.CAST_FRAME_ZOOM_FAR
+	var far_share: float = _main.call(&"_cast_frame_share")
+	(_main.get_node(^"Camera") as Camera2D).zoom = cam_zoom
+	_check(is_equal_approx(near_share, Lake.CAST_FRAME_NEAR) and is_equal_approx(far_share, Lake.CAST_FRAME_FAR)
+		and near_share < far_share, "and takes less of that move the nearer the zoom",
+		"near %.2f far %.2f" % [near_share, far_share])
 
 	# The frogs wear a black ring: every cell grew a pixel a side and holds pure black.
 	var frog := load("res://assets/wildlife/frog_green.png") as Texture2D
@@ -12450,7 +12459,13 @@ func _check_oct11_fixes() -> void:
 		if ground.layer == Ground.Layer.OUTSIDE:
 			bank = ground
 	if bank != null:
-		_check(bank.driftwood.size() >= 3, "the bank's beach has its driftwood", str(bank.driftwood.size()))
+		_check(bank.driftwood.size() >= 10, "the bank's beach has its driftwood", str(bank.driftwood.size()))
+		# Round the bank, not along one stretch of it.
+		var sides := {}
+		for box: Rect2 in bank.driftwood:
+			var tile := Iso.world_to_tile(box.get_center())
+			sides[int(floor((Vector2(tile.x, tile.y) - Iso.CENTRE).angle() / (PI * 0.5)))] = true
+		_check(sides.size() >= 3, "and the logs lie round the bank", str(sides.keys()))
 		var under := []
 		for index in _grid.stacks.size():
 			var tx := index % Iso.COLS
@@ -12475,12 +12490,28 @@ func _check_oct11_fixes() -> void:
 				on_wood += 1
 		_check(on_wood == 0, "no plant or animal's spot is on a log", str(on_wood))
 
-	# "$" is green, and as bright as the figure it stands by.
-	for ink: Color in [Style.PRICE_INK, Style.GOLD, Style.PAPER_INK, HudSkin.SPENT_INK]:
-		var green := Style.money_ink(ink)
-		_check(absf(green.get_luminance() - ink.get_luminance()) < 0.01
-			and green.g >= green.r and green.g >= green.b,
-			"the money mark is a green as bright as its figure", "%s for %s" % [green, ink])
+	# A capybara's view holds through a sidestep: one frame off the line is not a turn.
+	var walker := {"view": "side", "facing": 1.0}
+	var wild_turn: Wildlife = _main.get(&"_wildlife")
+	for i in 10:
+		wild_turn.call(&"_turn_with", walker, Vector2(-1.0, 0.1), 1.0 / 60.0)
+	wild_turn.call(&"_turn_with", walker, Vector2(0.1, 1.0), 1.0 / 60.0)
+	var held_view := String(walker["view"])
+	for i in 60:
+		wild_turn.call(&"_turn_with", walker, Vector2(0.05, 1.0), 1.0 / 60.0)
+	_check(held_view == "side" and String(walker["view"]) == "front",
+		"an animal's view holds through a sidestep and turns on a real turn",
+		"%s then %s" % [held_view, walker["view"]])
+	_check(Wildlife.CAPY_GAP >= 30.0, "a capybara pair keeps room between them", str(Wildlife.CAPY_GAP))
+
+	# "$" is the palette's grass: the light green by a pale figure, the bonus's near-white
+	# one included, the dark green on paper, and drawn back with a dimmed figure.
+	_check(Style.money_ink(Style.PRICE_INK).is_equal_approx(Style.MONEY_LIGHT)
+		and Style.money_ink(Style.INK).is_equal_approx(Style.MONEY_LIGHT)
+		and Style.money_ink(Style.PAPER_INK).is_equal_approx(Style.MONEY_DARK)
+		and Style.money_ink(Style.PRICE_INK.darkened(0.5)).get_luminance() < Style.MONEY_LIGHT.get_luminance(),
+		"the money mark is the palette's grass, light by a pale figure, dark on paper",
+		"%s %s" % [Style.money_ink(Style.INK), Style.money_ink(Style.PAPER_INK)])
 
 	# The jet on a ferry rings its bell once, puffs foam, and leaves it sailing.
 	_main.call(&"_set_wash", true)
