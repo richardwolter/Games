@@ -44,6 +44,16 @@ const ANIMS := [
 
 const DIRS := ["south", "north", "east", "west"]
 
+## Poses drawn standing on the boot rather than on each frame's ink box (2026-10-11). Centred on
+## its own box, a frame whose arm, hat or basket swings out moves the figure under the feet, and
+## the boots slid sideways a pixel or several while the angler stood still. A strip built by
+## tools/build_idle_frames.py comes with `<strip>_feet.json`: where it put the planted boot's toe
+## in each cell. Such a pose's ink box is its first frame's moved by however far each frame's toe
+## sits from the first's, so the boots land on the same pixel all loop. Read from the builder,
+## not off the pixels: east's basket reaches the ground row, and a toe measured there was the
+## basket's.
+const FEET_SUFFIX := "_feet.json"
+
 ## The run rows are read off Richard's flat sheet instead (2026-09-28, the repainted run):
 ## `art_source/character.png` holds all twelve rows stacked, touching, so each run row is cut
 ## at the band and width its old strip had. Measured by matching the strips against the
@@ -97,6 +107,7 @@ func _init() -> void:
 				"frames": frames,
 				"skip": int(anim.get("skip", 0)),
 				"ink_first": bool(anim.get("ink_first", false)),
+				"feet": _feet_of(SOURCE_DIR + slug + FEET_SUFFIX),
 				"cell_w": cell_w,
 				"cell_h": image.get_height(),
 			})
@@ -125,6 +136,16 @@ func _init() -> void:
 			if strip["ink_first"] and not frames.is_empty():
 				var first: Array = frames[0]["ink"]
 				ink = Rect2i(first[0] + box.position.x, first[1] + box.position.y, first[2], first[3])
+			elif not (strip["feet"] as Array).is_empty() and not frames.is_empty():
+				var feet: Array = strip["feet"]
+				var first: Array = frames[0]["ink"]
+				var toe: Array = feet[column]
+				var first_toe: Array = feet[int(strip["skip"])]
+				var moved := Vector2i(int(toe[0]) - int(first_toe[0]), int(toe[1]) - int(first_toe[1]))
+				ink = Rect2i(
+					first[0] + box.position.x + moved.x, first[1] + box.position.y + moved.y,
+					first[2], first[3]
+				)
 			frames.append({
 				"region": [box.position.x, box.position.y, box.size.x, box.size.y],
 				"ink": (
@@ -173,6 +194,14 @@ func _ink(atlas: Image, cell: Rect2i) -> Rect2i:
 	if high.x < low.x or high.y < low.y:
 		return Rect2i()
 	return Rect2i(low, high - low + Vector2i.ONE)
+
+
+## A builder's feet file, or nothing: one [column, row] a frame.
+func _feet_of(path: String) -> Array:
+	if not FileAccess.file_exists(path):
+		return []
+	var read: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return read if read is Array else []
 
 
 ## The atlas blown up over a grey, with the cell grid on it and every measured ink box.
