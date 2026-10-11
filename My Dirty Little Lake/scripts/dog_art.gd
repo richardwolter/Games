@@ -41,6 +41,24 @@ const HELD := {
 	&"sleep": 0.5,
 }
 
+## How far a planted paw slides back across the sheet in one frame of each gait, in sheet
+## pixels (2026-10-11, the walk-pacing pass): what the ground has to do under a drawn dog for
+## its feet to stay put. Measured off breed 22's walk and gallop and tuned by Richard off
+## `tools/shot_stride.tscn`; all four breeds are one silhouette. `pace` turns it into a speed
+## at any drawn height, and every walker that draws these frames walks at it.
+const WALK_STEP := 3.281
+const RUN_STEP := 10.44
+const STEP := {&"walk": WALK_STEP, &"walk2": WALK_STEP, &"run": RUN_STEP, &"run2": RUN_STEP}
+## The rows of the sheet a standing dog is, which `_scale_for` sizes it by.
+const SHEET_TALL := 29.0
+
+
+## The pace, in drawn pixels a second, at which a gait drawn `height` pixels tall keeps its
+## paws planted: STEP sheet pixels a frame, scaled, over the frame's HELD.
+static func pace(name: StringName, height: float, breed: int = 0) -> float:
+	return float(STEP.get(name, 0.0)) * _scale_for(name, height, breed) / float(HELD.get(name, 0.12))
+
+
 ## The two gaits the sheet carries, by which of the pair a dog runs on. Dogs in the odd slots
 ## of the pack use the second pair, so four dogs on one beach do not run in step.
 ## The pack's still rows end on two head-up frames with the mouth open: a bark, drawn into

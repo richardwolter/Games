@@ -10889,6 +10889,7 @@ func _stage_first_steps() -> void:
 	_check_cast_facing()
 	_check_rope_curve()
 	_check_walk_weight()
+	_check_walk_pacing()
 	_check_pier_look()
 	_advance()
 
@@ -11030,6 +11031,88 @@ func _check_walk_weight() -> void:
 	_angler.walk_to = Vector2.INF
 	_angler.stand_at(from)
 	_angler.can_walk = could
+
+
+## The legs step with the ground (2026-10-11, the walk-pacing pass): every walker's speed is
+## the one its frames are drawn for, the run frames advance by the ground covered, a push that
+## makes no ground runs in place, the swim wears the gallop, and the twitching run loops are
+## cut short.
+func _check_walk_pacing() -> void:
+	var dt := 1.0 / 60.0
+	_check(is_equal_approx(Angler.WALK_SPEED, Angler.STEP_PX / Angler.RUN_FRAME / Angler.SIDEWAYS)
+		and absf(Angler.WALK_SPEED - 1.91) < 0.02, "the angler walks at his boots' pace",
+		"%.3f" % Angler.WALK_SPEED)
+	var walk := DogArt.pace(&"walk", Dog.HEIGHT) / Angler.SIDEWAYS
+	var run := DogArt.pace(&"run", Dog.HEIGHT) / Angler.SIDEWAYS
+	_check(absf(walk - Dog.WALK_SPEED) < 0.01 and absf(run - Dog.RUN_SPEED) < 0.02,
+		"the dog walks and runs at its paws' pace", "walk %.3f run %.3f" % [walk, run])
+	_check(Dog.SWIM_SPEED < Dog.RUN_SPEED and Dog.SWIM_SPEED > Dog.RUN_SPEED * 0.5,
+		"the swim is slower than the run", "%.2f" % Dog.SWIM_SPEED)
+	_check(absf(ShedRoom.DOG_SPEED - DogArt.pace(&"walk", ShedRoom.DOG_TALL)) < 0.01,
+		"the shed's dog walks at its paws' pace", "%.3f" % ShedRoom.DOG_SPEED)
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/character.json"))
+	var lengths := {}
+	for dir: String in ["east", "west", "north", "south"]:
+		lengths[dir] = (data["poses"]["run_" + dir] as Array).size()
+	_check(lengths == {"east": 11, "west": 14, "north": 14, "south": 11},
+		"east and south run loops are cut short of their repeat", str(lengths))
+
+	# The run's frames step with the ground: a glide covers ground and steps it.
+	var could: bool = _angler.can_walk
+	var from: Vector2 = _angler.tile_pos
+	_angler.stand_at(Iso.ISLAND_CENTRE + Vector2(1.5, 1.5))
+	_angler.can_walk = false
+	_angler.set(&"_vel", Vector2(Angler.WALK_SPEED, 0.0))
+	var stride: float = _angler.get(&"_stride")
+	var start: Vector2 = _angler.tile_pos
+	for i in 20:
+		_angler.call(&"_process", dt)
+	var stepped: float = float(_angler.get(&"_stride")) - stride
+	var moved: float = _angler.tile_pos.distance_to(start)
+	_check(moved > 0.0 and absf(stepped - moved / Angler.WALK_SPEED) < 0.001,
+		"the run steps with the ground covered", "%.4f against %.4f" % [stepped, moved / Angler.WALK_SPEED])
+	# A push into the water's edge makes no ground and runs in place.
+	_angler.walk_to = Iso.ISLAND_CENTRE + Vector2(40.0, 40.0)
+	for i in 600:
+		_angler.call(&"_process", dt)
+	start = _angler.tile_pos
+	stride = _angler.get(&"_stride")
+	for i in 30:
+		_angler.call(&"_process", dt)
+	var crept := _angler.tile_pos.distance_to(start)
+	_check(crept < Angler.WALK_SPEED * 30.0 * dt * 0.5
+		and absf(float(_angler.get(&"_stride")) - stride - 30.0 * dt) < 0.001,
+		"a push that makes no ground runs in place",
+		"stride %.3f, crept %.3f" % [float(_angler.get(&"_stride")) - stride, crept])
+	_angler.walk_to = Vector2.INF
+	_angler.stand_at(from)
+	_angler.can_walk = could
+
+	var dogs: Array = _main.get(&"_dogs")
+	if dogs.is_empty():
+		_check(false, "a dog to pace", "")
+		return
+	var dog: Dog = dogs[0]
+	var was_state: int = dog.get(&"_state")
+	var was_at := dog.tile_pos
+	dog.set(&"_state", Dog.State.WANDER)
+	dog.call(&"_step_the_legs")
+	var dog_stride: float = dog.get(&"_stride")
+	dog.tile_pos += Vector2(0.2, 0.0)
+	dog.call(&"_step_the_legs")
+	_check(absf(float(dog.get(&"_stride")) - dog_stride - 0.2 / Dog.WALK_SPEED) < 0.001,
+		"a dog's walk steps with the ground covered", "")
+	dog_stride = dog.get(&"_stride")
+	dog.tile_pos += Vector2(5.0, 0.0)
+	dog.call(&"_step_the_legs")
+	_check(is_equal_approx(float(dog.get(&"_stride")), dog_stride), "a dog put somewhere steps nothing", "")
+	dog.set(&"_state", Dog.State.SWIM_OUT)
+	dog.tile_pos = Iso.ISLAND_CENTRE + Vector2(12.0, 12.0)
+	var shown := String(dog.call(&"_still_showing"))
+	_check(shown.begins_with("run"), "a swimming dog paddles on the gallop", shown)
+	dog.tile_pos = was_at
+	dog.set(&"_state", was_state)
+	dog.set(&"_stride_from", Vector2.INF)
 
 
 ## The drawn rope is a smooth curve through the chain: same ends, no corner sharper than a

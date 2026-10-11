@@ -12,10 +12,15 @@
 class_name Angler
 extends Node2D
 
-## Tiles per second. Unhurried, not slow: where you stand is a decision and it should cost
-## something to change, but the island is only nine tiles across and at the old 3.2 that
-## decision cost more waiting than thinking.
-const WALK_SPEED := 5.4
+## Tiles per second. Matched to the run frames, not chosen on its own (2026-10-11, the
+## walk-pacing pass): the planted boot of the run sheet moves STEP_PX art pixels a frame, the
+## figure is drawn one world pixel to one of art, and a tile walked sideways on screen is
+## SIDEWAYS world pixels, so STEP_PX / RUN_FRAME / SIDEWAYS is the speed at which the boots
+## do not skate. Richard picked it off `tools/shot_stride.tscn`. It was 5.4 (and 3.2 before
+## that), which ran the ground under the feet two to five times faster than they stepped.
+const STEP_PX := 2.59
+const SIDEWAYS := 45.254834
+const WALK_SPEED := STEP_PX / RUN_FRAME / SIDEWAYS
 
 ## How long it takes to reach WALK_SPEED from a standstill, and to shed it again, in seconds.
 ##
@@ -139,12 +144,18 @@ const SIDE_FAVOUR := 0.5
 ## Seconds a frame is held: a nine-frame idle, a seventeen-frame run held for less each so it
 ## keeps up with the feet, and the sixteen-frame cast, looped for as long as the net is out —
 ## see _cast_time. Public: the shed draws the same sheet at the same pace.
+##
+## The run is held RUN_FRAME at full walking pace and no longer by the clock: its frames step
+## with the ground the angler actually covers (`_stride`), so easing in, gliding to a stop and
+## sliding along a wall all step as far as they go. 0.05 until 2026-10-11, quickened with the
+## walk slowed to meet it. East and south loop eleven frames, west and north fourteen
+## (`tools/slice_character.gd`'s `keep`).
 const IDLE_FRAME := 0.24
-const RUN_FRAME := 0.05
+const RUN_FRAME := 0.03
 const CAST_FRAME := 0.04
 
 ## Where in the run cycle a foot comes down, as fractions of it: frames 3 and 10 of the
-## fourteen, where the figure's head is lowest. A footstep sound fires on each (2026-09-15).
+## fourteen (2 and 7 of the eleven-frame loops), where the figure's head is lowest. A footstep sound fires on each (2026-09-15).
 const FOOTFALLS := [0.21, 0.71]
 
 ## How far past the water's drawn edge the boots have to be before they count as in it, in
@@ -201,6 +212,10 @@ var crate_tile := Vector2.INF
 
 var _time: float = 0.0
 var _step: float = 0.0
+## The run's own clock, in seconds of walking at full pace: advanced by the ground the angler
+## covers over WALK_SPEED, so the boots stay planted at any pace. Pushing into something that
+## will not let him past runs on the clock instead: legs going, nowhere to go (Richard's call).
+var _stride: float = 0.0
 ## The run frame the last footfall check saw, so a frame held for several draws steps once.
 var _run_frame: int = -1
 
@@ -739,9 +754,12 @@ func _process(delta: float) -> void:
 		_vel = _vel.move_toward(Vector2.ZERO, STOP_ACCEL * delta)
 		_speed = _vel.length()
 		if _speed > 0.0:
+			var from := tile_pos
 			_move_by(_vel * delta)
+			_stride += tile_pos.distance_to(from) / WALK_SPEED
 			_place()
 			_leave_print()
+			_footfall()
 		_kick_feet(delta)
 		if _cast_time >= 0.0:
 			_cast_time += delta
@@ -760,7 +778,11 @@ func _process(delta: float) -> void:
 	facing = step
 	_vel = _vel.move_toward(step * WALK_SPEED, SLIP_ACCEL * delta)
 	_speed = _vel.length()
+	var from := tile_pos
 	_move_by(_vel * delta)
+	var moved := tile_pos.distance_to(from)
+	# Blocked: the step went less than half as far as the push asked. Run in place.
+	_stride += delta if moved < _speed * delta * 0.5 else moved / WALK_SPEED
 	_step += delta
 	_place()
 	_leave_print()
@@ -804,7 +826,7 @@ func _footfall() -> void:
 	var frames: Array = _poses.get(StringName("run_%s" % _view()), [])
 	if frames.is_empty():
 		return
-	var at := posmod(int(_time / RUN_FRAME), frames.size())
+	var at := posmod(int(_stride / RUN_FRAME), frames.size())
 	if at == _run_frame:
 		return
 	_run_frame = at
@@ -953,8 +975,18 @@ func _sun_key() -> int:
 	return 0 if sun == null else roundi(sun.lean * 60.0) * 1000 + roundi(sun.ink * 200.0)
 
 
+## Whether the run frames show: while walking, and through the glide after the push is let go,
+## which steps its few pixels rather than sliding them standing still.
+func _legs_going() -> bool:
+	return _step > 0.0 or (_speed > GLIDE_LEAST and _cast_time < 0.0)
+
+
+## Under this, in tiles a second, a glide has stopped for the eye: the idle takes over.
+const GLIDE_LEAST := 0.15
+
+
 func _paint_key() -> int:
-	var walking := _step > 0.0
+	var walking := _legs_going()
 	# How deep the boots are is part of the picture too: stepping into the shallows changes
 	# what is drawn without changing which frame it is.
 	var sunk := _wading()
@@ -982,7 +1014,7 @@ func _pose(walking: bool) -> Dictionary:
 		var pose := StringName("run_%s" % dir)
 		var frames: Array = _poses.get(pose, [])
 		if not frames.is_empty():
-			return {"pose": pose, "index": posmod(int(_time / RUN_FRAME), frames.size())}
+			return {"pose": pose, "index": posmod(int(_stride / RUN_FRAME), frames.size())}
 	var pose := StringName("idle_%s" % dir)
 	var frames: Array = _poses.get(pose, [])
 	var index := posmod(int(_time / IDLE_FRAME), frames.size()) if not frames.is_empty() else 0
@@ -1060,7 +1092,7 @@ func _frame(sunk: float, land_shift: float, buried := false) -> Dictionary:
 	if _poses.is_empty():
 		return {}
 
-	var walking := _step > 0.0
+	var walking := _legs_going()
 	var chosen: Dictionary = _pose(walking)
 	var frames: Array = _poses.get(chosen["pose"], [])
 	if frames.is_empty():

@@ -3156,6 +3156,44 @@ before it touched the game. **Supersedes "Frames are centred on their ink"** for
 - **Out of scope, by decision**: run, pet, sit, lie and read frames; hand-over-hand reel
   frames; a held reeling pose (the throw keeps looping and the loops follow it).
 
+### The Legs Step With the Ground (2026-10-11, `/grill-me` with Richard)
+Every walker's speed is the one its frames are drawn for, so the feet stay planted. Measured
+off the sheets, filmed at measured / -15% / +15% (`tools/shot_stride.tscn`, desktop build,
+`STRIDE_SET=angler|dogs|loops`, a pebbled strip per row) and picked by Richard.
+**Supersedes** the angler's 5.4 tiles/s, the dogs' 1.6 / 6.2 / 2.6, and "swims while over
+water and runs on grass" (the swim wore the walk frames).
+- **Speed gives, cadence holds** (Richard's call, over faster legs), except the angler, whose
+  zero-slide speed at the old 0.05 s frame measured about 1 tile/s: his run frame went to
+  **0.03 s** and his walk to **1.91 tiles/s** (`Angler.STEP_PX` 2.59 art px a frame,
+  `SIDEWAYS` 45.25 world px a tile walked sideways on screen, `WALK_SPEED` derived from them).
+  Dogs: walk **0.55**, run **2.5**, swim **1.75** (seven tenths of the run), from
+  `DogArt.WALK_STEP` / `RUN_STEP` (sheet px a frame) through `DogArt.pace(name, height)`.
+  `TRIP_MOST` 26 to 39 and `STRAND_TRIP_MOST` 60 to 90 s with the slower swim. Accepted:
+  slower walking and slower fetch trips, judged in play; no price moved.
+- **The frames step with the ground covered**, not the clock: the angler's `_stride`, the
+  dog's `_stride` (`_step_the_legs`, `_gait_pace`; a move over `STEP_MOST` steps nothing), the
+  shed's `_you_stride` and `ShedDog.stride`, the hounds' `Hound.stride`. Easing in, the glide
+  after letting go (run frames shown while `_speed` is over `GLIDE_LEAST`, footsteps too), a
+  nudge and a slide along a wall all step as far as they go. **A push that makes no ground runs
+  in place** at walking cadence (Richard's call), the angler indoors and out.
+- **A swimming dog wears the gallop**, churning faster than it goes (Richard's pick over a
+  sped-up walk or a slower swim).
+- **The angler's run loops were twitching**: east's last three frames repeated its first
+  three and south's likewise, so the front leg took one step twice a loop. Cut by
+  `tools/slice_character.gd`'s `keep` (east and south 11 frames, west and north 14); south
+  0-10 picked off three candidates. Footfalls stay fractions of the loop.
+- **Everyone who draws these frames walks at their pace**: shed angler `YOU_SPEED` 7.8 cells/s
+  (was 7.0), shed dog `DOG_SPEED` 3.1 (was 2.6), the shop's DOGS card at `DogArt.pace` for its
+  height (was a roll of 70-120 px/s), and the wash room's hounds **wander on the walk** at its
+  pace (about today's 140 px/s near) **and bolt on the gallop** at its, much faster (Richard's
+  pick; they galloped at a trot's speed). `DOG_BOLT` is gone.
+- **Out of scope, by decision**: wildlife (the turtle already paces by ground), frame times
+  other than the angler's run, new art, prices. `HOME_SPEED` and `NUDGE_SPEED` 2.2 (still over
+  the angler's 1.91) unchanged.
+- `test_lake`'s `_check_walk_pacing` guards the speeds against the strides, the loop lengths,
+  the run stepping with the ground, a blocked push running in place, the dog's legs, a dog put
+  somewhere stepping nothing, and the swim on the gallop.
+
 ### The Ferry (`scripts/boat.gd`, sheet: `assets/boat_sail_frames.png`)
 The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a 16-heading
 128 px sheet, credit @Pixel_Salvaje), cut for the lake by `tools/build_boat_sheet.py`
@@ -7292,7 +7330,7 @@ buildings before it touches them, and the pack is heard more, from all over the 
   `player.gd`** that took the dog out of the angler's collision ("an animal in the way");
   `Angler._slide` is untouched and still walks through — the push is the dog's own.
   Picked over the angler sliding round the dog and over a half-each shove.
-- **`WALK_SPEED` 2.4 → 1.6**; the run home stays 6.2; **the land leg out to a stick runs**
+- **`WALK_SPEED` 2.4 → 1.6** (0.55 since 2026-10-11, see The Legs Step With the Ground); the run home stays 6.2; **the land leg out to a stick runs**
   (`_swim_pace` picks `RUN_SPEED` on land, `SWIM_SPEED` afloat) — it crossed the beach at
   swim pace before.
 - **Steering, a tile ahead** (`_steer`, `AVOID_AHEAD` 1.0, `AVOID_CLEAR` 0.35, `AVOID_AT`

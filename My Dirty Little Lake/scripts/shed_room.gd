@@ -125,7 +125,9 @@ const DOGS_MOST := 4
 ## twenty-two, and this is what puts the same pair of animals in this room at the same ratio
 ## once the player's own height has been snapped to whole pixels of art.
 const DOG_TALL := 2.75
-const DOG_SPEED := 2.6
+## Matched to the walk frames (2026-10-11): `DogArt.pace` at DOG_TALL cells, so the paws stay
+## planted, and the frames step with the ground covered (`ShedDog.stride`). It was 2.6.
+const DOG_SPEED := DogArt.WALK_STEP * DOG_TALL / DogArt.SHEET_TALL / 0.1
 
 ## The longest step allowed in one frame, in cells. See the delta clamp in `_process`.
 const DOG_STEP_MOST := 0.6
@@ -540,7 +542,12 @@ const YOU_ART := Angler.ART
 const YOU_TALL := 3.9
 ## What the figure's scale is rounded to, in screen pixels per pixel of art.
 const YOU_STEP := 0.5
-const YOU_SPEED := 7.0
+## Cells a second, matched to the run frames the way the lake's walk is (2026-10-11): the
+## planted boot moves Angler.STEP_PX art pixels a frame, an art pixel is YOU_TALL over the
+## figure's 43 art pixels of cell, and the frames step with the ground covered (`_you_stride`).
+## It was 7.0, which at the old 0.05 s run frame skated the boots half again as fast as they
+## stepped.
+const YOU_SPEED := Angler.STEP_PX * YOU_TALL / 43.0 / Angler.RUN_FRAME
 const YOU_STEP_MOST := 0.7
 
 ## How far the player stands in front of the door when the room opens, in cells. Just onto
@@ -718,6 +725,8 @@ class ShedDog extends RefCounted:
 	var target := Vector2.ZERO
 	var state: StringName = &"idle"
 	var age: float = 0.0
+	## The walk's clock: ground covered over DOG_SPEED. See `Dog._stride`.
+	var stride: float = 0.0
 	var mood: float = 0.0
 	var left: bool = false
 	## Which of the pack this is, and so which breed it wears and which gait pair it walks
@@ -806,6 +815,9 @@ var _you_at := Vector2.ZERO
 var _you_facing := Vector2(0.0, 1.0)
 var _you_step: float = 0.0
 var _you_age: float = 0.0
+## The run's clock: ground covered over YOU_SPEED, or the clock itself when a push makes no
+## ground (legs going against a wall, as on the lake).
+var _you_stride: float = 0.0
 
 ## The sheet the player is drawn from. Loaded once, and null when the art is missing — in
 ## which case the room draws no player rather than a box.
@@ -1159,7 +1171,10 @@ func _walk_you(delta: float) -> void:
 	_you_step += delta
 	_you_facing = push.normalized()
 	var step := push.normalized() * minf(YOU_SPEED * delta, YOU_STEP_MOST)
+	var from := _you_at
 	_you_at = _slid(_you_at, step, _you_may_stand)
+	var moved := _you_at.distance_to(from)
+	_you_stride += delta if moved < step.length() * 0.5 else moved / YOU_SPEED
 
 
 ## With a piece in hand on a pad, the left stick moves it (Richard, 2026-09-14). It walks the
@@ -1234,7 +1249,7 @@ func _you_shown(floor_box: Rect2) -> Dictionary:
 		return {}
 	var frames: Array = _you_poses[pose]
 	var held := Angler.RUN_FRAME if walking else Angler.IDLE_FRAME
-	var index := posmod(int(_you_age / held), frames.size())
+	var index := posmod(int((_you_stride if walking else _you_age) / held), frames.size())
 	if petting:
 		index = mini(int(_you_pet / Angler.PET_TIME * frames.size()), frames.size() - 1)
 	elif reaching:
@@ -1382,6 +1397,12 @@ func _dog_think(dog: ShedDog) -> void:
 		dog.state = &"sit" if DogArt.has(&"sit", dog.breed) else &"idle"
 
 
+## The clock a shed dog's picture steps on: the walk's own ground for a walking dog, its age
+## for anything still.
+func _dog_clock(dog: ShedDog) -> float:
+	return dog.stride if DogArt.STEP.has(dog.state) else dog.age
+
+
 ## One step towards the target. True once it is there, or once it is stuck.
 ##
 ## A refused step slides along the face (`_slid`, 2026-09-27) rather than stopping on an
@@ -1423,6 +1444,7 @@ func _dog_walk(dog: ShedDog, delta: float) -> bool:
 			return true
 	else:
 		dog.blocked = 0.0
+	dog.stride += moved.distance_to(dog.at) / DOG_SPEED
 	dog.at = moved
 	return dog.at.distance_to(dog.target) <= 0.25
 
@@ -1849,7 +1871,7 @@ func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 	var at := floor_box.position + dog.at * float(step)
 	var tall := DOG_TALL * float(step)
 	DogArt.stamp(
-		self, dog.state, DogArt.frame_at(dog.state, dog.age, dog.breed), at, tall, dog.left,
+		self, dog.state, DogArt.frame_at(dog.state, _dog_clock(dog), dog.breed), at, tall, dog.left,
 		0.0, Color.WHITE, dog.breed
 	)
 	if dog.hearts > 0.0:
@@ -3534,7 +3556,7 @@ func _paint_walker_shades(pen: CanvasItem) -> void:
 		var light := _room_light(feet)
 		pen.draw_set_transform_matrix(_lay(feet, light))
 		DogArt.stamp(
-			pen, dog.state, DogArt.frame_at(dog.state, dog.age, dog.breed), Vector2.ZERO,
+			pen, dog.state, DogArt.frame_at(dog.state, _dog_clock(dog), dog.breed), Vector2.ZERO,
 			DOG_TALL * step, dog.left, 0.0, Color.WHITE, dog.breed
 		)
 	pen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

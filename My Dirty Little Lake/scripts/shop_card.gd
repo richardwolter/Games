@@ -75,8 +75,9 @@ const DOG_PIECE_MOST := 9.0
 const WOOD_TALL := 0.7
 const WOOD_LEAST := 0.75
 const WOOD_BASE := 0.45
-## A dog's run: pixels a second, and the wait off frame before it comes back.
-const DOG_SPEED := Vector2(70.0, 120.0)
+## A dog's wait off frame before it comes back, and how tall it draws. It runs at its gallop's
+## own pace for that height (`DogArt.pace`, 2026-10-11), so its paws stay planted; it was a
+## roll of 70 to 120 pixels a second.
 const DOG_WAIT := Vector2(0.4, 2.6)
 const DOG_TALL := Vector2(15.0, 21.0)
 ## The luck card: a piece into the box every `DROP_EVERY`, taking `DROP_FLIGHT`; the head
@@ -414,12 +415,13 @@ func _step_dogs(delta: float) -> void:
 func _new_run(slot: int, first: bool) -> Dictionary:
 	var way := 1.0 if _roll.randf() < 0.5 else -1.0
 	var y := _roll.randf_range(0.6, 1.0)
+	var tall := lerpf(DOG_TALL.x, DOG_TALL.y, (y - 0.6) / 0.4)
 	return {
 		"slot": slot, "way": way, "y": y,
 		# The first runs start somewhere across the card, so it is never empty when opened.
 		"x": _roll.randf_range(20.0, 280.0) if first else (-40.0 if way > 0.0 else maxf(size.x, 300.0) + 40.0),
-		"speed": _roll.randf_range(DOG_SPEED.x, DOG_SPEED.y),
-		"tall": lerpf(DOG_TALL.x, DOG_TALL.y, (y - 0.6) / 0.4),
+		"speed": DogArt.pace(DogArt.gait(slot, false, slot), tall, slot),
+		"tall": tall,
 		"age": _roll.randf() * 2.0,
 		"wait": 0.0 if first else _roll.randf_range(DOG_WAIT.x, DOG_WAIT.y),
 	}

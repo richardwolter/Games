@@ -128,15 +128,19 @@ const PUFF_LIFE := 0.45
 
 ## Dogs: how far away they keep, in tiles (far on the island's sand, near behind the stand),
 ## a standing dog's height times its distance (so its drawn height is `DOG_SIZE / d`), their
-## trot at the near end, how long they stop, and the jet's reach. A bolt is `DOG_BOLT` times
-## the trot and at least `BOLT_LEAST` long.
+## trot at the near end, how long they stop, and the jet's reach. A bolt is at least
+## `BOLT_LEAST` long.
+##
+## Since 2026-10-11 (the walk-pacing pass) a hound wanders on the walk and bolts on the gallop,
+## each at `DogArt.pace` for its drawn height, so the paws stay planted: it galloped at the
+## trot's 140 a second, five times slower than its legs went. DOG_PACE is only the fallback
+## for a sheet with no stride on record, and the walk's own pace near is about the same.
 const DOG_D := Vector2(7.0, 3.0)
 const DOG_SIZE := 400.0
 ## (95 until 2026-10-02, Richard: the trot read slow for the legs.)
 const DOG_PACE := 140.0
 const DOG_REST := Vector2(1.5, 6.0)
 const DOG_NEAR := 40.0
-const DOG_BOLT := 2.3
 const BOLT_LEAST := 320.0
 const BARK_GAP := 2.0
 const REST_POSES: Array[StringName] = [&"idle", &"idle", &"sit", &"laid", &"sleep"]
@@ -307,6 +311,8 @@ class Hound:
 	var pose: StringName = &"idle"
 	var rest := 0.0
 	var age := 0.0
+	## The gait's clock: ground covered over the gait's pace. See `Dog._stride`.
+	var stride := 0.0
 	var left := false
 	var bolting := false
 	## The pack slot this hound stands for, and so its breed and gait — `Dog.slot`'s rule.
@@ -516,7 +522,7 @@ func sprayed_at(point: Vector2) -> void:
 		var away := -1.0 if point.x > dog.at.x else 1.0
 		dog.bolting = true
 		dog.rest = 0.0
-		dog.pose = &"run"
+		dog.pose = DogArt.gait(dog.slot, false, dog.breed)
 		_aim(dog, Vector2(
 			clampf(dog.at.x + away * maxf(BOLT_LEAST, size.x * 0.3), -80.0, size.x + 80.0),
 			dog.at.y
@@ -630,7 +636,7 @@ func _send(dog: Hound) -> void:
 	var depth := clampf(dog.depth + _roll.randf_range(-0.3, 0.3), 0.0, 1.0)
 	_aim(dog, Vector2(_roll.randf_range(0.04, 0.96) * size.x, _lawn_y(depth)))
 	dog.left = dog.to.x < dog.at.x
-	dog.pose = DogArt.gait(dog.slot, false, dog.breed) if DogArt.has(&"run", dog.breed) else &"idle"
+	dog.pose = DogArt.gait(dog.slot, true, dog.breed) if DogArt.has(&"walk", dog.breed) else &"idle"
 	dog.rest = 0.0
 	dog.bolting = false
 
@@ -649,9 +655,13 @@ func _drive_dogs(delta: float) -> void:
 			if dog.rest <= 0.0:
 				_send(dog)
 			continue
-		var pace := DOG_PACE * (DOG_BOLT if dog.bolting else 1.0) * _dog_tall(dog) / (DOG_SIZE / DOG_D.y)
+		var pace := DogArt.pace(dog.pose, _dog_tall(dog), dog.breed)
+		if pace <= 0.0:
+			pace = DOG_PACE * _dog_tall(dog) / (DOG_SIZE / DOG_D.y)
 		var going := dog.to if dog.via == Vector2.INF else dog.via
+		var was := dog.at
 		dog.at = dog.at.move_toward(going, pace * delta)
+		dog.stride += dog.at.distance_to(was) / pace
 		if dog.via != Vector2.INF and dog.at.distance_to(dog.via) < 1.0:
 			dog.via = Vector2.INF
 			continue
@@ -663,6 +673,11 @@ func _drive_dogs(delta: float) -> void:
 			var pose: StringName = REST_POSES[_roll.randi() % REST_POSES.size()]
 			dog.pose = pose if DogArt.has(pose, dog.breed) else &"idle"
 			dog.age = 0.0
+
+
+## The clock a hound's picture steps on: the ground it covered for a gait, its age otherwise.
+func _hound_clock(dog: Hound) -> float:
+	return dog.stride if DogArt.STEP.has(dog.pose) else dog.age
 
 
 ## The pallet grown by a dog's clearance: behind it, and either side of it.
@@ -1142,13 +1157,13 @@ func _draw_dogs() -> void:
 				Shade.lying(dog.at.snapped(Vector2.ONE * PIXEL), shade.x, shade.y)
 			)
 			DogArt.stamp(
-				self, dog.pose, DogArt.frame_at(dog.pose, dog.age, dog.breed), Vector2.ZERO,
+				self, dog.pose, DogArt.frame_at(dog.pose, _hound_clock(dog), dog.breed), Vector2.ZERO,
 				_dog_tall(dog), dog.left, 0.0, ink, dog.breed
 			)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for dog: Hound in order:
 		DogArt.stamp(
-			self, dog.pose, DogArt.frame_at(dog.pose, dog.age, dog.breed),
+			self, dog.pose, DogArt.frame_at(dog.pose, _hound_clock(dog), dog.breed),
 			dog.at.snapped(Vector2.ONE * PIXEL), _dog_tall(dog), dog.left, 0.0, Color.WHITE,
 			dog.breed
 		)

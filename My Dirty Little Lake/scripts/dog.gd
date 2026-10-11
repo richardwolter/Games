@@ -28,9 +28,18 @@ const HEIGHT := 22.0
 ## wander about the island and nothing else; every land leg of a trip — out to the water
 ## after a stick as well as home with it — is run (2026-09-22, Richard: walking slower,
 ## and the way out should run, not walk). The walk went 2.4 to 1.6 the same day.
-const SWIM_SPEED := 2.6
-const WALK_SPEED := 1.6
-const RUN_SPEED := 6.2
+##
+## Matched to the legs since 2026-10-11 (the walk-pacing pass, picked by Richard off
+## `tools/shot_stride.tscn`): the walk and the gallop are the speeds at which the paws stay
+## planted, `DogArt.STEP` sheet pixels a frame drawn at HEIGHT over the sheet's 29 rows, a
+## tile walked sideways on screen being Angler.SIDEWAYS world pixels. They were 1.6 and 6.2,
+## which ran the ground two and a half to three times faster than the legs went. The swim is
+## seven tenths of the run and wears the gallop, not the walk: the legs churn faster than the
+## dog goes, as paddling does, where the walk's frames went three times too slowly. `_stride`
+## steps the frames with the ground covered, `_gait_pace` says at which pace.
+const SWIM_SPEED := 1.75
+const WALK_SPEED := 0.55
+const RUN_SPEED := 2.5
 
 ## The dog feels this far ahead of itself, in tiles, for the hut, the crate, the pump and
 ## the beehive (the last a rectangle off its own tile, see `_bumped`),
@@ -117,7 +126,7 @@ const STRAND_AT := Vector2(0.955, 1.06)
 ## How far up the outer bank's beach the dog may go, in tiles past the waterline — a little
 ## past the furthest washed-up rubbish, so it can stand over the last piece to pick it up.
 const BEACH_WALK := 3.0
-const STRAND_TRIP_MOST := 60.0
+const STRAND_TRIP_MOST := 90.0
 
 ## How near the target counts as arrived, in tiles.
 const CLOSE := 0.35
@@ -152,7 +161,7 @@ const STEP_MOST := 0.5
 
 ## How long a trip may take before the dog admits something is in the way, in seconds, and
 ## how long it has to be walking into that thing before it counts as stuck.
-const TRIP_MOST := 26.0
+const TRIP_MOST := 39.0
 const STUCK_TIME := 0.45
 
 ## How long the dog may go without getting any nearer to what it is heading for before that
@@ -347,10 +356,14 @@ var _print_left: bool = false
 ## been shoving at something that will not move; how long the current trip has run; and a
 ## point off to one side it is making for while it gets round whatever that was.
 var _speed: float = 0.0
-## The pace `_step_towards` is easing to, and the gait's own clock: it runs at the share of
-## that pace the dog has actually reached, so the legs speed up with the body.
+## The pace `_step_towards` is easing to.
 var _top_speed: float = 1.0
+## The gait's own clock, in seconds of moving at the gait's full pace: advanced by the ground
+## the dog covered last frame over `_gait_pace`, so the paws stay planted however fast it goes
+## and stop when it stops (2026-10-11; it was the clock, slowed to the share of the pace
+## reached and never under a fifth).
 var _stride: float = 0.0
+var _stride_from := Vector2.INF
 var _stuck: float = 0.0
 
 ## The greeting: how long its hearts have left, how long until it may happen again, and
@@ -550,7 +563,7 @@ func _process(delta: float) -> void:
 	# One long frame is one slow frame, never a jump. See STEP_MOST.
 	delta = minf(delta, 0.1)
 	_age += delta
-	_stride += delta * clampf(_speed / _top_speed, 0.2, 1.0)
+	_step_the_legs()
 	_mood_left -= delta
 	_pet_cool = maxf(_pet_cool - delta, 0.0)
 	_trip += delta
@@ -1471,7 +1484,7 @@ func _barking() -> bool:
 func _still_showing() -> StringName:
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK:
-			return DogArt.gait(slot, not _on_land(), breed)
+			return DogArt.gait(slot, false, breed)
 		State.WANDER:
 			return DogArt.gait(slot, true, breed)
 		State.NAP:
@@ -1482,6 +1495,24 @@ func _still_showing() -> StringName:
 			return &"sit" if DogArt.has(&"sit", breed) else &"idle"
 		_:
 			return &"idle"
+
+
+## The ground covered since last frame, over the pace the frames showing are drawn for. A move
+## longer than STEP_MOST is a dog put somewhere, not a step, and steps nothing.
+func _step_the_legs() -> void:
+	if _stride_from != Vector2.INF:
+		var moved := tile_pos.distance_to(_stride_from)
+		if moved <= STEP_MOST:
+			_stride += moved / _gait_pace()
+	_stride_from = tile_pos
+
+
+## The speed at which the gait showing keeps its paws planted: the walk's, the gallop's, or in
+## the water the swim's, which the gallop churns through faster than the dog goes.
+func _gait_pace() -> float:
+	if _state == State.WANDER:
+		return WALK_SPEED
+	return RUN_SPEED if _on_land() else SWIM_SPEED
 
 
 ## The clock a picture is stepped on: the gait's own for a moving dog, the age otherwise.

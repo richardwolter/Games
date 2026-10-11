@@ -22,7 +22,10 @@ const SOURCE_DIR := "res://art_source/character_extracted/"
 ## stand at the top of each stride.
 const ANIMS := [
 	{"prefix": "idle", "slug": "idle", "frames": 9},
-	{"prefix": "run", "slug": "running", "frames": 17, "skip": 3},
+	# `keep` cuts a loop short after the skip (2026-10-11, the walk-pacing pass): east's last
+	# three frames repeat its first three and south's last three do the same, so the front leg
+	# took one step twice a loop and twitched. West and north loop whole.
+	{"prefix": "run", "slug": "running", "frames": 17, "skip": 3, "keep": {"east": 11, "south": 11}},
 	{"prefix": "cast", "slug": "casting", "frames": 16},
 	# The reach to pet a dog, built by rule (tools/build_pet_frames.py, 2026-09-28). Every
 	# frame is measured against the first one's ink, which has no arm out: centred on its own
@@ -106,6 +109,7 @@ func _init() -> void:
 				"art": image,
 				"frames": frames,
 				"skip": int(anim.get("skip", 0)),
+				"keep": int((anim.get("keep", {}) as Dictionary).get(dir, -1)),
 				"ink_first": bool(anim.get("ink_first", false)),
 				"feet": _feet_of(SOURCE_DIR + slug + FEET_SUFFIX),
 				"cell_w": cell_w,
@@ -125,7 +129,10 @@ func _init() -> void:
 		var cell_w: float = strip["cell_w"]
 		var cell_h: int = strip["cell_h"]
 		var frames: Array = []
-		for column in range(int(strip["skip"]), int(strip["frames"])):
+		var last := int(strip["frames"])
+		if int(strip["keep"]) > 0:
+			last = mini(last, int(strip["skip"]) + int(strip["keep"]))
+		for column in range(int(strip["skip"]), last):
 			# Whole-pixel columns off a fractional cell width: rounded edges rather than a
 			# truncated width repeated, so the last frame is not left thinner than the rest
 			# by everyone else's rounding.
