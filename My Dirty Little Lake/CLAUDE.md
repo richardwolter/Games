@@ -3179,6 +3179,16 @@ water and runs on grass" (the swim wore the walk frames).
   in place** at walking cadence (Richard's call), the angler indoors and out.
 - **A swimming dog wears the gallop**, churning faster than it goes (Richard's pick over a
   sped-up walk or a slower swim).
+- **And sinks deeper the further out it swims** (same day, Richard): `Dog._sink_here` cuts
+  `SINK_EDGE` 0.3 of the frame at the water's edge, easing to `SINK_DEEP` 0.58 (head and top
+  of the back) by `SINK_REACH` 3 tiles from the nearer shore, island's or bank's. Supersedes
+  `SINK` 0.42 everywhere. The foam collar and shadow follow the cut.
+- **The cast stands on its boots, south and north** (same day, Richard: "reeling south is
+  making player slide sideways"): the cast loops for as long as the net is out, and centred on
+  each frame's ink box the swinging arm and net moved the box, so the boots wandered six pixels
+  sideways and back each loop. `tools/slice_character.gd`'s `pin_boots` moves each box so the
+  boots' leather keeps the first frame's distance from the anchor (now within half a pixel).
+  East and west are left: they step into the throw in the art.
 - **The angler's run loops were twitching**: east's last three frames repeated its first
   three and south's likewise, so the front leg took one step twice a loop. Cut by
   `tools/slice_character.gd`'s `keep` (east and south 11 frames, west and north 14); south

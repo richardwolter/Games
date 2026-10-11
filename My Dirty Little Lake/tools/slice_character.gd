@@ -26,7 +26,12 @@ const ANIMS := [
 	# three frames repeat its first three and south's last three do the same, so the front leg
 	# took one step twice a loop and twitched. West and north loop whole.
 	{"prefix": "run", "slug": "running", "frames": 17, "skip": 3, "keep": {"east": 11, "south": 11}},
-	{"prefix": "cast", "slug": "casting", "frames": 16},
+	# `pin_boots`: drawn standing on its boots (2026-10-11, Richard: "reeling south is making
+	# player slide sideways"). The cast loops for as long as the net is out, and centred on each
+	# frame's ink box the arm and net swinging out moved the box, so the boots wandered six
+	# pixels sideways and back every loop. Front and back views only; east and west step into
+	# the throw in the art.
+	{"prefix": "cast", "slug": "casting", "frames": 16, "pin_boots": ["south", "north"]},
 	# The reach to pet a dog, built by rule (tools/build_pet_frames.py, 2026-09-28). Every
 	# frame is measured against the first one's ink, which has no arm out: centred on its own
 	# ink the body would slide back as the arm went out.
@@ -111,6 +116,7 @@ func _init() -> void:
 				"skip": int(anim.get("skip", 0)),
 				"keep": int((anim.get("keep", {}) as Dictionary).get(dir, -1)),
 				"ink_first": bool(anim.get("ink_first", false)),
+				"pin_boots": dir in (anim.get("pin_boots", []) as Array),
 				"feet": _feet_of(SOURCE_DIR + slug + FEET_SUFFIX),
 				"cell_w": cell_w,
 				"cell_h": image.get_height(),
@@ -129,6 +135,7 @@ func _init() -> void:
 		var cell_w: float = strip["cell_w"]
 		var cell_h: int = strip["cell_h"]
 		var frames: Array = []
+		var boot_off := NAN
 		var last := int(strip["frames"])
 		if int(strip["keep"]) > 0:
 			last = mini(last, int(strip["skip"]) + int(strip["keep"]))
@@ -140,6 +147,16 @@ func _init() -> void:
 			var right := int(round((column + 1) * cell_w))
 			var box := Rect2i(left, y, right - left, cell_h)
 			var ink := _ink(atlas, box)
+			if strip["pin_boots"]:
+				# Keep the boots the same distance from the anchor (the box's middle) as on the
+				# first frame, by moving the box, never resizing it.
+				var boots := _boots_x(atlas, box)
+				if not is_nan(boots):
+					var middle := ink.position.x + ink.size.x * 0.5
+					if is_nan(boot_off):
+						boot_off = boots - middle
+					else:
+						ink.position.x += roundi(boots - boot_off - middle)
 			if strip["ink_first"] and not frames.is_empty():
 				var first: Array = frames[0]["ink"]
 				ink = Rect2i(first[0] + box.position.x, first[1] + box.position.y, first[2], first[3])
@@ -201,6 +218,29 @@ func _ink(atlas: Image, cell: Rect2i) -> Rect2i:
 	if high.x < low.x or high.y < low.y:
 		return Rect2i()
 	return Rect2i(low, high - low + Vector2i.ONE)
+
+
+## The boots' leather, as painted on the angler.
+const BOOTS := [Color8(93, 46, 40), Color8(74, 36, 35), Color8(145, 77, 49), Color8(125, 61, 42)]
+## How many rows up from the bottom of a cell the boots are looked for.
+const BOOT_ROWS := 8
+
+
+## The middle of the boots in a cell, across the atlas, or NAN where none show.
+func _boots_x(atlas: Image, cell: Rect2i) -> float:
+	var sum := 0.0
+	var count := 0
+	for y in range(cell.end.y - BOOT_ROWS, cell.end.y):
+		for x in range(cell.position.x, cell.end.x):
+			var c := atlas.get_pixel(x, y)
+			if c.a < INK_ALPHA:
+				continue
+			for boot: Color in BOOTS:
+				if c.is_equal_approx(Color(boot.r, boot.g, boot.b, c.a)):
+					sum += x
+					count += 1
+					break
+	return sum / count if count > 0 else NAN
 
 
 ## A builder's feet file, or nothing: one [column, row] a frame.

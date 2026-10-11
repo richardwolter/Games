@@ -11110,6 +11110,19 @@ func _check_walk_pacing() -> void:
 	dog.tile_pos = Iso.ISLAND_CENTRE + Vector2(12.0, 12.0)
 	var shown := String(dog.call(&"_still_showing"))
 	_check(shown.begins_with("run"), "a swimming dog paddles on the gallop", shown)
+	# Deeper water, deeper dog: shallow by the island's edge, head and back only far out.
+	var edge := Iso.world_to_tile(Iso.island_point(0.6, 0.0))
+	var shallow := 1.0
+	for i in 40:
+		var at := edge + (edge - Iso.ISLAND_CENTRE).normalized() * (0.05 * i)
+		if not Iso.on_island_ground(at):
+			dog.tile_pos = at
+			shallow = dog.call(&"_sink_here")
+			break
+	dog.tile_pos = Iso.ISLAND_CENTRE + (edge - Iso.ISLAND_CENTRE).normalized() * 14.0
+	var deep: float = dog.call(&"_sink_here")
+	_check(shallow < 0.4 and is_equal_approx(deep, Dog.SINK_DEEP),
+		"a swimming dog sinks deeper the further out it is", "%.2f by the shore, %.2f out" % [shallow, deep])
 	dog.tile_pos = was_at
 	dog.set(&"_state", was_state)
 	dog.set(&"_stride_from", Vector2.INF)

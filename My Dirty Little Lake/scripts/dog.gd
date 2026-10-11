@@ -89,9 +89,14 @@ const HIVE_CLEAR := 2.0
 ## for a crowded island.
 const IDLE_DARTS := 24
 
-## How much of the picture goes under the water while it swims, as a fraction of the frame.
-## Enough that the legs and most of the chest are gone and the head and shoulders are not.
-const SINK := 0.42
+## How much of the picture goes under the water while it swims, as a fraction of the frame:
+## SINK_EDGE at the water's edge, where the paws and the belly go under, easing to SINK_DEEP
+## by SINK_REACH tiles out from the nearer shore, where only the head and the top of the back
+## are left (2026-10-11, Richard: "more submerged when entering deeper waters"; it was 0.42
+## wherever the water was). `_sink_here`. The mouth stays above it at every depth.
+const SINK_EDGE := 0.3
+const SINK_DEEP := 0.58
+const SINK_REACH := 3.0
 
 ## How far the swimming dog bobs, in pixels, and how fast.
 const BOB := 1.6
@@ -1307,6 +1312,13 @@ func _may_stand(tile: Vector2) -> bool:
 	return Iso.on_beach_at(tile, -1.0, BEACH_WALK)
 
 
+## How far under the water the swimming dog is drawn here, as a fraction of the frame: deeper
+## the further it is from the nearer shore, the island's or the bank's. See SINK_EDGE.
+func _sink_here() -> float:
+	var out := minf(Iso.past_shelf(tile_pos), -Ground.out_of_water(tile_pos.x, tile_pos.y))
+	return lerpf(SINK_EDGE, SINK_DEEP, smoothstep(0.0, SINK_REACH, out))
+
+
 func _on_land() -> bool:
 	# The island's drawn edge, not its waterline: the water is seen to start where the shader
 	# stops discarding it, and the dog should be swimming exactly where it is seen in water.
@@ -1566,8 +1578,8 @@ func _draw() -> void:
 		# amount that was cut, which puts the cut itself on the tile the dog is standing on
 		# — so the waterline in the picture is the waterline in the world, and the ring it
 		# pushes out can be drawn around the dog rather than under it.
-		at.y += sin(_age * BOB_RATE) * BOB + SINK * HEIGHT
-		sink = SINK
+		sink = _sink_here()
+		at.y += sin(_age * BOB_RATE) * BOB + sink * HEIGHT
 		var edge := DogArt.cut_edge(name, frame, at, HEIGHT, facing_left, sink, breed)
 		# Its shadow on the water, cut where the picture is: what is under the surface
 		# casts nothing on top of it, the wading angler's rule.
