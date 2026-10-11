@@ -25,6 +25,16 @@ if not exist "%CONTENT%\MyDirtyLittleLakeDemo.pck" (
 	echo No MyDirtyLittleLakeDemo.pck in build\windows_demo. Export the "Windows Demo" preset first.
 	goto fail
 )
+if exist "%CONTENT%\steam_appid.txt" (
+	echo build\windows_demo holds steam_appid.txt. It is for dev runs only: delete it and run again.
+	goto fail
+)
+if not exist "%HERE%..\..\addons\godotsteam\license.md" (
+	echo GodotSteam licence not found at addons\godotsteam\license.md
+	goto fail
+)
+rem GodotSteam is MIT: its licence travels with the DLL.
+copy /y "%HERE%..\..\addons\godotsteam\license.md" "%CONTENT%\GodotSteam_LICENSE.md" >nul
 if not exist "%HERE%..\..\build\steampipe" mkdir "%HERE%..\..\build\steampipe"
 
 for /f %%i in ('git -C "%HERE%." rev-parse --short HEAD 2^>nul') do set "COMMIT=%%i"

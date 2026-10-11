@@ -6908,6 +6908,21 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
 - **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
+### Uploading the Full Game (2026-10-10, `/grill-me` with Richard, issue #35)
+**Launch is November 16, 2026** (the release-date art says so); milestones moved to match:
+M3 Nov 1, M4 (release candidate up for Valve's review) **Nov 6**, M5 Nov 16.
+- **`tools/steampipe/upload_game.bat`** (double-click `preview_game.bat` for a dry run) uploads
+  `build/windows/` in place to app **5375170**, depot **5375171**, through
+  `app_build_5375170.vdf`. Export the "Windows" preset from the editor first; the script never
+  exports. Default: nothing goes live, Richard sets the build live by hand.
+  **`upload_game.bat beta`** writes `app_build_5375170_beta.tmp.vdf` (`SetLive "beta"`,
+  git-ignored) and uploads that; the `beta` branch is created once in Steamworks.
+- **Both upload scripts copy `addons/godotsteam/license.md` beside the exe as
+  `GodotSteam_LICENSE.md`** (MIT, it travels with the DLL) and refuse a folder holding
+  `steam_appid.txt`. The full game's also refuses a stale `LakeCleanup.exe`. **The demo's first
+  upload (2026-10-10) went up without the licence**; its next upload carries it, by Richard's
+  call.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

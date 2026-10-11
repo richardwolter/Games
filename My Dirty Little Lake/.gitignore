@@ -88,3 +88,4 @@ __MACOSX/
 
 # Loose review pictures dropped next to the film folders
 tools/film/*.png
+tools/steampipe/*.tmp.vdf

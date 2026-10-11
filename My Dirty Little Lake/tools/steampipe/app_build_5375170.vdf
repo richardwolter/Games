@@ -1,0 +1,30 @@
+"AppBuild"
+{
+	// My Dirty Little Lake, the full game. Run through upload_game.bat, which passes -desc
+	// (date and commit) and, with "preview", -preview. SetLive is empty: Richard sets the
+	// default branch live by hand in Steamworks (SteamPipe > Builds). "upload_game.bat beta"
+	// writes a copy of this file with SetLive "beta" and uploads that instead.
+	"AppID" "5375170"
+	"Desc" "My Dirty Little Lake"
+	"verbose" "0"
+	"preview" "0"
+	"SetLive" ""
+
+	// Relative to this file: the Windows preset's export folder, read in place.
+	"ContentRoot" "..\..\build\windows\"
+	"BuildOutput" "..\..\build\steampipe\"
+
+	"Depots"
+	{
+		"5375171" // My Dirty Little Lake Content (Windows, 64-bit)
+		{
+			"FileMapping"
+			{
+				"LocalPath" "*"
+				"DepotPath" "."
+				"recursive" "1"
+			}
+			"FileExclusion" "*.pdb"
+		}
+	}
+}
