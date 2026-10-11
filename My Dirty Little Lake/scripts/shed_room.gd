@@ -768,6 +768,26 @@ var _grids_for: int = 0
 ## The dogs that are in, none to `DOGS_MOST`. Empty is a room with nobody in it.
 var _dogs: Array[ShedDog] = []
 
+## The house's inside (2026-10-11, `HouseInside`): which stage it shows (1 abandoned, 2 half
+## mended, 3 mended), the lake's latch pushed in every frame, and the last stage the player
+## has seen in here, which the lake saves. A stage over the last one seen plays its stage-up
+## once, the next time the door opens. 3 for a room no lake drives: the room as it always was.
+var house_stage: int = 3
+var house_seen: int = 3
+var _house_under: Array[HouseInside.Layer] = []
+var _house_over: Array[HouseInside.Layer] = []
+var _house_clock: float = 0.0
+## The stage-ups still to play this visit, in order ("u12", "u23").
+var _house_playing: Array[String] = []
+var _house_frame_was: int = -1
+var _house_sound_set: String = ""
+## How far the shower has spread through the room, 0..1, a source pixel at a time.
+var _rain_mix: float = 0.0
+var _splash_next: float = 0.0
+## Footfalls in a puddle, [{"at": placement px, "age": s}].
+var _house_rings: Array = []
+var _bird_next: float = 0.0
+
 ## The dogs in the room, for the harness and the probe. Not for the game: nothing outside
 ## this file drives them.
 func dogs() -> Array[ShedDog]:
@@ -933,6 +953,7 @@ func _room_shown() -> void:
 	var door := _door_span()
 	_you_at = Vector2((door.x + door.y) * 0.5, YOU_ENTRY)
 	_you_facing = Vector2(0.0, 1.0)
+	_house_shown()
 	_you_step = 0.0
 	_you_age = 0.0
 	_rest_key = ""
@@ -977,6 +998,7 @@ func _process(delta: float) -> void:
 	_pad_tick()
 	_tick_turn_hint(delta)
 	_walk_you(delta)
+	_tick_house(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
 	if sound != null:
@@ -1456,7 +1478,7 @@ func _dog_walk(dog: ShedDog, delta: float) -> bool:
 ## patch of floor it belongs to, so whether a dog can get somewhere is one comparison.
 ## Memoised on the furniture and the exemption; the furniture moving throws the lot away.
 func _path_grid(over: Dictionary) -> Dictionary:
-	var furniture := decor.hash()
+	var furniture := _floor_key()
 	if furniture != _grids_for:
 		_grids_for = furniture
 		_grids.clear()
@@ -1815,7 +1837,7 @@ func _seat_still_there(dog: ShedDog) -> bool:
 ## pet bed and a small piece set on another block nothing; the picture above a base never
 ## does. Each carries the piece's key, which `ShedDog.over` holds for the seat it lies on.
 func _blockers() -> Array:
-	var key := decor.hash()
+	var key := _floor_key()
 	if sheets == null:
 		return []
 	if key == _blocked_for:
@@ -1841,7 +1863,19 @@ func _blockers() -> Array:
 			Vector2(float(span.x), float(base)) / float(CELL)
 		).grow(grow)
 		list.append({"key": "%s@%d,%d" % [piece, cell.x, cell.y], "box": foot})
+	# The house's holes and broken boards (2026-10-11): nobody walks there, dogs included.
+	for r in HouseInside.walk_blocks(house_stage):
+		list.append({
+			"key": "house@%d,%d" % [r.position.x, r.position.y],
+			"box": Rect2(Vector2(r.position) / float(CELL), Vector2(r.size) / float(CELL)).grow(grow),
+		})
 	return list
+
+
+## What the walkers' floor is made of: the furniture and the house's stage. A change to either
+## throws the blockers and the dogs' path grids away.
+func _floor_key() -> int:
+	return hash([decor.hash(), house_stage])
 
 
 ## Take one step of a walk, sliding along whatever face refuses it (2026-09-27): the whole
@@ -2007,7 +2041,18 @@ func can_place(piece: StringName, cell: Vector2i, view: int = 0, _ignore: int = 
 	# A floor piece keeps its whole base on the floor. The rest of the picture is height and
 	# rises up the wall, and a piece standing against the back wall draws over the skirting
 	# the way furniture in a room does.
-	return cell.y + span.y - base_of(piece, view) >= 0 and cell.y + span.y <= PLACE_ROWS
+	var base := base_of(piece, view)
+	if cell.y + span.y - base < 0 or cell.y + span.y > PLACE_ROWS:
+		return false
+	# Not on a hole, a broken board or a puddle (2026-10-11, `HouseInside`).
+	return not HouseInside.base_blocked(house_stage, base_rect(piece, cell, view))
+
+
+## A piece's floor base at `cell`, in placement px: the bottom `base_of` rows of its span.
+func base_rect(piece: StringName, cell: Vector2i, view: int = 0) -> Rect2i:
+	var span := span_of(piece, view)
+	var base := base_of(piece, view)
+	return Rect2i(cell.x, cell.y + span.y - base, span.x, base)
 
 
 ## Put a piece down, if it fits. The one way anything enters `decor`.
@@ -3001,6 +3046,7 @@ func _draw() -> void:
 	# piece lands somewhere it does not.
 
 	_dress_light(floor_box)
+	_draw_house_rings(floor_box)
 
 	# Where the piece in hand would land, tinted by whether it may. On the boards under the
 	# furniture; the piece itself is drawn in its place among them below.
@@ -3313,6 +3359,24 @@ func _build_shade_layers() -> void:
 	_shades.add_child(_walker_shades)
 	add_child(_shades)
 	move_child(_shades, 1)
+	# The house's inside (2026-10-11): two layers under the furniture, behind the shadows and
+	# over the boards, and two over everything in the room, above the window's light. Two of
+	# each so one set can give way to another a pixel at a time (the shower coming in).
+	for k in 2:
+		var under := HouseInside.Layer.new()
+		under.name = StringName("HouseUnder%d" % k)
+		under.which = "under"
+		under.show_behind_parent = true
+		add_child(under)
+		move_child(under, 1 + k)
+		_house_under.append(under)
+	for k in 2:
+		var over := HouseInside.Layer.new()
+		over.name = StringName("HouseOver%d" % k)
+		over.which = "over"
+		add_child(over)
+		move_child(over, _light.get_index() + 1 + k)
+		_house_over.append(over)
 
 
 ## Where the light comes in, in the room's own space: the round window half way down the
@@ -4270,3 +4334,177 @@ func _draw_zs(from: Vector2, scale: float) -> void:
 		Style.write(
 			self, "z", Style.TEXT_SMALL + i * 3, at.round(), Color(1.0, 1.0, 1.0, sin(phase * PI))
 		)
+
+
+# ---------------------------------------------------------------- the house's stages
+
+## How long the shower takes to spread through the room, and to dry back out, in seconds.
+const RAIN_SPREAD := 4.0
+## A step in a puddle splashes at most this often, in seconds.
+const SPLASH_EVERY := 0.32
+## A drop landing is this far under the drips' own mix, and fainter the further off it is
+## (dB a cell).
+const DRIP_DB := -8.0
+const DRIP_FAR_DB := 0.35
+## How often a bird is heard from outside once the house is mending, in seconds.
+const BIRD_GAP := Vector2(22.0, 55.0)
+
+
+## The door has opened: the loop starts over, and a stage the player has not seen in here
+## yet plays its stage-up first (u12, u23 in turn for a jump of two).
+func _house_shown() -> void:
+	_house_clock = 0.0
+	_house_frame_was = -1
+	_house_playing.clear()
+	_house_rings.clear()
+	_rain_mix = _rain_wanted()
+	_bird_next = randf_range(BIRD_GAP.x * 0.3, BIRD_GAP.y * 0.5)
+	if house_seen < house_stage:
+		if house_seen <= 1 and house_stage >= 2 and HouseInside.has_set("u12"):
+			_house_playing.append("u12")
+		if house_stage >= 3 and HouseInside.has_set("u23"):
+			_house_playing.append("u23")
+	house_seen = house_stage
+
+
+## How much of the room the shower should have: stage 1 only, the one with the leaks.
+func _rain_wanted() -> float:
+	if house_stage > 1:
+		return 0.0
+	return clampf((Weather.now - 0.15) / 0.5, 0.0, 1.0)
+
+
+## A frame of the house: which sets show, at which frame, how far the shower has spread; the
+## drops' sounds, a foot splashing in a puddle, a bird outside.
+func _tick_house(delta: float) -> void:
+	if _house_under.is_empty() or not HouseInside.ready_to_draw():
+		return
+	_house_clock += delta
+	var fps := HouseInside.fps()
+	var main := ""
+	var other := ""
+	var frame := 0
+	while not _house_playing.is_empty():
+		var up := HouseInside.set_of(_house_playing[0])
+		frame = int(_house_clock * fps)
+		if not up.is_empty() and frame < int(up["frames"]):
+			main = _house_playing[0]
+			break
+		_house_playing.pop_front()
+		_house_clock = 0.0
+		_house_frame_was = -1
+	if main.is_empty():
+		_rain_mix = move_toward(_rain_mix, _rain_wanted(), delta / RAIN_SPREAD)
+		main = HouseInside.loop_of(house_stage, false)
+		var wet := HouseInside.loop_of(house_stage, true)
+		if wet != main and _rain_mix > 0.0:
+			other = wet
+	var floor_box := _floor_rect()
+	var origin := floor_box.position + Vector2(HouseInside.region().position) * _zoom()
+	for pair: Array in [_house_under, _house_over]:
+		var a: HouseInside.Layer = pair[0]
+		var b: HouseInside.Layer = pair[1]
+		_lay_house(a, main, origin, other != "", _rain_mix if other != "" else 1.0)
+		_lay_house(b, other, origin, false, _rain_mix)
+	_house_drips(other if other != "" and _rain_mix >= 0.5 else main, floor_box)
+	_house_splash(delta)
+	_house_birds(delta)
+
+
+func _lay_house(layer: HouseInside.Layer, set_name: String, origin: Vector2, flip: bool, share: float) -> void:
+	layer.set_name = set_name
+	layer.flip = flip
+	layer.show_share = share
+	layer.origin = origin
+	layer.zoom = _zoom()
+	layer.visible = not set_name.is_empty()
+	if not set_name.is_empty():
+		var s := HouseInside.set_of(set_name)
+		var n := maxi(int(s.get("frames", 1)), 1)
+		var f := int(_house_clock * HouseInside.fps())
+		layer.frame = f % n if bool(s.get("loop", true)) else mini(f, n - 1)
+	layer.queue_redraw()
+
+
+## Every drop that lands between the last frame and this one, heard where it lands.
+func _house_drips(set_name: String, floor_box: Rect2) -> void:
+	if set_name.is_empty():
+		return
+	var s := HouseInside.set_of(set_name)
+	if s.is_empty():
+		return
+	var n := maxi(int(s["frames"]), 1)
+	var f := int(_house_clock * HouseInside.fps())
+	f = f % n if bool(s["loop"]) else mini(f, n - 1)
+	if set_name != _house_sound_set:
+		_house_sound_set = set_name
+		_house_frame_was = f
+		return
+	if f == _house_frame_was:
+		return
+	var drips: Dictionary = s["drips"]
+	var at := _house_frame_was
+	var guard := 0
+	while at != f and guard < n:
+		at = (at + 1) % n
+		guard += 1
+		for spot: Vector2 in drips.get(at, []):
+			var cells := spot.distance_to(_you_at * float(CELL)) / float(CELL)
+			var sound := Sfx.main()
+			if sound != null:
+				sound.room_drip(DRIP_DB - cells * DRIP_FAR_DB)
+	_house_frame_was = f
+
+
+## A foot in a puddle splashes, with a ring of foam where it went in.
+func _house_splash(delta: float) -> void:
+	_splash_next = maxf(_splash_next - delta, 0.0)
+	for ring: Dictionary in _house_rings:
+		ring["age"] = float(ring["age"]) + delta
+	_house_rings = _house_rings.filter(func(r: Dictionary) -> bool: return float(r["age"]) < 0.5)
+	if house_stage >= 3 or _you_step <= 0.0 or _splash_next > 0.0:
+		return
+	var feet := _you_at * float(CELL)
+	for r in HouseInside.puddles(house_stage):
+		if Rect2(r).grow(1.0).has_point(feet):
+			_splash_next = SPLASH_EVERY
+			_house_rings.append({"at": feet.round(), "age": 0.0})
+			var sound := Sfx.main()
+			if sound != null:
+				sound.room_puddle_step()
+			return
+
+
+## A bird now and then from outside, once the house is mending (stage 2 and 3).
+func _house_birds(delta: float) -> void:
+	if house_stage < 2:
+		return
+	_bird_next -= delta
+	if _bird_next > 0.0:
+		return
+	_bird_next = randf_range(BIRD_GAP.x, BIRD_GAP.y)
+	var sound := Sfx.main()
+	if sound != null:
+		sound.room_birdsong()
+
+
+## A splash's ring: foam pixels opening over four 8 fps ticks, the drips' own ring, on the
+## boards under the furniture and the walkers.
+func _draw_house_rings(floor_box: Rect2) -> void:
+	var zoom := _zoom()
+	for ring: Dictionary in _house_rings:
+		var tick := int(float(ring["age"]) * 8.0)
+		if tick > 3:
+			continue
+		var rx := 2.0 + float(tick)
+		var ry := maxf(1.0, roundf(rx * 0.5))
+		var at: Vector2 = ring["at"]
+		var ink := Color(0.93, 0.95, 0.94, 0.85 * (1.0 - float(tick) * 0.22))
+		var seen := {}
+		for i in 32:
+			var a := TAU * float(i) / 32.0
+			var p := Vector2(roundf(at.x + cos(a) * rx), roundf(at.y + sin(a) * ry))
+			if seen.has(p):
+				continue
+			seen[p] = true
+			draw_rect(Rect2(floor_box.position + p * zoom, Vector2(zoom, zoom)), ink)

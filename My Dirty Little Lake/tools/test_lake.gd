@@ -4861,6 +4861,93 @@ func _check_shed_cues(room: ShedRoom) -> void:
 		_main.call(&"_set_shed", false)
 
 
+## The house's inside at its stages (2026-10-11, `HouseInside`): the baked sets load, holes stop
+## walkers and pieces, puddles stop pieces only, the stage only moves forward, a stage the
+## player has not seen plays its stage-up once, a piece on a hole goes back to the shelf, and
+## the stage is saved.
+func _check_house(room: ShedRoom) -> void:
+	_check(HouseInside.ready_to_draw(), "the house's baked sets are there", HouseInside.DATA)
+	for name in ["s1", "s1r", "s2", "s3", "u12", "u23"]:
+		var s := HouseInside.set_of(name)
+		_check(not s.is_empty() and s["sheet"] != null and int(s["frames"]) > 0,
+			"the house's set %s loads" % name, str(s.get("frames", 0)))
+	var holes1 := HouseInside.walk_blocks(1)
+	var holes2 := HouseInside.walk_blocks(2)
+	_check(holes1.size() > holes2.size() and not holes2.is_empty() and HouseInside.walk_blocks(3).is_empty(),
+		"stage 1 has the most holes, stage 2 a few, stage 3 none", "%d %d" % [holes1.size(), holes2.size()])
+	_check(not HouseInside.puddles(1).is_empty(), "stage 1 has its leak puddles", "")
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var kept_stage := room.house_stage
+	var kept_seen := room.house_seen
+	var kept_pin: int = _main.get(&"_inside_pin")
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	decor.clear()
+	var hole: Rect2i = holes1[0]
+	var on_hole := Vector2i(hole.get_center()) - Vector2i(6, 20)
+	room.house_stage = 1
+	_check(not room.can_place(&"decor_pk_wood_chair", on_hole), "a piece is refused on a hole", str(on_hole))
+	_check(not bool(room.call(&"_dog_may_stand", Vector2(hole.get_center()) / float(ShedRoom.CELL))),
+		"a walker is refused on a hole", "")
+	var pool: Rect2i = HouseInside.puddles(1)[0]
+	_check(bool(room.call(&"_dog_may_stand", Vector2(pool.get_center()) / float(ShedRoom.CELL))),
+		"a walker may stand in a puddle", "")
+	_check(HouseInside.base_blocked(1, Rect2i(pool.get_center(), Vector2i(4, 2))), "a piece's base may not stand in a puddle", "")
+	room.house_stage = 3
+	_check(room.can_place(&"decor_pk_wood_chair", on_hole), "the mended floor takes the piece", "")
+	# A save from before the stages, furnished on what is now a hole: back to the shelf.
+	room.house_stage = 1
+	_main.set(&"_inside_pin", 1)
+	decor.append({"piece": "decor_pk_wood_chair", "cell": [on_hole.x, on_hole.y], "view": 0})
+	_main.call(&"_settle_house")
+	_check(decor.is_empty(), "a piece standing on a hole goes back to the shelf", str(decor))
+	# The latch: forward only.
+	var kept_pollution: float = _main.get(&"pollution")
+	var kept_house: int = _main.get(&"house_stage")
+	_main.set(&"house_stage", 0)
+	_main.set(&"pollution", 0.4)
+	_main.call(&"_latch_house")
+	var reached: int = _main.get(&"house_stage")
+	_main.set(&"pollution", 0.9)
+	_main.call(&"_latch_house")
+	_check(reached == 2 and int(_main.get(&"house_stage")) == 2, "the stage latches: the meter going back does not undo it", str(reached))
+	_main.set(&"pollution", kept_pollution)
+	_main.set(&"house_stage", kept_house)
+	# Seen next visit: once.
+	_main.set(&"_inside_pin", 3)
+	room.house_stage = 3
+	room.house_seen = 1
+	room.call(&"_house_shown")
+	var queued: Array = room.get(&"_house_playing")
+	_check(queued == ["u12", "u23"] and room.house_seen == 3, "a jump of two stages plays both stage-ups, once", str(queued))
+	room.call(&"_house_shown")
+	_check((room.get(&"_house_playing") as Array).is_empty(), "and not on the next visit", "")
+	# A foot in a puddle splashes.
+	room.house_stage = 1
+	room.set(&"_house_rings", [])
+	room.set(&"_splash_next", 0.0)
+	room.set(&"_you_step", 1.0)
+	room.set(&"_you_at", Vector2(pool.get_center()) / float(ShedRoom.CELL))
+	room.call(&"_house_splash", 0.016)
+	_check((room.get(&"_house_rings") as Array).size() == 1, "a foot in a puddle throws a ring", "")
+	room.set(&"_you_step", 0.0)
+	decor.clear()
+	decor.append_array(kept)
+	room.house_stage = kept_stage
+	room.house_seen = kept_seen
+	_main.set(&"_inside_pin", kept_pin)
+	if not was_open:
+		_main.call(&"_set_shed", false)
+	_check(bool(_main.call(&"save_game")), "the house's stage saves", "")
+	var file := FileAccess.open(String(_main.get(&"save_path")), FileAccess.READ)
+	var saved: Variant = file.get_var(true) if file != null else null
+	if file != null:
+		file.close()
+	_check(saved is Dictionary and (saved as Dictionary).has("house") and (saved as Dictionary).has("house_seen"),
+		"the save carries the house's stage and the last seen", "")
+
+
 func _check_shed_dogs(room: ShedRoom) -> void:
 	var sheets: Sheets = room.sheets
 	if sheets == null or not sheets.has(&"decor_sofa") or not sheets.has(&"decor_pet_bed"):
@@ -4869,6 +4956,7 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 	_check_shed_rest(room)
 	_check_shed_cues(room)
 	_check_shed_paths(room)
+	_check_house(room)
 	# The room has to be on screen: `_room_shown` is what rolls the dogs, and it does
 	# nothing at all for a room nobody is looking at. Opening it also re-points `decor` at
 	# the lake's own array, so the furniture goes down after the door is open, not before.

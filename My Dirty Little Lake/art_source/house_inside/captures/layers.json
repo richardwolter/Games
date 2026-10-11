@@ -1,0 +1,746 @@
+{
+  "board": [
+    1278.0,
+    177.0,
+    405.0,
+    747.0
+  ],
+  "border_px": {
+    "corner_bottom": [
+      11,
+      16
+    ],
+    "corner_top": [
+      6,
+      7
+    ],
+    "horizontal": [
+      10,
+      10
+    ],
+    "sill": [
+      26,
+      10
+    ],
+    "vertical": [
+      6,
+      23
+    ]
+  },
+  "cells": [
+    42,
+    28,
+    8,
+    4
+  ],
+  "door": [
+    722.400024414063,
+    168.0,
+    67.1999988555908,
+    84.0
+  ],
+  "end": "done",
+  "floor": [
+    252.0,
+    252.0,
+    1008.0,
+    672.0
+  ],
+  "screen": [
+    1920,
+    1080
+  ],
+  "shed": [
+    252.0,
+    156.0,
+    1008.0,
+    768.0
+  ],
+  "source_px": 3.0,
+  "stages": [
+    {
+      "dogs": [
+        {
+          "at": [
+            25.5,
+            15.875
+          ],
+          "seat": "decor_pk_bed@192,112",
+          "state": "sleep"
+        }
+      ],
+      "freeze_ok": "0 sampled pixels differ",
+      "pieces": [
+        {
+          "at": [
+            192,
+            112
+          ],
+          "base": 30,
+          "piece": "decor_pk_bed",
+          "span": [
+            24,
+            47
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            176,
+            64
+          ],
+          "base": 13,
+          "piece": "decor_pk_sofa",
+          "span": [
+            38,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            112,
+            80
+          ],
+          "base": 7,
+          "piece": "decor_pk_wood_chair",
+          "span": [
+            13,
+            24
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            16,
+            112
+          ],
+          "base": 4,
+          "piece": "decor_pk_coat_stand",
+          "span": [
+            14,
+            38
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            248,
+            120
+          ],
+          "base": 6,
+          "piece": "decor_pk_nightstand",
+          "span": [
+            15,
+            18
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            248,
+            104
+          ],
+          "base": 4,
+          "piece": "decor_vynil_player",
+          "span": [
+            16,
+            29
+          ],
+          "view": 0
+        }
+      ],
+      "player_cells": [
+        17.0,
+        19.0
+      ],
+      "refused": []
+    },
+    {
+      "dogs": [
+        {
+          "at": [
+            25.5,
+            15.875
+          ],
+          "seat": "decor_pk_bed@192,112",
+          "state": "sleep"
+        },
+        {
+          "at": [
+            24.375,
+            10.5
+          ],
+          "seat": "decor_pk_sofa@176,64",
+          "state": "sleep"
+        },
+        {
+          "at": [
+            35.375,
+            11.125
+          ],
+          "seat": "decor_pk_armchair@272,64",
+          "state": "sleep"
+        }
+      ],
+      "freeze_ok": "0 sampled pixels differ",
+      "pieces": [
+        {
+          "at": [
+            192,
+            112
+          ],
+          "base": 30,
+          "piece": "decor_pk_bed",
+          "span": [
+            24,
+            47
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            176,
+            64
+          ],
+          "base": 13,
+          "piece": "decor_pk_sofa",
+          "span": [
+            38,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            112,
+            80
+          ],
+          "base": 7,
+          "piece": "decor_pk_wood_chair",
+          "span": [
+            13,
+            24
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            16,
+            112
+          ],
+          "base": 4,
+          "piece": "decor_pk_coat_stand",
+          "span": [
+            14,
+            38
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            248,
+            120
+          ],
+          "base": 6,
+          "piece": "decor_pk_nightstand",
+          "span": [
+            15,
+            18
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            248,
+            104
+          ],
+          "base": 4,
+          "piece": "decor_vynil_player",
+          "span": [
+            16,
+            29
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            160,
+            48
+          ],
+          "base": 40,
+          "piece": "decor_pk_rug",
+          "span": [
+            43,
+            43
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            32,
+            64
+          ],
+          "base": 18,
+          "piece": "decor_pk_table",
+          "span": [
+            40,
+            30
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            96,
+            80
+          ],
+          "base": 7,
+          "piece": "decor_pk_chair",
+          "span": [
+            12,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            72,
+            40
+          ],
+          "base": 6,
+          "piece": "decor_pk_globe",
+          "span": [
+            19,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            272,
+            64
+          ],
+          "base": 12,
+          "piece": "decor_pk_armchair",
+          "span": [
+            22,
+            31
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            8,
+            -32
+          ],
+          "base": 6,
+          "piece": "decor_pk_bookshelf",
+          "span": [
+            30,
+            50
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            240,
+            16
+          ],
+          "base": 7,
+          "piece": "decor_pk_fireplace",
+          "span": [
+            31,
+            30
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            304,
+            24
+          ],
+          "base": 3,
+          "piece": "decor_pk_floor_lamp",
+          "span": [
+            10,
+            32
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            288,
+            112
+          ],
+          "base": 4,
+          "piece": "decor_pk_potted_tree",
+          "span": [
+            16,
+            39
+          ],
+          "view": 0
+        }
+      ],
+      "player_cells": [
+        17.0,
+        19.0
+      ],
+      "refused": []
+    },
+    {
+      "dogs": [
+        {
+          "at": [
+            25.5,
+            15.875
+          ],
+          "seat": "decor_pk_bed@192,112",
+          "state": "sleep"
+        },
+        {
+          "at": [
+            24.375,
+            10.5
+          ],
+          "seat": "decor_pk_sofa@176,64",
+          "state": "sleep"
+        },
+        {
+          "at": [
+            35.375,
+            11.125
+          ],
+          "seat": "decor_pk_armchair@272,64",
+          "state": "sleep"
+        },
+        {
+          "at": [
+            30.0963478088379,
+            26.0155754089355
+          ],
+          "seat": "",
+          "state": "idle"
+        }
+      ],
+      "freeze_ok": "0 sampled pixels differ",
+      "pieces": [
+        {
+          "at": [
+            192,
+            112
+          ],
+          "base": 30,
+          "piece": "decor_pk_bed",
+          "span": [
+            24,
+            47
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            176,
+            64
+          ],
+          "base": 13,
+          "piece": "decor_pk_sofa",
+          "span": [
+            38,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            112,
+            80
+          ],
+          "base": 7,
+          "piece": "decor_pk_wood_chair",
+          "span": [
+            13,
+            24
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            16,
+            112
+          ],
+          "base": 4,
+          "piece": "decor_pk_coat_stand",
+          "span": [
+            14,
+            38
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            248,
+            120
+          ],
+          "base": 6,
+          "piece": "decor_pk_nightstand",
+          "span": [
+            15,
+            18
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            248,
+            104
+          ],
+          "base": 4,
+          "piece": "decor_vynil_player",
+          "span": [
+            16,
+            29
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            160,
+            48
+          ],
+          "base": 40,
+          "piece": "decor_pk_rug",
+          "span": [
+            43,
+            43
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            32,
+            64
+          ],
+          "base": 18,
+          "piece": "decor_pk_table",
+          "span": [
+            40,
+            30
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            96,
+            80
+          ],
+          "base": 7,
+          "piece": "decor_pk_chair",
+          "span": [
+            12,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            72,
+            40
+          ],
+          "base": 6,
+          "piece": "decor_pk_globe",
+          "span": [
+            19,
+            27
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            272,
+            64
+          ],
+          "base": 12,
+          "piece": "decor_pk_armchair",
+          "span": [
+            22,
+            31
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            8,
+            -32
+          ],
+          "base": 6,
+          "piece": "decor_pk_bookshelf",
+          "span": [
+            30,
+            50
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            240,
+            16
+          ],
+          "base": 7,
+          "piece": "decor_pk_fireplace",
+          "span": [
+            31,
+            30
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            304,
+            24
+          ],
+          "base": 3,
+          "piece": "decor_pk_floor_lamp",
+          "span": [
+            10,
+            32
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            288,
+            112
+          ],
+          "base": 4,
+          "piece": "decor_pk_potted_tree",
+          "span": [
+            16,
+            39
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            72,
+            -24
+          ],
+          "base": 7,
+          "piece": "decor_pk_fridge",
+          "span": [
+            19,
+            38
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            112,
+            -24
+          ],
+          "base": 8,
+          "piece": "decor_pk_landscape",
+          "span": [
+            15,
+            18
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            144,
+            -32
+          ],
+          "base": 8,
+          "piece": "decor_pk_portrait",
+          "span": [
+            18,
+            23
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            176,
+            -16
+          ],
+          "base": 12,
+          "piece": "decor_pk_kitchen_counter",
+          "span": [
+            23,
+            33
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            264,
+            -8
+          ],
+          "base": 9,
+          "piece": "decor_pk_stove",
+          "span": [
+            21,
+            30
+          ],
+          "view": 1
+        },
+        {
+          "at": [
+            224,
+            -32
+          ],
+          "base": 6,
+          "piece": "decor_pk_grandfather_clock",
+          "span": [
+            15,
+            41
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            48,
+            48
+          ],
+          "base": 1,
+          "piece": "decor_pk_flower_vase",
+          "span": [
+            8,
+            19
+          ],
+          "view": 0
+        },
+        {
+          "at": [
+            40,
+            48
+          ],
+          "base": 1,
+          "piece": "decor_pk_table_lamp",
+          "span": [
+            10,
+            16
+          ],
+          "view": 1
+        }
+      ],
+      "player_cells": [
+        17.0,
+        19.0
+      ],
+      "refused": []
+    }
+  ],
+  "to_screen": 1.5,
+  "wall": [
+    252.0,
+    156.0,
+    1008.0,
+    96.0
+  ],
+  "window_at": [
+    270.0,
+    588.0
+  ],
+  "zoom": 2.0
+}

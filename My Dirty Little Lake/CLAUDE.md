@@ -2762,8 +2762,8 @@ old source) and the 1.4 grain notes above for what the lake draws.
   oak-moss palette, lap siding on every wall (the "small planks"), fascia, frieze and barge as
   planks of the same wood, corner boards, sage shutters with a heart cut out.
 - **Three stages by the meter** (`Lake.SHED_ARTS`, `SHED_STAGE_AT` 0.5 / 0.9 cleaned,
-  `shed_stage_for`, `_restage_shed`): picked off `pollution` each draw, nothing saved, no
-  `SAVE_VERSION` bump. A change rebuilds the hem (`_shed_skirt`), re-sweeps the shadow
+  `shed_stage_for`, `_restage_shed`): latched and saved since 2026-10-11 (`house_stage`, see The House
+  Inside Matches the Outside), no `SAVE_VERSION` bump. A change rebuilds the hem (`_shed_skirt`), re-sweeps the shadow
   (`Shade.Cast.forget`) and hands the decorate button the new hut.
   - **Neglected**: broken roof (holes onto the rafters, cracked shingles, gaps in the ridge
     cap), heavy moss, cracked and knotted boards, missing board pieces, a cobweb under the
@@ -2802,6 +2802,60 @@ old source) and the 1.4 grain notes above for what the lake draws.
   pixels, only its outline's corners. `docs/CREDITS.md` still credits it until Richard decides.
 - Out of scope, by decision: animation (smoke, flicker), a new footprint, the shed's interior,
   porch items that echo placed finds, the trailer.
+
+### The House Inside Matches the Outside (2026-10-11, `/grill-me` with Richard)
+The room inside the house wears the hut's three stages. Picked off a mockup Richard approved
+("pretty cool for now"), then baked into the game. `HouseInside` (`scripts/house_inside.gd`),
+`ShedRoom`'s "the house's stages" block, `Lake.house_stage`.
+- **Stage 1, abandoned** (under 50% cleaned): about 19% of the boards lost to four holes (earth
+  and weeds below, splintered plank ends, a shadow band under the rim) and three broken runs
+  (sunk, tented, fallen through). The window's sunny side and the rotten side: the left half
+  dries in the light, the right half holds the dark holes. Three leak puddles with drops
+  falling from ceiling height; dead ivy and moss on the frame, peeling stained wallpaper,
+  cobwebs, mushrooms, weeds in cracks, dust motes in the sun shaft, the room dimmer.
+- **Stage 2** (50% to 90%): fresh tan patches, two small holes left (about 4.5%: the sun
+  hole's core in flower, the low corner with boards and a saw waiting), one slow drip, green
+  ivy on the frame hanging onto the lake and tendrils down the wallpaper.
+- **Stage 3**: the clean room, roses, wisteria and ivy on the frame, bees, butterflies,
+  petals.
+- **Holes and broken boards block walking and placing; puddles block placing only**
+  (`walk_blocks`, `puddles`, `base_blocked`): in `_blockers` (grown by `WALK_CLEAR`, so the
+  dogs' path grids follow) and `can_place`. The door lane is clear and every board reachable
+  (checked by the mockup's `layout_check.py`).
+- **Latched and saved** (`house_stage`, `house_seen`; absent reads as the meter's stage, seen,
+  so an older run plays no stage-up; no `SAVE_VERSION` bump): the meter only moves it forward,
+  so a tornado flinging the lake back never reopens a hole. **The hut outside reads the latch
+  too** (`_restage_shed`). A save whose furniture stands on a hole or puddle sends those
+  pieces back to the shelf on load (`_settle_house`).
+- **Stage-up on the next visit**: u12 / u23 play once (2.5 s, both for a jump of two) the
+  next time the door opens, then the stage's loop.
+- **A shower in stage 1** spreads through the room a source pixel at a time over
+  `RAIN_SPREAD` (the s1r set: bigger puddles, faster drops, rain through the roof hole).
+- **Sound** (existing takes, through the room's door, `Sfx.room_drip`/`room_puddle_step`/
+  `room_birdsong`): each drop landing, quieter further off; a foot in a puddle splashes (a
+  foam ring, `SPLASH_EVERY`); a forest chirp every `BIRD_GAP` from stage 2.
+- **Baked, not computed**: the mockup's Python modules (`art_source/house_inside/`: floor,
+  damp, veg, life, `layout.json`, `base.py`, `make.py` for stills and clips) are the art
+  source. `tools/build_house_inside.py` runs them frame by frame on an empty room and writes
+  `assets/house/`: per set a still layer under the furniture and one over everything, plus
+  the 8x8 tiles that move (`_tiles`) and one row of tile numbers a frame (`_index`). Loops are
+  rendered for 30 s and cut where they come back closest to their first frame (22-28 s, a
+  few hundred pixels off). About 600 KB in all; a frame draws ~300 tiles. The bake is
+  byte-for-byte reproducible. **Drawn on an empty room by decision**: nothing in it depends on
+  where the player puts furniture. Re-run the builder after editing a module, then reimport.
+  The modules read the room's captures (`art_source/house_inside/captures/`, from
+  `tools/shot_house_layers.tscn`); re-shoot them if the room's size or moulding changes.
+- **Borrowed lakes show stage 3** (the room as it always was), unless `Lake.force_house`.
+- **Known, accepted**: the play-ins are the mockup's, baked; the stage-1 dim and the motes
+  assume a middling hour; the shed's prompts are under the stage-1 veil.
+- **Open, from the mockup's critics** (to fix in the modules, then re-bake): broken runs on
+  the door path and by the left wall read as stains, wallpaper streaks odd-shaped, the window
+  puddle too dark, stage 2's patches loud, stage 3's bees and petals small, drips hop a pixel
+  as they let go, the stage-up's saw stack builds in slices.
+- Probe: `tools/shot_house.tscn` (desktop build, own save) saves `tools/last_house_{s1,s2,s3,
+  s1_rain,up12,up23}.png` and `last_house.log`. `test_lake`'s `_check_house` guards the sets,
+  the holes per stage, blocking, puddles, the latch, the shelf return, the stage-ups once,
+  the splash and the save.
 
 ### One Sun (2026-10-02, `/grill-me` with Richard)
 Every shadow in the game follows one light model. **Supersedes every per-caster shadow gain,

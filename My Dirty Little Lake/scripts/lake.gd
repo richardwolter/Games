@@ -1224,6 +1224,11 @@ func double_cast_chance() -> float:
 
 
 func _ready() -> void:
+	# A borrowed lake's room stays as it always was (stage 3) unless a probe asks for one;
+	# pinned before the load, so a probe's copied save keeps its furniture where it stood.
+	if get_parent() != get_tree().root:
+		_inside_pin = force_house if force_house >= 1 else 3
+	force_house = -1
 	($Sky/Fill as ColorRect).color = BEYOND
 	_mark("children ready")
 	_day = %Day as DayCycle
@@ -1583,6 +1588,12 @@ func _ready() -> void:
 	_skin.snap_meter()
 	start_fresh = false
 	_mark("load game")
+	if not loaded:
+		# A new run: the house is as the meter finds it, and seen that way (no stage-up).
+		house_stage = 0
+		_latch_house()
+		if _room != null:
+			_room.house_seen = house_inside()
 	_seed_starter_bed()
 	_mark("end")
 	_raise_front(loaded)
@@ -4361,6 +4372,9 @@ func _raise_front(loaded: bool) -> void:
 	# and a probe photographing the front is not one either — unless it says so, which is
 	# what `tools/shot_letter.tscn` is for.
 	if get_parent() != get_tree().root:
+		if _room != null:
+			_room.house_stage = house_inside()
+			_room.house_seen = house_inside()
 		if not force_intro:
 			_intro_done = true
 			_steps_done = true
@@ -7298,6 +7312,10 @@ func save_game() -> bool:
 		"unwashed": unwashed,
 		"hose": hose_level,
 		"decor": decor,
+		# The house's stage and the last one seen inside (2026-10-11). Absent: worked out
+		# off the meter on the way in, and seen, so an older run plays no stage-up.
+		"house": house_stage,
+		"house_seen": _room.house_seen if _room != null else house_stage,
 		"switch_tried": switch_tried,
 		"petted": petted,
 		"afloat": afloat,
@@ -7560,6 +7578,12 @@ func load_game() -> bool:
 	# that the build already worked out, and the field is the truth.
 	_filth_left = _grid.filth_left()
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
+	# The house's stage (2026-10-11), off the meter just worked out when the file has none.
+	house_stage = maxi(int(save.get("house", shed_stage_for(1.0 - pollution) + 1)), 1)
+	_latch_house()
+	if _room != null:
+		_room.house_seen = clampi(int(save.get("house_seen", house_stage)), 1, house_stage)
+	_settle_house()
 	_filth_stale = true
 	_camera.position = Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	_load_extra(save)
@@ -7842,6 +7866,54 @@ func _draw_door_note(picture: Rect2) -> void:
 	_island.draw_rect(Rect2(pin, Vector2(px, px)), Color(0.72, 0.18, 0.16))
 
 
+## The house's stage, 1 to 3 (2026-10-11, `HouseInside`): the hut outside and the room
+## inside. Latched and saved: the meter only ever moves it forward, so a tornado flinging the
+## lake back past a mark never reopens a hole under furniture. 0 until the first look.
+var house_stage: int = 0
+## The room's stage held for a borrowed lake (every harness and probe: 3, the room as it
+## always was), or under 0 for the game's own lake, which shows `house_stage`.
+var _inside_pin: int = -1
+## For the probes that photograph the house's stages on a borrowed lake: the stage the room
+## shows. Read once, like `force_intro`.
+static var force_house: int = -1
+
+
+## The stage the room inside shows.
+func house_inside() -> int:
+	return _inside_pin if _inside_pin >= 1 else maxi(house_stage, 1)
+
+
+## The latch: the meter's stage, if it is past the one held. Pushed to the room.
+func _latch_house() -> void:
+	var earned := shed_stage_for(1.0 - pollution) + 1
+	if earned > house_stage:
+		house_stage = earned
+	if _room != null and _room.house_stage != house_inside():
+		_room.house_stage = house_inside()
+
+
+## A piece standing on a hole, a broken board or a puddle at the room's stage goes back to the
+## shelf (a save from before the stages had its furniture wherever it liked). Nothing lost:
+## the shelf is what is unlocked and not stood.
+func _settle_house() -> void:
+	if _room == null or _room.sheets == null:
+		return
+	var stage := house_inside()
+	var kept: Array = []
+	for row: Dictionary in decor:
+		var piece := StringName(row["piece"])
+		var cell := Vector2i(int(row["cell"][0]), int(row["cell"][1]))
+		var view := int(row.get("view", 0))
+		if not _room.sheets.on_wall(piece) and HouseInside.base_blocked(
+			stage, _room.base_rect(piece, cell, view)
+		):
+			continue
+		kept.append(row)
+	if kept.size() != decor.size():
+		decor.clear()
+		decor.append_array(kept)
+
+
 ## Which picture the meter has earned (see `SHED_ARTS`).
 func shed_stage_for(cleared: float) -> int:
 	var stage := 0
@@ -7854,7 +7926,8 @@ func shed_stage_for(cleared: float) -> int:
 ## Puts up the hut the meter has earned. On a change the grass and the shadow, both measured
 ## off the picture, are rebuilt, and the decorate button is handed the new hut.
 func _restage_shed() -> void:
-	var stage := shed_stage_pin if shed_stage_pin >= 0 else shed_stage_for(1.0 - pollution)
+	_latch_house()
+	var stage := shed_stage_pin if shed_stage_pin >= 0 else house_stage - 1
 	if stage == _shed_stage:
 		return
 	_shed_stage = stage

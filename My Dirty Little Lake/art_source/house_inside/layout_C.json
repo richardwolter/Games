@@ -1,0 +1,1563 @@
+{
+ "name": "C",
+ "idea": "C, THE CLEARING. The room as a picture: the damage is a broken ring round a clearing in the middle, where the furniture, the dog and the player stand, and the window's beam is the one place the ring opens to the light. The ring is heaviest and darkest on the right, far from the window under the worst of the roof (the rot corner, the failed repair, the big collapse), and lighter on the left, where the boards are sunken or split rather than gone and the one real hole is the sun pit, full of weeds in the beam. Two calm areas, top left and bottom left, frame the beam above and below so it reads clearly; one snapped board is a small note in the quiet. Eye path from the door: the lane drops into the clearing; the door sag turns the eye left into the light; the sun pit and the bright beam puddle; down the split, which falls at the beam's own angle, past the player's puddle to the bed's foot; the collapse; up past the record player's island and the sofa gap; to the rot corner, whose strip along the back wall points back to the door. A loop that keeps the eye in the room. Sizes run from large to tiny (the collapse 4.6k px down to the snapped board's 128); no two share a row or a column; ragged rot outlines and square-ended board outlines alternate. The puddles step down the light: one in the beam (brightest), one on its edge (the player's), one in the dark corner. Stage 2 keeps the two ends of the loop: the sun pit's core in flower with the last leak at its lip (light), and the collapse's core in the shade with new boards waiting (dark); everything else is fresh tan, joint to joint, peeking out between the new furniture.",
+ "grid": "Every block rect starts on a seam row (y = 4n) and covers whole planks (h a multiple of 4), so a hole's upper rim is a seam and its lower edge the next board's seam. Plank n (rows 4n+1..4n+3) has its butt joints at x = [6, 10, 4, 12][n % 4] + 16k (the floor tile laid from the floor box's top-left). Many hole ends sit on those joints: the board came away whole, draw a clean end grain. The rest are mid-board breaks: draw them splintered. Patches (stage 2) list their exact boards, joint to joint.",
+ "features": [
+  {
+   "id": "h1",
+   "kind": "hole",
+   "stages": [
+    1,
+    2
+   ],
+   "block": [
+    [
+     66,
+     84,
+     16,
+     4
+    ],
+    [
+     58,
+     88,
+     34,
+     4
+    ],
+    [
+     46,
+     92,
+     54,
+     4
+    ],
+    [
+     36,
+     96,
+     70,
+     4
+    ],
+    [
+     40,
+     100,
+     66,
+     4
+    ],
+    [
+     26,
+     104,
+     74,
+     4
+    ],
+    [
+     28,
+     108,
+     70,
+     4
+    ],
+    [
+     32,
+     112,
+     58,
+     4
+    ],
+    [
+     34,
+     116,
+     50,
+     4
+    ],
+    [
+     30,
+     120,
+     46,
+     4
+    ],
+    [
+     36,
+     124,
+     30,
+     4
+    ],
+    [
+     44,
+     128,
+     14,
+     4
+    ]
+   ],
+   "block_s2": [
+    [
+     48,
+     100,
+     32,
+     4
+    ],
+    [
+     40,
+     104,
+     48,
+     4
+    ],
+    [
+     38,
+     108,
+     54,
+     4
+    ],
+    [
+     42,
+     112,
+     48,
+     4
+    ],
+    [
+     46,
+     116,
+     36,
+     4
+    ],
+    [
+     50,
+     120,
+     22,
+     4
+    ],
+    [
+     44,
+     124,
+     20,
+     4
+    ]
+   ],
+   "note": "THE SUN PIT, the picture's lit focal point. Rain blew in at the window for years and the sun dried it again; the boards went soft and fell through, so the beam now lands on bare earth. Earth floor lit warm by the beam (brightest on its window side), the tallest weeds of any hole, leaning toward the window, lit to LEAF[4] at the tips where the beam crosses them and dark at the roots. Far (upper) rim: splintered board ends and the shadow band under them; near (lower) rim: cleaner board edges. The beam enters from the left, so the hole's left inner wall is in shade and its right inner wall lit. A sliver of lit board is left between the pit and the coat stand (it stands on the last sound boards under the window); the hole leans up and right, its long tongue on y 96-103 reaching for the chair's feet. STAGE 2: the ring is fresh tan boards; the core is left open on purpose, the weeds now in flower (a few daisies, WHITE/YELLOW), still in the beam: the room's one garden, with the last leak (p1) dripping at its lip."
+  },
+  {
+   "id": "h2",
+   "kind": "hole",
+   "stages": [
+    1,
+    2
+   ],
+   "block": [
+    [
+     272,
+     140,
+     18,
+     4
+    ],
+    [
+     262,
+     144,
+     36,
+     4
+    ],
+    [
+     234,
+     148,
+     68,
+     4
+    ],
+    [
+     226,
+     152,
+     78,
+     4
+    ],
+    [
+     222,
+     156,
+     82,
+     4
+    ],
+    [
+     221,
+     160,
+     83,
+     4
+    ],
+    [
+     186,
+     164,
+     118,
+     4
+    ],
+    [
+     196,
+     168,
+     116,
+     4
+    ],
+    [
+     213,
+     172,
+     91,
+     4
+    ],
+    [
+     226,
+     176,
+     78,
+     4
+    ],
+    [
+     220,
+     180,
+     84,
+     4
+    ],
+    [
+     232,
+     184,
+     74,
+     4
+    ],
+    [
+     236,
+     188,
+     64,
+     4
+    ],
+    [
+     244,
+     192,
+     52,
+     4
+    ],
+    [
+     250,
+     196,
+     50,
+     4
+    ],
+    [
+     260,
+     200,
+     32,
+     4
+    ],
+    [
+     266,
+     204,
+     18,
+     4
+    ]
+   ],
+   "block_s2": [
+    [
+     248,
+     152,
+     32,
+     4
+    ],
+    [
+     240,
+     156,
+     52,
+     4
+    ],
+    [
+     232,
+     160,
+     60,
+     4
+    ],
+    [
+     236,
+     164,
+     56,
+     4
+    ],
+    [
+     228,
+     168,
+     64,
+     4
+    ],
+    [
+     238,
+     172,
+     54,
+     4
+    ],
+    [
+     240,
+     176,
+     52,
+     4
+    ],
+    [
+     246,
+     180,
+     46,
+     4
+    ],
+    [
+     250,
+     184,
+     38,
+     4
+    ],
+    [
+     254,
+     188,
+     26,
+     4
+    ],
+    [
+     258,
+     192,
+     14,
+     4
+    ]
+   ],
+   "note": "THE COLLAPSE, the heaviest dark mass, on the lower-right power point and in the room's deepest shade (the beam has faded out here). A joist gave way under the bed's foot: two planks went in a slot that runs left under the foot (y 164-171), so the bed, with the dog asleep on it, stands at the brink, and the record player's island (see h4) at its upper edge. Its left side is ragged rot; its right side snapped straight down a joist line at x 304 (one board broke on past it, on y 168): a structural break, a different silhouette from every rot hole. Earth deeper and darker than the sun pit's (HOLE ramp, little light), the broken end of a joist showing in the far rim, only a few pale weeds, a damp sheen near the bed. Its far rim casts the widest shadow band in the room. STAGE 2: shrunk to its middle; the slot under the bed and the rim are fresh tan, two fresh boards wait at its foot (l3)."
+  },
+  {
+   "id": "h3",
+   "kind": "hole",
+   "stages": [
+    1
+   ],
+   "block": [
+    [
+     252,
+     12,
+     75,
+     4
+    ],
+    [
+     262,
+     16,
+     65,
+     4
+    ],
+    [
+     276,
+     20,
+     51,
+     4
+    ],
+    [
+     258,
+     24,
+     69,
+     4
+    ],
+    [
+     272,
+     28,
+     55,
+     4
+    ],
+    [
+     270,
+     32,
+     57,
+     4
+    ],
+    [
+     290,
+     36,
+     37,
+     4
+    ],
+    [
+     306,
+     40,
+     21,
+     4
+    ],
+    [
+     300,
+     44,
+     27,
+     4
+    ],
+    [
+     310,
+     48,
+     17,
+     4
+    ],
+    [
+     314,
+     52,
+     13,
+     4
+    ],
+    [
+     316,
+     56,
+     10,
+     4
+    ],
+    [
+     318,
+     60,
+     8,
+     4
+    ]
+   ],
+   "note": "THE ROT CORNER, top right: the worst of the roof leak ran down both walls for years. The boards rotted out of the corner, and the rot crept along the back wall's foot toward the door (the strip on y 12-19 from x 252) and down the right wall in a tongue. Black wet earth, moss on the soft board ends (MOSS ramp), mushrooms on the rim (m1), the wallpaper above it streaked worst. The strip along the back wall is the leading line that takes the eye back to the door. STAGE 2: all fresh tan; the fireplace and the floor lamp stand on the new boards."
+  },
+  {
+   "id": "h4",
+   "kind": "hole",
+   "stages": [
+    1
+   ],
+   "block": [
+    [
+     244,
+     72,
+     16,
+     4
+    ],
+    [
+     236,
+     76,
+     32,
+     4
+    ],
+    [
+     230,
+     80,
+     32,
+     4
+    ],
+    [
+     218,
+     84,
+     48,
+     4
+    ],
+    [
+     220,
+     88,
+     50,
+     4
+    ],
+    [
+     220,
+     92,
+     48,
+     4
+    ],
+    [
+     226,
+     96,
+     36,
+     4
+    ],
+    [
+     234,
+     100,
+     22,
+     4
+    ],
+    [
+     238,
+     104,
+     14,
+     4
+    ]
+   ],
+   "note": "THE SOFA GAP: an old repair that failed. Its short boards fell through whole, so most rows end square on the butt joints, unlike the ragged rot holes: a contrast of shape. With the collapse below, it leaves the record player standing on an island of sound boards, a crack across it (c1). Medium-dark earth, a few weeds, one short board lying tilted in it. STAGE 2: fresh tan; the armchair stands beside it."
+  },
+  {
+   "id": "b1",
+   "kind": "broken",
+   "stages": [
+    1
+   ],
+   "block": [
+    [
+     134,
+     48,
+     16,
+     4
+    ],
+    [
+     106,
+     52,
+     48,
+     4
+    ],
+    [
+     88,
+     56,
+     60,
+     4
+    ],
+    [
+     88,
+     60,
+     68,
+     4
+    ],
+    [
+     98,
+     64,
+     52,
+     4
+    ],
+    [
+     112,
+     68,
+     26,
+     4
+    ]
+   ],
+   "note": "THE DOOR SAG: the first boards past the door, left of the lane. Five or six boards cracked through over a sunken joist and sagging in a trough: not open, but dark gaps between tilted boards, splits along the grain, one board end standing proud. It sits on the beam's upper edge and turns the eye from the lane left into the light. STAGE 2: replaced joint to joint in fresh tan."
+  },
+  {
+   "id": "b2",
+   "kind": "broken",
+   "stages": [
+    1
+   ],
+   "block": [
+    [
+     58,
+     168,
+     34,
+     4
+    ],
+    [
+     64,
+     172,
+     56,
+     4
+    ],
+    [
+     90,
+     176,
+     38,
+     4
+    ],
+    [
+     96,
+     180,
+     58,
+     4
+    ],
+    [
+     124,
+     184,
+     36,
+     4
+    ],
+    [
+     128,
+     188,
+     56,
+     4
+    ],
+    [
+     156,
+     192,
+     26,
+     4
+    ],
+    [
+     160,
+     196,
+     30,
+     4
+    ],
+    [
+     174,
+     200,
+     12,
+     4
+    ]
+   ],
+   "note": "THE SPLIT: a beam under the floor sank and broke every board along a diagonal, each at a different place, so its steps are uneven (two boards snap close together, then a long one runs on). It falls from the beam's foot to the bed's foot at the same angle as the beam's lower edge, so it echoes the light and carries the eye from the sun pit to the collapse: the composition's main leading line. Draw a jagged trough 2-3 boards wide: board halves tilted down into it, dark gaps, splinters, a thin line of grass (w2). STAGE 2: fresh tan boards in a diagonal staircase."
+  },
+  {
+   "id": "b3",
+   "kind": "broken",
+   "stages": [
+    1
+   ],
+   "block": [
+    [
+     42,
+     36,
+     16,
+     4
+    ],
+    [
+     36,
+     40,
+     16,
+     4
+    ]
+   ],
+   "note": "THE SNAPPED BOARD: one board broken and sunk where something heavy once stood, the only mark in the quiet top-left: a small note that makes the calm read as space, not as nothing, and gives the big holes their scale. STAGE 2: one fresh board."
+  },
+  {
+   "id": "p1",
+   "kind": "puddle",
+   "stages": [
+    1,
+    2
+   ],
+   "center": [
+    86,
+    124
+   ],
+   "size": [
+    18,
+    7
+   ],
+   "size_s2": [
+    12,
+    5
+   ],
+   "rain_grow": 1.4,
+   "note": "THE BEAM PUDDLE: a leak at the window wall drips at the sun pit's right lip, inside the beam: the brightest water in the room, lit to the top of the clean ramp with a glint, and every drop flashes as it falls through the light. A thin run of water over the lip into the pit. Survives into stage 2, smaller, with a slow drip: the last leak beside the last hole, both in the sun."
+  },
+  {
+   "id": "p2",
+   "kind": "puddle",
+   "stages": [
+    1
+   ],
+   "center": [
+    140,
+    155
+   ],
+   "size": [
+    30,
+    10
+   ],
+   "rain_grow": 1.3,
+   "note": "THE FEET PUDDLE: a leak over the middle of the room, right where the player stands, so the splash reads (a foam ring at every step). It is on the beam's lower edge: the light falls off across it, lit on its left, dull on its right. Tide rings round it (s2)."
+  },
+  {
+   "id": "p3",
+   "kind": "puddle",
+   "stages": [
+    1
+   ],
+   "center": [
+    286,
+    60
+   ],
+   "size": [
+    24,
+    9
+   ],
+   "rain_grow": 1.5,
+   "note": "THE CORNER PUDDLE: the worst leak, in the dark top right beside the rot corner. It catches the window's light only as a dull sliver, but its drops come fastest and it spreads most in rain. Mushrooms round it (m1)."
+  },
+  {
+   "id": "c1",
+   "kind": "crack",
+   "stages": [
+    1
+   ],
+   "rect": [
+    266,
+    108,
+    6,
+    32
+   ],
+   "note": "Across the record player's island, from the sofa gap's lip to the collapse's: the island is on borrowed time. One crack, wandering along two seams and across a board."
+  },
+  {
+   "id": "c2",
+   "kind": "crack",
+   "stages": [
+    1
+   ],
+   "rect": [
+    56,
+    42,
+    36,
+    16
+   ],
+   "note": "Hairline crack along two seams linking the snapped board (b3) to the door sag: the quiet corner is not quite whole."
+  },
+  {
+   "id": "c3",
+   "kind": "crack",
+   "stages": [
+    1
+   ],
+   "rect": [
+    164,
+    148,
+    24,
+    18
+   ],
+   "note": "Two cracks fanning from the tip of the collapse's slot toward the feet puddle: the way the water goes."
+  },
+  {
+   "id": "s1",
+   "kind": "stain",
+   "stages": [
+    1
+   ],
+   "rect": [
+    8,
+    96,
+    20,
+    36
+   ],
+   "note": "Under the window: boards bleached pale by sun and rain (one step LIGHTER than the floor, not darker), the beam's entry patch."
+  },
+  {
+   "id": "s2",
+   "kind": "stain",
+   "stages": [
+    1
+   ],
+   "rect": [
+    116,
+    142,
+    48,
+    24
+   ],
+   "note": "Tide rings of old water round the feet puddle, darker boards, two or three rings."
+  },
+  {
+   "id": "s3",
+   "kind": "stain",
+   "stages": [
+    1
+   ],
+   "rect": [
+    184,
+    10,
+    68,
+    8
+   ],
+   "note": "Dark damp band along the back wall's foot, running on from the rot corner's strip and thinning out toward the door: continues the leading line back to the door."
+  },
+  {
+   "id": "w1",
+   "kind": "weeds",
+   "stages": [
+    1
+   ],
+   "rect": [
+    100,
+    90,
+    30,
+    24
+   ],
+   "note": "The sun pit's weeds escaping along the seams into the beam: a blade or two per seam, tallest nearest the light, lit tips."
+  },
+  {
+   "id": "w2",
+   "kind": "weeds",
+   "stages": [
+    1
+   ],
+   "rect": [
+    56,
+    166,
+    136,
+    40
+   ],
+   "note": "A thin line of grass along the split, sparse, mostly where it is widest."
+  },
+  {
+   "id": "m1",
+   "kind": "mushrooms",
+   "stages": [
+    1
+   ],
+   "rect": [
+    262,
+    50,
+    36,
+    18
+   ],
+   "note": "Pale caps on the soft board ends round the corner puddle, in the shade."
+  },
+  {
+   "id": "m2",
+   "kind": "mushrooms",
+   "stages": [
+    1
+   ],
+   "rect": [
+    306,
+    188,
+    22,
+    20
+   ],
+   "note": "Brown caps in the darkest corner of the room, by the collapse's right rim."
+  },
+  {
+   "id": "m3",
+   "kind": "mushrooms",
+   "stages": [
+    1
+   ],
+   "rect": [
+    174,
+    156,
+    16,
+    10
+   ],
+   "note": "Two small caps in the shade under the bed's foot, at the tip of the collapse's slot."
+  },
+  {
+   "id": "l1",
+   "kind": "loose",
+   "stages": [
+    1
+   ],
+   "rect": [
+    182,
+    24,
+    16,
+    4
+   ],
+   "note": "The first board inside the door, right of the lane, lifted at one end: it rattles when walked on. Blocks nothing."
+  },
+  {
+   "id": "l2",
+   "kind": "loose",
+   "stages": [
+    1
+   ],
+   "rect": [
+    292,
+    140,
+    16,
+    4
+   ],
+   "note": "A board on the collapse's upper rim, tipped down into the hole at one end."
+  },
+  {
+   "id": "f1",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    20,
+    84,
+    98,
+    48
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the sun pit's ring (the core stays open). Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     58,
+     84,
+     32,
+     4
+    ],
+    [
+     52,
+     88,
+     48,
+     4
+    ],
+    [
+     44,
+     92,
+     64,
+     4
+    ],
+    [
+     22,
+     96,
+     96,
+     4
+    ],
+    [
+     26,
+     100,
+     22,
+     4
+    ],
+    [
+     80,
+     100,
+     26,
+     4
+    ],
+    [
+     20,
+     104,
+     20,
+     4
+    ],
+    [
+     88,
+     104,
+     12,
+     4
+    ],
+    [
+     28,
+     108,
+     10,
+     4
+    ],
+    [
+     92,
+     108,
+     16,
+     4
+    ],
+    [
+     22,
+     112,
+     20,
+     4
+    ],
+    [
+     90,
+     112,
+     12,
+     4
+    ],
+    [
+     26,
+     116,
+     20,
+     4
+    ],
+    [
+     82,
+     116,
+     8,
+     4
+    ],
+    [
+     20,
+     120,
+     30,
+     4
+    ],
+    [
+     72,
+     120,
+     12,
+     4
+    ],
+    [
+     28,
+     124,
+     16,
+     4
+    ],
+    [
+     64,
+     124,
+     12,
+     4
+    ],
+    [
+     38,
+     128,
+     32,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "f2",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    186,
+    140,
+    138,
+    68
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the collapse's ring and the slot under the bed. Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     268,
+     140,
+     32,
+     4
+    ],
+    [
+     262,
+     144,
+     48,
+     4
+    ],
+    [
+     234,
+     148,
+     80,
+     4
+    ],
+    [
+     212,
+     152,
+     36,
+     4
+    ],
+    [
+     280,
+     152,
+     28,
+     4
+    ],
+    [
+     220,
+     156,
+     20,
+     4
+    ],
+    [
+     292,
+     156,
+     24,
+     4
+    ],
+    [
+     214,
+     160,
+     18,
+     4
+    ],
+    [
+     292,
+     160,
+     18,
+     4
+    ],
+    [
+     186,
+     164,
+     50,
+     4
+    ],
+    [
+     292,
+     164,
+     22,
+     4
+    ],
+    [
+     196,
+     168,
+     32,
+     4
+    ],
+    [
+     292,
+     168,
+     32,
+     4
+    ],
+    [
+     204,
+     172,
+     34,
+     4
+    ],
+    [
+     292,
+     172,
+     24,
+     4
+    ],
+    [
+     214,
+     176,
+     26,
+     4
+    ],
+    [
+     292,
+     176,
+     18,
+     4
+    ],
+    [
+     218,
+     180,
+     28,
+     4
+    ],
+    [
+     292,
+     180,
+     22,
+     4
+    ],
+    [
+     228,
+     184,
+     22,
+     4
+    ],
+    [
+     288,
+     184,
+     20,
+     4
+    ],
+    [
+     236,
+     188,
+     18,
+     4
+    ],
+    [
+     280,
+     188,
+     20,
+     4
+    ],
+    [
+     230,
+     192,
+     28,
+     4
+    ],
+    [
+     272,
+     192,
+     38,
+     4
+    ],
+    [
+     250,
+     196,
+     64,
+     4
+    ],
+    [
+     260,
+     200,
+     32,
+     4
+    ],
+    [
+     252,
+     204,
+     32,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "f3",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    244,
+    12,
+    86,
+    52
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the rot corner and its strip along the back wall. Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     252,
+     12,
+     78,
+     4
+    ],
+    [
+     262,
+     16,
+     68,
+     4
+    ],
+    [
+     266,
+     20,
+     64,
+     4
+    ],
+    [
+     244,
+     24,
+     86,
+     4
+    ],
+    [
+     268,
+     28,
+     62,
+     4
+    ],
+    [
+     262,
+     32,
+     68,
+     4
+    ],
+    [
+     282,
+     36,
+     48,
+     4
+    ],
+    [
+     292,
+     40,
+     38,
+     4
+    ],
+    [
+     300,
+     44,
+     30,
+     4
+    ],
+    [
+     310,
+     48,
+     20,
+     4
+    ],
+    [
+     314,
+     52,
+     16,
+     4
+    ],
+    [
+     308,
+     56,
+     22,
+     4
+    ],
+    [
+     316,
+     60,
+     14,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "f4",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    212,
+    72,
+    64,
+    36
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the sofa gap. Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     244,
+     72,
+     16,
+     4
+    ],
+    [
+     236,
+     76,
+     32,
+     4
+    ],
+    [
+     230,
+     80,
+     32,
+     4
+    ],
+    [
+     218,
+     84,
+     48,
+     4
+    ],
+    [
+     212,
+     88,
+     64,
+     4
+    ],
+    [
+     220,
+     92,
+     48,
+     4
+    ],
+    [
+     214,
+     96,
+     48,
+     4
+    ],
+    [
+     234,
+     100,
+     32,
+     4
+    ],
+    [
+     228,
+     104,
+     32,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "f5",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    76,
+    48,
+    80,
+    24
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the door sag. Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     134,
+     48,
+     16,
+     4
+    ],
+    [
+     106,
+     52,
+     48,
+     4
+    ],
+    [
+     84,
+     56,
+     64,
+     4
+    ],
+    [
+     76,
+     60,
+     80,
+     4
+    ],
+    [
+     86,
+     64,
+     64,
+     4
+    ],
+    [
+     106,
+     68,
+     32,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "f6",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    52,
+    168,
+    150,
+    36
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the split, a diagonal staircase of new boards. Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     52,
+     168,
+     48,
+     4
+    ],
+    [
+     60,
+     172,
+     64,
+     4
+    ],
+    [
+     86,
+     176,
+     48,
+     4
+    ],
+    [
+     90,
+     180,
+     64,
+     4
+    ],
+    [
+     116,
+     184,
+     48,
+     4
+    ],
+    [
+     124,
+     188,
+     64,
+     4
+    ],
+    [
+     150,
+     192,
+     32,
+     4
+    ],
+    [
+     154,
+     196,
+     48,
+     4
+    ],
+    [
+     164,
+     200,
+     32,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "f7",
+   "kind": "patch",
+   "stages": [
+    2
+   ],
+   "rect": [
+    36,
+    36,
+    22,
+    8
+   ],
+   "note": "Fresh tan boards (FRESH ramp, like the hut's mended shingles) over the snapped board. Laid the way a carpenter would: every plank of the old hole replaced from butt joint to butt joint, so the patch's ends fall on the floor's own joints. 'boards' lists the exact plank pieces.",
+   "boards": [
+    [
+     42,
+     36,
+     16,
+     4
+    ],
+    [
+     36,
+     40,
+     16,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "c4",
+   "kind": "crack",
+   "stages": [
+    2
+   ],
+   "rect": [
+    266,
+    108,
+    6,
+    16
+   ],
+   "note": "The island's crack, shorter now, its lower half under a fresh board."
+  },
+  {
+   "id": "c5",
+   "kind": "crack",
+   "stages": [
+    2
+   ],
+   "rect": [
+    156,
+    56,
+    14,
+    8
+   ],
+   "note": "An old board beside the door sag's patch, split along its grain where the new boards meet it."
+  },
+  {
+   "id": "s4",
+   "kind": "stain",
+   "stages": [
+    2
+   ],
+   "rect": [
+    74,
+    116,
+    26,
+    14
+   ],
+   "note": "The last puddle's ring on the boards beside the sun core."
+  },
+  {
+   "id": "s5",
+   "kind": "stain",
+   "stages": [
+    2
+   ],
+   "rect": [
+    222,
+    10,
+    24,
+    8
+   ],
+   "note": "The old boards along the back wall still dark beside the corner's new ones."
+  },
+  {
+   "id": "w3",
+   "kind": "weeds",
+   "stages": [
+    2
+   ],
+   "rect": [
+    40,
+    126,
+    30,
+    10
+   ],
+   "note": "Two daisies (WHITE/YELLOW) escaped from the sun core into the seams below it, still in the beam."
+  },
+  {
+   "id": "m4",
+   "kind": "mushrooms",
+   "stages": [
+    2
+   ],
+   "rect": [
+    288,
+    188,
+    12,
+    8
+   ],
+   "note": "Two caps left on the collapse core's lower-right rim, in the shade."
+  },
+  {
+   "id": "l3",
+   "kind": "loose",
+   "stages": [
+    2
+   ],
+   "rect": [
+    252,
+    198,
+    28,
+    5
+   ],
+   "note": "Two fresh boards stacked by the collapse core's foot, waiting to go in: the repair is in progress. Blocks nothing."
+  }
+ ]
+}

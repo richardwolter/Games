@@ -89,3 +89,7 @@ __MACOSX/
 # Loose review pictures dropped next to the film folders
 tools/film/*.png
 tools/steampipe/*.tmp.vdf
+
+# The house mockup's renders (2026-10-11): reviewed, not the source. The modules and captures are.
+/art_source/house_inside/out/
+/art_source/house_inside/__pycache__/

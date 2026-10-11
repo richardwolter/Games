@@ -739,6 +739,26 @@ func room_bell(db: float = 0.0) -> void:
 	_from_room = false
 
 
+## The house's own sounds (2026-10-11, its stages), through its door like the bark: a leak's
+## drop landing (`db` under the drips' mix), a foot in a leak puddle, a bird outside.
+func room_drip(db: float = 0.0) -> void:
+	_from_room = true
+	_drip(db, _rng.randf_range(0.85, 1.2))
+	_from_room = false
+
+
+func room_puddle_step() -> void:
+	_from_room = true
+	play_puddle_step()
+	_from_room = false
+
+
+func room_birdsong() -> void:
+	_from_room = true
+	play(&"forest", -4.0, 1.0, next_step(&"forest", _count(&"forest")))
+	_from_room = false
+
+
 ## The first player in a pool with nothing playing, or null.
 func _idle(pool: Array[AudioStreamPlayer]) -> AudioStreamPlayer:
 	for voice in pool:

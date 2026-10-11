@@ -1,0 +1,445 @@
+{
+ "name": "A",
+ "idea": "STORY OF THE ROT: water did all of this, and you can follow it. The house has sunk at its gable end. Outside, the gable's siding is gone at the back corner, so the sill beam under the room's bottom-left corner rotted, the corner dropped, and the whole floor now tilts gently down to it: everything wet ends up there, and that is the worst hole (H1), open to the earth, rank with weeds, with daylight slitting in through the corner. The roof holes you can see on the outside hut drip straight down: the big cluster at the far gable rains into the top-right corner (H5, the one spot where it really rains indoors in a shower), the cluster near the ridge drips on the left middle (H4), and where each drip lands now there is a puddle on the hole's high lip, cupping the next boards: the hole's next bite. The cracked gable window leaks down the left wall into H2, and the sun through that same window falls into it, so its weeds lean into the light. Water streaks on the back wallpaper end in rotten boards at the wall's foot (B2). The path from the door is worn into a dish by boots; rain blown in under the door runs down it and soaks the boards where the path ends (B1). A pot-belly stove stood out on the floor under its flue: its weight sagged the boards, and when it was hauled away the flue hole was never capped, so rain came straight down where it stood: a ring of rust and four foot dents round a hole full of grey ash-earth (H3). The back eave has no gutter, so the front sill went soft and the boards along it sank (B3). And one leak is new: the drip at the player's feet (P1) lands on boards that are still sound, inside a dark ring: every hole here began like that. STAGE 2: the roof is mended but for one crack, so the hole under that last drip (H4, with P2) is left open (nobody lays boards under a drip), and the corner (H1) waits for a new sill beam; both remnants have their rotten ends SAWN SQUARE (work in progress, not decay). Everything else is patched in fresh tan boards laid in the same rows, each patch stepping on the butt joints the way the hole did, and where the fresh leak was there is only a pale dried ring.",
+ "hints": {
+  "planks": "planks run across: seams at floor-rel y % 4 == 0 (rows 4k), wood rows 4k+1..4k+3; butt joints in band k at x = [6, 10, 4, 12][k % 4] + 16 m. Every hole/broken rect has its top and bottom on a seam; each band's ends are either a joint (a whole board gone: clean dark end grain) or mid-board (snapped: 2-3 px of splinters).",
+  "lean": "the floor tilts down towards the bottom-left corner (H1). Water marks, tide lines, stains and moss gather on the low (left / lower) side of things.",
+  "drips": "P1, P2, P3 each have a drip from the ceiling (about 32 source px above the puddle on screen). H3 also has a drip, down the old stove flue, into the hole's middle: it lands in ash-mud with a brown splash, no puddle. In a shower H5 gets rain falling into it (short streaks over its bbox) and H4/P2's drip doubles.",
+  "wall_streaks_abs_x": [
+   138,
+   154,
+   177
+  ],
+  "wall_streaks": "water streaks down the back wallpaper end on B2's two tongues: draw them at abs x 138 and 177 (strong) and 154 (faint), from the wall's top to the moulding; the boards under them are B2.",
+  "outside": "matches assets/shed_neglected.png: front-slope roof holes near the far gable -> H5/P3; near the ridge towards the window gable -> H4/P2; the gable window -> H2; the gable's missing siding at the back corner -> H1. P1's leak is in the back slope (never seen from outside)."
+ },
+ "features": [
+  {
+   "id": "H1",
+   "kind": "hole",
+   "stages": [1, 2],
+   "note": "THE LOW CORNER, the worst. The gable's siding fell off outside at this corner, the sill beam rotted, the corner sank and the whole floor drains to it. Open to the earth: dark wet soil, a rotten joist running across it (one dark beam band, rows ~188-195), standing water in the deepest pocket against the wall. Board ends: whole boards gone at the joint ends, splintered stubs at the mid ends; the board at rows 180-183 juts into the hole like a jetty, sagging at its tip, and the one at rows 196-199 is gone far to the right (a long board pulled out). Thick shadow band under the top rim (3 rows), less under the side ends. A thin tongue runs up the wall foot (x 6..12, rows 148-163) behind the coat stand: the rot's path from the window. Daylight slits from the missing siding lie across the earth (L1). Stage 2: cut back to sound wood with SQUARE SAWN ends, the earth still showing; the outer part patched (pa_H1).",
+   "block": [
+    [6, 148, 4, 4],
+    [6, 152, 6, 8],
+    [6, 160, 9, 4],
+    [6, 164, 52, 4],
+    [6, 168, 43, 4],
+    [6, 172, 70, 4],
+    [6, 176, 60, 4],
+    [6, 180, 32, 4],
+    [6, 184, 52, 4],
+    [6, 188, 77, 4],
+    [6, 192, 80, 4],
+    [6, 196, 100, 4],
+    [6, 200, 88, 4],
+    [6, 204, 83, 4],
+    [6, 208, 60, 4],
+    [6, 212, 75, 2]
+   ],
+   "block_s2": [
+    [6, 172, 22, 4],
+    [6, 176, 39, 4],
+    [6, 180, 32, 4],
+    [6, 184, 52, 4],
+    [6, 188, 50, 4],
+    [6, 192, 48, 4],
+    [6, 196, 52, 4],
+    [6, 200, 62, 4],
+    [6, 204, 61, 4],
+    [6, 208, 60, 4],
+    [6, 212, 52, 2]
+   ]
+  },
+  {
+   "id": "H2",
+   "kind": "hole",
+   "stages": [1],
+   "note": "UNDER THE CRACKED WINDOW (the sun shaft starts at abs (90, 196), rel (6, 112)). Rain through the cracked pane ran down the inside of the gable wall and into the boards at its foot. The sun shaft from the same window falls across its lower rows, so the earth there is lit and its weeds (WD2) are pale and stretched, leaning towards the light. The board tongue at rows 96-99 reaches furthest: a long board that slid out from under the wall plate.",
+   "block": [
+    [6, 84, 36, 4],
+    [6, 88, 30, 4],
+    [6, 92, 38, 4],
+    [6, 96, 53, 4],
+    [6, 100, 20, 4],
+    [6, 104, 30, 4],
+    [6, 108, 25, 4],
+    [6, 112, 32, 4],
+    [6, 116, 20, 4]
+   ]
+  },
+  {
+   "id": "H3",
+   "kind": "hole",
+   "stages": [1],
+   "note": "WHERE THE STOVE STOOD. A pot-belly stove stood here under its flue; its weight sagged the boards into a dish (the rim boards tilt down into the hole, their lit edges facing up), its ash ate them, and when it was hauled out the flue hole in the roof stayed open, so rain comes straight down onto this spot: a drip with no puddle, landing in the hole's middle in grey ASH-MUD (greyer, flatter earth than the other holes; one pale seedling, nothing else grows in ash). Rust ring and foot dents round it: see S1.",
+   "block": [
+    [227, 80, 35, 4],
+    [218, 84, 42, 4],
+    [220, 88, 40, 4],
+    [217, 92, 54, 4],
+    [214, 96, 48, 4],
+    [218, 100, 48, 4],
+    [212, 104, 32, 4],
+    [220, 108, 24, 4]
+   ]
+  },
+  {
+   "id": "H4",
+   "kind": "hole",
+   "stages": [1, 2],
+   "note": "UNDER THE RIDGE LEAK, mid-left, long and thin along the grain (water spreads along the boards before it rots them). The drip that made it now lands a hand's width to the right, on the high lip (P2), where the boards are cupping and dark: the hole's next bite; a thin wet trickle runs from P2's left edge over the broken ends into the hole. It sits in the window's sun shaft, so its mud has a wet glint. Stage 2: THE LAST DRIP is still there, so this core is left open (sawn square), new boards laid round it.",
+   "block": [
+    [49, 120, 51, 4],
+    [47, 124, 45, 4],
+    [38, 128, 64, 4],
+    [46, 132, 56, 4],
+    [52, 136, 64, 4],
+    [64, 140, 28, 4]
+   ],
+   "block_s2": [
+    [68, 120, 16, 4],
+    [60, 124, 32, 4],
+    [54, 128, 48, 4],
+    [58, 132, 44, 4],
+    [52, 136, 48, 4],
+    [70, 140, 19, 4]
+   ]
+  },
+  {
+   "id": "H5",
+   "kind": "hole",
+   "stages": [1],
+   "note": "UNDER THE BIG ROOF HOLE (the far-gable shingle cluster seen from outside). The biggest leak, so the hole is wide and reaches the right wall; the joist under it is bare and green with moss, a fern under the drip line (WD3). The water that misses the hole runs down the lean to the lower-left lip and pools there (P3). In a shower rain falls INTO this hole (the only place indoors it rains).",
+   "block": [
+    [282, 20, 32, 4],
+    [276, 24, 32, 4],
+    [268, 28, 51, 4],
+    [278, 32, 52, 4],
+    [266, 36, 64, 4],
+    [273, 40, 57, 4],
+    [264, 44, 66, 4],
+    [275, 48, 55, 4],
+    [266, 52, 64, 4],
+    [276, 56, 54, 4],
+    [284, 60, 46, 4],
+    [294, 64, 36, 4],
+    [298, 68, 16, 4]
+   ]
+  },
+  {
+   "id": "B1",
+   "kind": "broken",
+   "stages": [1],
+   "note": "WHERE THE WORN PATH ENDS. The path from the door is dished by boots (W1); rain blown in under the door runs down that dish and stops here, so these boards stayed wet: cupped, split along the grain, sunk a pixel or two below their neighbours (dark gap rows along their top edges), one snapped in the middle with its two halves tipped into a shallow V. Not an open hole: you see wood, broken. The first thing the player meets walking in. Stage 2: replaced, and the rug laid over most of the patch.",
+   "block": [
+    [151, 52, 32, 4],
+    [151, 56, 37, 4],
+    [134, 60, 38, 4],
+    [166, 64, 11, 4]
+   ]
+  },
+  {
+   "id": "B2",
+   "kind": "broken",
+   "stages": [1],
+   "note": "AT THE FOOT OF THE WALLPAPER STREAKS. Water from the roof's front slope ran down the inside of the back wall (hints.wall_streaks): a strip of soft, blackened, crumbling boards along the wall foot, with two tongues reaching into the room right under the two strong streaks (the left one short, the right one long: more water came down there). Boards sunk and furred with grey mould, some ends crumbled away to a pixel of dark gap. Not open earth.",
+   "block": [
+    [36, 10, 80, 2],
+    [44, 12, 80, 4],
+    [54, 16, 44, 4],
+    [48, 20, 13, 4],
+    [86, 20, 14, 4],
+    [88, 24, 15, 4],
+    [89, 28, 9, 4]
+   ]
+  },
+  {
+   "id": "B3",
+   "kind": "broken",
+   "stages": [1],
+   "note": "ALONG THE FRONT SILL. The back eave has no gutter; rain splashing off the ground rotted the sill plate under this edge and the boards resting on it sank: a long shallow trough of boards sloping down to the sill, cracked along their length, ends lifted where they parted (light end-grain pixels), grass in the seams (WD4), a bracket fungus in the corner beyond it (M5).",
+   "block": [
+    [230, 192, 58, 4],
+    [218, 196, 80, 4],
+    [228, 200, 71, 4],
+    [220, 204, 93, 4],
+    [224, 208, 89, 4],
+    [218, 212, 96, 2]
+   ]
+  },
+  {
+   "id": "P1",
+   "kind": "puddle",
+   "stages": [1],
+   "center": [137, 153],
+   "size": [22, 8],
+   "rain_grow": 1.4,
+   "note": "THE FRESH LEAK, at the player's feet (so the splash reads). The ridge cap split last winter right above: the drip lands on boards that are still SOUND, inside a darker wet ring (S2). No rot yet: this is how every hole in the room started. The player splashes through it."
+  },
+  {
+   "id": "P2",
+   "kind": "puddle",
+   "stages": [1, 2],
+   "center": [116, 130],
+   "size": [14, 8],
+   "size_s2": [10, 6],
+   "rain_grow": 1.3,
+   "note": "H4's drip, landing on the hole's high (right) lip on cupped boards; its left edge spills over the broken board ends into H4 (a 1-px wet trickle). Stage 2: THE LAST LEAK, a slow drip, a smaller puddle; mushrooms by it (M2)."
+  },
+  {
+   "id": "P3",
+   "kind": "puddle",
+   "stages": [1],
+   "center": [258, 62],
+   "size": [18, 8],
+   "rain_grow": 1.5,
+   "note": "H5's overflow and its own drip: water that misses the big hole runs down the lean and gathers on H5's lower-left lip. Grows the most in a shower (the roof is most open here). A wet seam runs from it towards the stove's hole (C4). Stage 2: a pale dried ring (S7)."
+  },
+  {
+   "id": "W1",
+   "kind": "worn",
+   "stages": [1, 2],
+   "rect": [157, 10, 22, 42],
+   "note": "the path from the door, worn into a shallow dish by forty years of boots: boards a step paler in the middle third, grain standing proud (light dashes along the planks), the dish's edges a step darker. It leads straight to B1. In a shower a skin of water lies in the dish. Walkable."
+  },
+  {
+   "id": "L1",
+   "kind": "light",
+   "stages": [1],
+   "rect": [6, 196, 14, 18],
+   "note": "two thin slits of daylight from the missing siding at the corner, lying across H1's earth and the broken board ends at a steep angle (whole pixels, the window light's colour, dim). Gone in stage 2 (the siding is back)."
+  },
+  {
+   "id": "LB1",
+   "kind": "loose",
+   "stages": [1],
+   "rect": [154, 36, 16, 4],
+   "note": "one whole board in the worn path (between its joints), loose: rocks and clacks when walked on; a 1-px dark gap opens at its far end under a walker."
+  },
+  {
+   "id": "S1",
+   "kind": "stain",
+   "stages": [1],
+   "rect": [204, 70, 74, 50],
+   "note": "the stove's ghost round H3: a rust-orange ring on the boards where its base sat, a fan of soot spreading right (the draught), and four round dents from its cast feet at the ring's corners, about (216, 75), (262, 75), (222, 116), (264, 116); draw the ones the sofa, bed and record player do not hide."
+  },
+  {
+   "id": "S2",
+   "kind": "stain",
+   "stages": [1],
+   "rect": [118, 144, 38, 18],
+   "note": "the fresh leak's high-water ring round P1: the boards inside it a step darker, a 1-px tide line at its edge (lower and longer on the left: the lean)."
+  },
+  {
+   "id": "S3",
+   "kind": "stain",
+   "stages": [1],
+   "rect": [6, 120, 10, 28],
+   "note": "a dark wet margin at the left wall's foot, from H2 down behind the coat stand to H1's tongue: the window water's path to the low corner; moss in its seams."
+  },
+  {
+   "id": "S4",
+   "kind": "stain",
+   "stages": [1],
+   "rect": [36, 10, 88, 6],
+   "note": "where the wallpaper streaks meet the floor (hints.wall_streaks): the moulding's foot darkened and the first boards blackened under each streak."
+  },
+  {
+   "id": "S5",
+   "kind": "stain",
+   "stages": [1],
+   "rect": [60, 150, 70, 26],
+   "note": "old flood tide-lines on the boards between P1 and H1, each a faint 1-px line a step darker than the boards, curving round towards the low corner: the floor drains to H1, and you can see it."
+  },
+  {
+   "id": "C1",
+   "kind": "crack",
+   "stages": [1, 2],
+   "rect": [56, 112, 34, 4],
+   "note": "split boards just above H4, already grey: the next to go. Still there in stage 2 (under the last drip's spray)."
+  },
+  {
+   "id": "C2",
+   "kind": "crack",
+   "stages": [1],
+   "rect": [218, 116, 26, 4],
+   "note": "boards split by the stove's weight, under the dish's low rim."
+  },
+  {
+   "id": "C3",
+   "kind": "crack",
+   "stages": [1],
+   "rect": [236, 186, 40, 4],
+   "note": "a long split along a board above B3, where the sinking boards pulled apart."
+  },
+  {
+   "id": "C4",
+   "kind": "crack",
+   "stages": [1],
+   "rect": [230, 66, 22, 3],
+   "note": "a wet seam from P3 running left towards the stove's hole: water follows the plank seams downhill."
+  },
+  {
+   "id": "WD1",
+   "kind": "weeds",
+   "stages": [1],
+   "rect": [6, 160, 70, 54],
+   "note": "the rankest: tall grass, dock leaves and a nettle standing up out of the corner hole, spilling over the rim; the only weeds in the room with height."
+  },
+  {
+   "id": "WD2",
+   "kind": "weeds",
+   "stages": [1],
+   "rect": [6, 84, 44, 36],
+   "note": "pale, stretched seedlings and one dandelion in H2, all leaning right, up into the window's sun."
+  },
+  {
+   "id": "WD3",
+   "kind": "weeds",
+   "stages": [1],
+   "rect": [270, 24, 56, 48],
+   "note": "moss carpeting the bare joist in H5 and a young fern unrolling under the drip."
+  },
+  {
+   "id": "WD4",
+   "kind": "weeds",
+   "stages": [1],
+   "rect": [296, 200, 20, 14],
+   "note": "grass blades up through the seams along the sunk sill boards (B3)."
+  },
+  {
+   "id": "M1",
+   "kind": "mushrooms",
+   "stages": [1],
+   "rect": [58, 160, 12, 6],
+   "note": "a cluster of small brown caps on the wet boards at H1's upper rim."
+  },
+  {
+   "id": "M2",
+   "kind": "mushrooms",
+   "stages": [1, 2],
+   "rect": [118, 136, 10, 6],
+   "note": "pale caps on the cupped boards by P2 (the last drip keeps them alive in stage 2)."
+  },
+  {
+   "id": "M3",
+   "kind": "mushrooms",
+   "stages": [1],
+   "rect": [126, 10, 10, 6],
+   "note": "a tuft in the shade at the back wall's foot, just right of B2's end."
+  },
+  {
+   "id": "M4",
+   "kind": "mushrooms",
+   "stages": [1],
+   "rect": [244, 66, 10, 6],
+   "note": "two or three caps beside P3."
+  },
+  {
+   "id": "M5",
+   "kind": "mushrooms",
+   "stages": [1],
+   "rect": [314, 196, 12, 8],
+   "note": "a bracket fungus shelf in the bottom-right corner past B3, the sill's damp."
+  },
+  {
+   "id": "pa_H1",
+   "kind": "patch",
+   "stages": [2],
+   "note": "fresh tan boards (base.FRESH) round the corner's remnant; their inner ends sawn square at the remnant; a few boards still to lay. Nail heads at the board ends.",
+   "rect": [6, 148, 100, 66]
+  },
+  {
+   "id": "pa_H2",
+   "kind": "patch",
+   "stages": [2],
+   "note": "under the window: fully re-laid in fresh tan boards, each ending on its row's joint, so the patch edge steps like the hole did.",
+   "rect": [6, 84, 53, 36]
+  },
+  {
+   "id": "pa_H3",
+   "kind": "patch",
+   "stages": [2],
+   "note": "the stove's hole boarded over in fresh tan; the rust ring stays faintly round it (the old boards keep their stain).",
+   "rect": [212, 80, 59, 32]
+  },
+  {
+   "id": "pa_H4",
+   "kind": "patch",
+   "stages": [2],
+   "note": "new boards round H4's open core (left open under the last drip), sawn square at it.",
+   "rect": [38, 120, 78, 24]
+  },
+  {
+   "id": "pa_H5",
+   "kind": "patch",
+   "stages": [2],
+   "note": "the big corner patch: the most new wood in the room, partly under the fireplace, the lamp and the armchair.",
+   "rect": [264, 20, 66, 52]
+  },
+  {
+   "id": "pa_B1",
+   "kind": "patch",
+   "stages": [2],
+   "note": "replaced boards at the path's end; the rug covers most of them.",
+   "rect": [134, 52, 54, 16]
+  },
+  {
+   "id": "pa_B2",
+   "kind": "patch",
+   "stages": [2],
+   "note": "new boards along the back wall's foot, the streaks on the wallpaper above faded.",
+   "rect": [36, 10, 88, 22]
+  },
+  {
+   "id": "pa_B3",
+   "kind": "patch",
+   "stages": [2],
+   "note": "the sill run re-laid in fresh boards.",
+   "rect": [218, 192, 96, 22]
+  },
+  {
+   "id": "LB2",
+   "kind": "loose",
+   "stages": [2],
+   "rect": [20, 168, 32, 4],
+   "note": "a new tan board laid at the corner remnant's top edge but not nailed yet: it sits a pixel proud of its neighbours (a 1-px shadow under its lower edge) and clacks when walked on. The carpenter's next job."
+  },
+  {
+   "id": "C5",
+   "kind": "crack",
+   "stages": [2],
+   "rect": [266, 120, 22, 3],
+   "note": "an old board kept among the new ones, split along its grain: not everything was replaced."
+  },
+  {
+   "id": "S6",
+   "kind": "stain",
+   "stages": [2],
+   "rect": [118, 144, 38, 18],
+   "note": "where the fresh leak was: only a pale dried ring on sound boards (the roof mended)."
+  },
+  {
+   "id": "S7",
+   "kind": "stain",
+   "stages": [2],
+   "rect": [244, 54, 32, 16],
+   "note": "P3's pale dried ring beside the new boards of pa_H5."
+  },
+  {
+   "id": "WD5",
+   "kind": "weeds",
+   "stages": [2],
+   "rect": [6, 172, 56, 42],
+   "note": "the corner's weeds cut back: short stubble and one dandelion left in H1's remnant."
+  },
+  {
+   "id": "WD6",
+   "kind": "weeds",
+   "stages": [2],
+   "rect": [52, 120, 50, 24],
+   "note": "a few low green shoots in H4's open core, wet from the last drip."
+  }
+ ]
+}
