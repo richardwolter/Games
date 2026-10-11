@@ -1,7 +1,8 @@
 # Steam Pricing — My Dirty Little Lake
 
 > **Decided by Richard, 2026-10-10: US$4.99, 15% launch discount (Nov 16-30).** Regional
-> prices, the Winter Sale and the length line on the store page are still open.
+> prices: proposed in **Regional prices for US$4.99** below. The Winter Sale and the length
+> line on the store page are still open.
 
 Researched 2026-10-10 for the 2026-11-16 launch (app 5375170). Prices and review counts
 were read from the Steam store API (US and BR storefronts) the same day.
@@ -106,6 +107,84 @@ tornadoes, 8 languages, controller support), so it belongs in the cozy band, not
     the full US price.
   - **Floors:** don't hand-lower any currency under Steam's $0.99-equivalent floor, or the
     game becomes unavailable there and no discount can be scheduled.
+
+## Regional prices for US$4.99 (2026-10-10)
+
+**Method.** Valve's tool is in Steamworks, but its output can be read off games that took it.
+Two unrelated $4.99 games, *A Game About Digging A Hole* (2025) and *Brotato* (2023), were
+read from the store API in 42 storefronts. They match to the cent in 38, including odd figures
+like PHP 174.95, NOK 55.49 and AUD 7.50 that nobody picks by hand. Where they differ (UK,
+China), the 2025 game is taken as the current tool and Brotato as an older one or a hand
+choice. **Before entering anything, open the tool in Steamworks: its figures win** where they
+differ from this table.
+
+**Rule followed.** Take Valve's figure unless there is a reason that is about *this* game or
+*that* market. Three changes, all small, all downwards, all things a later price review can undo.
+
+| Currency | Valve's tool | **Use** | Why a change |
+|---|---|---|---|
+| USD (US) | 4.99 | **4.99** | |
+| EUR | 4.99 | **4.99** | |
+| GBP | 4.29 | **3.99** | £x.99 under a pound line is the UK convention; Brotato sits there too |
+| CAD | 6.49 | **6.49** | |
+| AUD | 7.50 | **7.50** | |
+| NZD | 7.39 | **7.39** | |
+| CHF | 5.49 | **5.49** | |
+| NOK | 55.49 | **55.49** | |
+| PLN | 22.99 | **22.99** | |
+| JPY | 580 | **580** | |
+| KRW | 5,600 | **5,600** | |
+| CNY | 18.50 | **18** | Steam China prices are whole yuan (18, 22, 36…); a .50 looks like an error |
+| TWD | 102 | **102** | |
+| HKD | 33 | **33** | |
+| SGD | 5.25 | **5.25** | |
+| MYR | 13.99 | **13.99** | |
+| IDR | 47,499 | **47,499** | |
+| PHP | 174.95 | **174.95** | |
+| THB | 115 | **115** | |
+| VND | 73,500 | **73,500** | |
+| INR | 250 | **250** | |
+| BRL | 16.99 | **16.99** | Kept: see below |
+| MXN | 64.49 | **64.49** | |
+| CLP | 3,000 | **3,000** | |
+| COP | 13,500 | **13,500** | |
+| PEN | 12.00 | **12.00** | |
+| UYU | 159 | **159** | |
+| CRC | 2,400 | **2,400** | |
+| UAH | 124 | **124** | |
+| KZT | 1,500 | **1,500** | |
+| RUB | 200 | **200** | |
+| ZAR | 52 | **52** | |
+| ILS | 18.50 | **18.50** | |
+| SAR | 11.95 | **11.95** | |
+| AED | 15.00 | **15.00** | |
+| QAR | 12.99 | **12.99** | |
+| KWD | 1.10 | **1.10** | |
+| LATAM-USD (Argentina and others) | 2.99 | **2.99** | Must be filled, or these pay US$4.99 |
+| MENA-USD (Turkey and others) | 2.99 | **2.99** | Must be filled |
+| CIS-USD | 3.29 | **3.29** | Must be filled |
+| South Asia-USD (Pakistan, Bangladesh…) | 2.99 | **2.99** | Must be filled |
+
+**Brazil, thought through.** The pull is to go lower at home. Not doing it:
+- R$16,99 is already under the R$20 impulse line, and the 15% launch discount puts it at about
+  R$14,44 in launch week, under the R$14,99 a hand-cut would have set.
+- R$16,99 against US$4.99 is about 3.4 reais to the dollar, well under the market rate, so
+  Valve's tool already gives Brazil a large cut. (Exchange rate not checked here; compare with
+  the day's rate if the size of the cut matters.)
+- A home-market cut is one-way in practice. Lowering a regional price later is always allowed;
+  raising it reads as a betrayal to the very audience that would talk about the game first.
+- Keep the change in reserve: if PT-BR wishlists convert poorly in launch week, R$14,99 is a
+  quick, reversible-in-spirit move after the launch discount ends.
+
+**What was looked at and left alone.**
+- **Odd-looking figures** (NOK 55.49, NZD 7.39, KRW 5,600): they are Valve's and match what
+  these storefronts show for every $4.99 game. Rounding them buys nothing measurable.
+- **Russia and Ukraine**: Steam still lists RUB and UAH prices; payment in Russia is hard and
+  out of the developer's hands. Valve's figures, no stance taken through pricing.
+- **Key arbitrage**: Steam blocks gifting across regions with large price gaps and the game is
+  not sold as keys elsewhere, so the cheap regions are not a leak.
+- **The launch discount and sales apply as a percentage in every currency**, so this table only
+  has to be right once.
 
 ## Risks
 
