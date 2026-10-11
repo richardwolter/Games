@@ -398,6 +398,12 @@ func _ready() -> void:
 		_cards[board] = card
 	_wake = HullFoam.new()
 	_wake.z_index = 0
+	# The ferry's own foam (2026-10-11): the board's head is the same boat.
+	_wake.thick_scale = Boat.FOAM_THICK
+	_wake.spread_scale = Boat.FOAM_SPREAD
+	_wake.trail_scale = Boat.FOAM_TRAIL
+	_wake.trail_fade = Boat.FOAM_TRAIL_FADE
+	_wake.solid = Boat.FOAM_SOLID
 	_wake.visible = false
 	add_child(_wake)
 	# A polygon rather than a sprite: the hull is cut along its waterline, which is not a

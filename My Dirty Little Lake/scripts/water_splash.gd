@@ -278,6 +278,38 @@ func splash(at: Vector2, strength: float, tall: bool = true) -> void:
 	_redraw()
 
 
+## The water a hull's bow breaks (2026-10-11, `/grill-me` with Richard: the ferry's spray
+## was "too far" from the hull): a crown only `span` px wide, its spray sheet the same size,
+## and `BOW_DROPS` drops that land within about a span of where they left. `splash` cannot be
+## asked this small: its crown is never under 40 px and its drops fly two spans out.
+const BOW_DROPS := Vector2i(2, 4)
+
+
+func bow_spray(at: Vector2, span: float) -> void:
+	if _crown_age.size() >= CROWNS_MOST:
+		return
+	_crown_at.append(at)
+	_crown_age.append(0.0)
+	_crown_span.append(span)
+	_crown_roll.append(randf())
+	_crown_tall.append(1)
+	if _burst_age.size() < MAX_BURSTS:
+		_burst_at.append(at)
+		_burst_age.append(0.0)
+		_burst_span.append(span * BURST_SCALE)
+	for i in randi_range(BOW_DROPS.x, BOW_DROPS.y):
+		if _drop_life.size() >= MAX_DROPS:
+			break
+		var from_centre := randf_range(-1.0, 1.0)
+		_drop_pos.append(at + Vector2(from_centre * span * 0.3, 0.0))
+		_drop_floor.append(at.y)
+		_drop_vel.append(Vector2(from_centre * span * randf_range(0.6, 1.1), -randf_range(70.0, 120.0)))
+		_drop_life.append(randf_range(0.18, 0.3))
+		_drop_size.append(maxf(span * randf_range(0.05, 0.08), 1.0))
+	set_process(true)
+	_redraw()
+
+
 ## A single drop of water, thrown from wherever you say. For water running off something
 ## hauled out of the lake. It falls back through the height it was thrown from.
 func drip(at: Vector2, vel: Vector2, size: float, life: float) -> void:

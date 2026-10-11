@@ -73,6 +73,26 @@ var streak_long := STREAK_LONG
 ## Whether the trailing pair is drawn at all. Off for the net, by decision.
 var with_trail := true
 
+## A ferry's own sizes on the shared shape (2026-10-11, Richard: "thicker, wider and more
+## prominent"): how much thicker every streak is drawn, how much further the peeling part
+## spreads, how much longer the trailing pair runs, and how solid the trailing pair is. The
+## dog's, the angler's and the net's waves keep 1, 1, 1 and `TRAIL_FADE`.
+var thick_scale := 1.0
+var spread_scale := 1.0
+var trail_scale := 1.0
+var trail_fade := TRAIL_FADE
+
+## The hull's waterline on screen as an ellipse, in the parent's space: its middle and its
+## two half axes (across the screen, down it). Set, the streaks start at the ellipse's edge at
+## the bow and hug its side, whatever heading the drawn hull shows; unset (zero), the old
+## projection (`BOW_AT`, `HUG` of `half_width` squashed by `SQUASH`), which put the bow pair
+## under the hull's picture side on and end on.
+var footprint := Vector2.ZERO
+var origin := Vector2.ZERO
+## How much less the streak breaks up (the shader's `solid`), 0 to 1. The ferry's is
+## `Boat.FOAM_SOLID`; set before the node enters the tree, it picks the material.
+var solid := 0.0
+
 var _heading := Vector2(1.0, 0.0)
 var _push := 0.0
 var _shown_push := -1.0
@@ -84,6 +104,11 @@ func _init() -> void:
 	# Behind the hull: foam over the paint is a white stripe on the boat.
 	z_index = -1
 	material = _material()
+
+
+func _ready() -> void:
+	if solid > 0.0:
+		material = _solid_material(solid)
 
 
 ## Point the streaks along `heading` (on screen) and ease the wave towards `push`, 0 to 1.
@@ -128,9 +153,9 @@ func _draw_streak(along: Vector2, out: Vector2, trail: bool) -> void:
 	var uvs := PackedVector2Array()
 	var colours := PackedColorArray()
 	var indices := PackedInt32Array()
-	var tint := Color(1.0, 1.0, 1.0, _push * (TRAIL_FADE if trail else 1.0))
-	var thick_bow := TRAIL_THICK_BOW if trail else THICK_BOW
-	var thick_tail := TRAIL_THICK_TAIL if trail else THICK_TAIL
+	var tint := Color(1.0, 1.0, 1.0, _push * (trail_fade if trail else 1.0))
+	var thick_bow := (TRAIL_THICK_BOW if trail else THICK_BOW) * thick_scale
+	var thick_tail := (TRAIL_THICK_TAIL if trail else THICK_TAIL) * thick_scale
 	for i in SEGMENTS + 1:
 		var u := float(i) / float(SEGMENTS)
 		var centre := _centre(along, out, u, trail)
@@ -160,14 +185,50 @@ func _draw_streak(along: Vector2, out: Vector2, trail: bool) -> void:
 ## the hull's side quickly, then peeling steadily away behind it. The trailing pair run the
 ## same curve with its own numbers — further back, wider, and away from the hull sooner.
 func _centre(along: Vector2, out: Vector2, u: float, trail: bool) -> Vector2:
-	var long := TRAIL_LONG if trail else streak_long
+	var long := TRAIL_LONG * trail_scale if trail else streak_long
 	var reach := TRAIL_HUG if trail else HUG
-	var spread := TRAIL_SPREAD if trail else SPREAD
+	var spread := (TRAIL_SPREAD if trail else SPREAD) * spread_scale
 	var until := TRAIL_HUG_UNTIL if trail else HUG_UNTIL
-	var back := half_length * BOW_AT - half_length * long * u
 	var hug := smoothstep(0.0, until, u) * reach
 	var peel := maxf(u - until, 0.0) / (1.0 - until) * spread
+	if footprint.x > 0.0:
+		# Off the drawn waterline: from the ellipse's edge at the bow, out to its edge on
+		# this side (`reach` of the way for the trail, which starts tucked in), then peeling.
+		var back := ellipse_reach(along) * BOW_FIT - half_length * long * u
+		var side := out.normalized()
+		var hug_out := ellipse_reach(side) * HUG_FIT * smoothstep(0.0, until, u) * reach / HUG
+		return origin + along * back + side * hug_out + out * half_width * peel
+	var back := half_length * BOW_AT - half_length * long * u
 	return along * back + out * half_width * (hug + peel)
+
+
+## How far the waterline ellipse reaches from its middle along `dir` (a unit vector).
+func ellipse_reach(dir: Vector2) -> float:
+	if footprint.x <= 0.0 or footprint.y <= 0.0:
+		return 0.0
+	var x := dir.x / footprint.x
+	var y := dir.y / footprint.y
+	var k := x * x + y * y
+	return 1.0 / sqrt(k) if k > 0.0 else 0.0
+
+
+## Where on the waterline ellipse the bow pair starts (a share of the reach towards the bow)
+## and how far out of it the hugging part sits (past its edge, so the near streak shows under
+## the cut hull rather than behind it).
+const BOW_FIT := 0.92
+const HUG_FIT := 1.08
+
+
+## The less broken material, one per `solid` value asked for.
+static var _solids: Dictionary = {}
+
+
+static func _solid_material(amount: float) -> ShaderMaterial:
+	if not _solids.has(amount):
+		var skin := _material().duplicate() as ShaderMaterial
+		skin.set_shader_parameter("solid", amount)
+		_solids[amount] = skin
+	return _solids[amount]
 
 
 ## One material for every boat: nothing on it differs between them.

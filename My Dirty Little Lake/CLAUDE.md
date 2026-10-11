@@ -3305,9 +3305,8 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   `tools/last_boat_N.png`, for checking that the anchor puts the hull on the water. It loads
   the boat to `HOLD_SHOWN` — a full hold is the case worth looking at, an empty one shows
   nothing and a half one hides whether the heap clears the sail.
-- **Open**: the bow-foam streaks (`HullFoam`, `HUG` at a constant `SQUASH`) sit inside the
-  hull's silhouette in the side and end-on views and only show where they spread past the
-  stern — as they did under the old hull. A heading-aware across scale would fix it.
+- **Fixed 2026-10-11** (see The Ferry's Water): the bow-foam streaks sat inside the hull's
+  silhouette in the side and end-on views; they hug the drawn waterline now.
 
 ### The Throw and the Quiet Landing (2026-09-24, `/grill-me` with Richard)
 - **Superseded 2026-10-02** (The Net Drawn by Rule): the throw's frames, the `skip` of the
@@ -4441,6 +4440,27 @@ Every mechanic a player meets mid-run is named the first time it happens.
 - All numbers first guesses. `test_lake`'s `_check_oct11_fixes` guards the camera switch, the
   frog ring, the driftwood rules, the money green, the bell and the door;
   `_stage_settings_shape` the two faces.
+
+### The Ferry's Water (2026-10-11, `/grill-me` with Richard)
+- **The bow breaks water on its own waterline, tight** (`Boat._throw_spray`, `_bow_point`,
+  `WaterSplash.bow_spray`, `BOW_SPRAY` 0.2 s, `BOW_SPRAY_SPAN` 14-22 px): a small crown and
+  its spray sheet at the edge of the hull's waterline ellipse the way the boat points
+  (`waterline_ellipse`: the frame's level cut, its half span across, `COLLAR_BOW` of it down),
+  `BOW_BELOW` px towards the camera, with 2-4 drops that land within about a span. It was the
+  net's splash at 0.22 (a 60 px crown, drops flung twice that) put 15 px to one side of the
+  bow along a direction the plane never squashed. Ferries only; `splash` is untouched.
+- **The ferry's foam is thicker, wider, longer and less broken** (`Boat.FOAM_THICK` 2,
+  `FOAM_SPREAD` 1.7, `FOAM_TRAIL` 1.5, `FOAM_TRAIL_FADE` 1, `FOAM_SOLID` 0.9): per-instance
+  scales on `HullFoam` (`thick_scale`, `spread_scale`, `trail_scale`, `trail_fade`) and the
+  shader's new `solid` (fewer gaps, fuller line, later fade), on a second material. The
+  dog's, the angler's and the net's waves keep the old numbers; the shop's BOATS card wears
+  the ferry's.
+- **The streaks hug the drawn hull at every heading** (`HullFoam.footprint`/`origin`,
+  `ellipse_reach`, `BOW_FIT`, `HUG_FIT`): set by the boat each frame from the waterline
+  ellipse, so they start at the bow's edge and hug the side the picture shows. Unset, the old
+  projection.
+- All numbers first guesses. Probe: `tools/shot_boat.tscn` (five headings now);
+  `test_lake`'s `_check_oct11_fixes` guards the foam's numbers, the spray's place and size.
 
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and

@@ -35,6 +35,10 @@ uniform float segments = 26.0;
 uniform float slide = 3.0;
 uniform float bubble_down = 70.0;
 uniform float bubble_across = 5.0;
+// How much less the streak comes apart: 0 for the dog's, the angler's and the net's waves,
+// up for the ferry's (2026-10-11, Richard: "more prominent"): fewer gaps between segments,
+// fewer bubbles lost, the line fuller across its strip and fading later towards its tail.
+uniform float solid = 0.0;
 
 varying float push;
 // Where this fragment is in the boat's frame: world units, before the node's transform.
@@ -69,19 +73,19 @@ void fragment() {
 	// The line wanders across its strip as it goes, so it is water rather than a ruled edge,
 	// and thins towards the tail.
 	float wander = sin(u * 18.0 - t * 6.0) * 0.25 + sin(u * 41.0 + t * 4.0) * 0.12;
-	float thick = mix(0.9, 0.45, u);
+	float thick = mix(0.9, 0.45, u) + solid * mix(0.1, 0.35, u);
 	float line = step(abs(v - wander * 0.5), thick * 0.5);
 
 	// Broken into segments sliding back, more broken the further back they get.
 	float segment = foam_hash(vec2(floor(u * segments - t * slide * push), 1.0));
-	line *= step(0.2 + u * 0.5, segment);
+	line *= step((0.2 + u * 0.5) * (1.0 - solid * 0.6), segment);
 
 	// Solid at the bow, coming apart into bubbles down the streak.
 	float grain = foam_hash(floor(vec2(u * bubble_down - t * slide * 2.0 * push, uv.y * bubble_across)));
-	float kept = mix(1.0, step(0.3 + u * 0.4, grain), smoothstep(0.2, 0.7, u));
+	float kept = mix(1.0, step((0.3 + u * 0.4) * (1.0 - solid * 0.5), grain), smoothstep(0.2, 0.7, u));
 
 	// In off the bow without a hard start, and out at the tail.
-	float fade = smoothstep(0.0, 0.05, u) * (1.0 - smoothstep(0.6, 1.0, u));
+	float fade = smoothstep(0.0, 0.05, u) * (1.0 - smoothstep(mix(0.6, 0.75, solid), 1.0, u));
 
 	vec3 lit = mix(foam.rgb, foam_core.rgb, grain * 0.3);
 	COLOR = vec4(lit, foam.a * line * kept * fade * push);

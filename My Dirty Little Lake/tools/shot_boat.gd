@@ -12,7 +12,7 @@ const CROP := 340
 const ZOOM := 2
 
 ## Tile headings to shoot, each held still under way long enough for the bow wave to build.
-const HEADINGS: Array[Vector2] = [Vector2(-1.0, 1.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0)]
+const HEADINGS: Array[Vector2] = [Vector2(-1.0, 1.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(1.0, -1.0), Vector2(-1.0, -1.0)]
 const HOLD := 70
 
 var _main: Node

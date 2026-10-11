@@ -40,10 +40,23 @@ const WAVE_SPEED := 1.0
 ## How high the hull rides above the tile it is over.
 const RIDE_HEIGHT := 7.0
 
-## How often a boat under way throws spray off its bow, in seconds, and how big. Small: it is
-## a work boat at walking pace, not a speedboat.
-const BOW_SPRAY := 0.34
-const BOW_SPRAY_SIZE := 0.22
+## How often a boat under way breaks water at its bow, in seconds, and how wide the break is,
+## world px (`WaterSplash.bow_spray`). On the hull's own waterline at the bow
+## (`_bow_point`), tight and often (2026-10-11, `/grill-me` with Richard: the spray was "too
+## far" from the hull). It was the net's splash at 0.22, a crown of 60 px with drops flung
+## twice that, put 15 px to one side of the bow along a direction the plane never squashed.
+const BOW_SPRAY := 0.2
+const BOW_SPRAY_SPAN := Vector2(14.0, 22.0)
+
+## The ferry's foam against the shared shape (`HullFoam`, same day: "thicker, wider and more
+## prominent"): every streak twice as thick, the peel half as wide again, the trailing pair
+## half as long again and as solid as the bow pair.
+const FOAM_THICK := 2.0
+const FOAM_SPREAD := 1.7
+const FOAM_TRAIL := 1.5
+const FOAM_TRAIL_FADE := 1.0
+## And less broken up (`HullFoam.solid`): fewer gaps, fuller line, fading later.
+const FOAM_SOLID := 0.9
 
 ## The hull at the waterline, in world pixels: the blue boat's forty-six by twenty-five art
 ## pixels at two world pixels each, the scale every other sprite in the lake is drawn at.
@@ -347,6 +360,11 @@ func _ready() -> void:
 	_foam.name = &"Foam"
 	_foam.half_length = HULL_LENGTH * 0.5
 	_foam.half_width = HULL_WIDTH * 0.5
+	_foam.thick_scale = FOAM_THICK
+	_foam.spread_scale = FOAM_SPREAD
+	_foam.trail_scale = FOAM_TRAIL
+	_foam.trail_fade = FOAM_TRAIL_FADE
+	_foam.solid = FOAM_SOLID
 	add_child(_foam)
 	_shade = HullShade.new()
 	_shade.name = &"Shade"
@@ -566,6 +584,7 @@ func _process(delta: float) -> void:
 	_place()
 	_throw_spray(delta)
 	if _foam != null:
+		_fit_foam()
 		_foam.lay(_screen_heading(), 1.0 if _under_way() else 0.0, delta)
 	# The water the hull pushes aside sets what is floating near it bobbing, the same bobble a
 	# piece settles with when it surfaces. See LakeGrid.bump.
@@ -641,16 +660,48 @@ func _throw_spray(delta: float) -> void:
 	_spray_in -= delta
 	if _spray_in > 0.0:
 		return
-	_spray_in = BOW_SPRAY
-	# Off the bow, and off to one side or the other of it: a hull pushing water throws it
-	# outward rather than straight ahead.
+	_spray_in = BOW_SPRAY * _rng.randf_range(0.8, 1.2)
+	splash.bow_spray(position + _bow_point(), _rng.randf_range(BOW_SPRAY_SPAN.x, BOW_SPRAY_SPAN.y))
+
+
+## The hull's waterline on screen as an ellipse, in this node's space: the middle of the
+## frame's level cut and its half span across the screen, and down it `COLLAR_BOW` of that,
+## the near half of the curve the collar is laid on. What the foam and the spray are put on.
+func waterline_ellipse() -> Array:
+	if _sheet() == null:
+		return [Vector2.ZERO, Vector2(HULL_LENGTH * 0.5, HULL_WIDTH * 0.5 * HullFoam.SQUASH)]
+	var scale := HULL_LENGTH / HULL_IN_FRAME
+	var line := cut_line(heading_frame())
+	var left := (line[0] - _anchor) * scale
+	var right := (line[line.size() - 1] - _anchor) * scale
+	var half := maxf(absf(right.x - left.x) * 0.5, 1.0)
+	return [(left + right) * 0.5, Vector2(half, half * COLLAR_BOW)]
+
+
+## Where the bow cuts the water: the waterline ellipse's edge the way the boat points, a
+## pixel down the screen so the break sits on the near side of the cut, not behind the hull.
+func _bow_point() -> Vector2:
+	var fit := waterline_ellipse()
 	var along := _screen_heading()
-	var across := Vector2(-along.y, along.x)
-	var side := 1.0 if _rng.randf() < 0.5 else -1.0
-	splash.splash(
-		position + along * HULL_LENGTH * 0.44 + across * HULL_WIDTH * 0.3 * side,
-		BOW_SPRAY_SIZE * _rng.randf_range(0.7, 1.3)
-	)
+	var reach := _ellipse_reach(fit[1], along)
+	return (fit[0] as Vector2) + along * reach * HullFoam.BOW_FIT + Vector2(0.0, BOW_BELOW)
+
+
+const BOW_BELOW := 2.0
+
+
+static func _ellipse_reach(axes: Vector2, dir: Vector2) -> float:
+	var x := dir.x / maxf(axes.x, 0.01)
+	var y := dir.y / maxf(axes.y, 0.01)
+	var k := x * x + y * y
+	return 1.0 / sqrt(k) if k > 0.0 else 0.0
+
+
+## Hand the foam the waterline it hugs, for the frame the hull is showing.
+func _fit_foam() -> void:
+	var fit := waterline_ellipse()
+	_foam.origin = fit[0]
+	_foam.footprint = fit[1]
 
 
 ## Work out the stops and set off for the first one. A hold that turns out to be empty —

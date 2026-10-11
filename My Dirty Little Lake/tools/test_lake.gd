@@ -12534,6 +12534,30 @@ func _check_oct11_fixes() -> void:
 			"the jet on a ferry rings its bell, puffs foam, and not again at once", str(box))
 	_main.call(&"_set_wash", false)
 
+	# The ferry's water (2026-10-11, second `/grill-me`): spray tight on the bow's waterline,
+	# foam thicker, wider, longer and less broken, hugging the drawn hull.
+	var ferry := _main.get_node_or_null(^"Boat") as Boat
+	if ferry != null:
+		var wake := ferry.get_node(^"Foam") as HullFoam
+		_check(is_equal_approx(wake.thick_scale, Boat.FOAM_THICK) and is_equal_approx(wake.spread_scale, Boat.FOAM_SPREAD)
+			and is_equal_approx(wake.trail_scale, Boat.FOAM_TRAIL) and is_equal_approx(wake.trail_fade, 1.0)
+			and is_equal_approx(float((wake.material as ShaderMaterial).get_shader_parameter("solid")), Boat.FOAM_SOLID),
+			"the ferry's foam is thicker, wider, longer, solid and less broken", "")
+		var fit: Array = ferry.waterline_ellipse()
+		var bow: Vector2 = ferry.call(&"_bow_point")
+		var reach := (fit[1] as Vector2).x + 3.0
+		_check((bow - (fit[0] as Vector2)).length() <= reach,
+			"the bow's spray is on the hull's own waterline", "%s from %s, reach %.1f" % [bow, fit[0], reach])
+		var water: WaterSplash = ferry.splash
+		if water != null:
+			var drops_were: int = water._drop_vel.size()
+			water.bow_spray(Vector2(5000.0, 5000.0), 18.0)
+			var far_drop := 0.0
+			for i in range(drops_were, water._drop_vel.size()):
+				far_drop = maxf(far_drop, absf(water._drop_vel[i].x))
+			_check(is_equal_approx(water._crown_span[water._crown_span.size() - 1], 18.0) and far_drop <= 18.0 * 1.1 + 0.01,
+				"a bow spray is a small crown whose drops stay by it", "drop pace %.1f" % far_drop)
+
 	# The house's door: E in front of it leaves, away from it does not.
 	var room: ShedRoom = _main.get(&"_room")
 	_main.call(&"_set_shed", true)
