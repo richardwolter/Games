@@ -3170,7 +3170,7 @@ water and runs on grass" (the swim wore the walk frames).
   and 4.0: slower legs, quicker pace. A frame held under 0.02 s is faster than 60 fps.
   **Then 5.3 on the same 0.024 s legs** (`/grill-me` with Richard, same day: "make the player
   a bit faster"), **then both down a fifth: 4.2 tiles/s on 0.03 s legs** (Richard: the legs
-  fit the pace at 5.3, both too quick). Same ratio of pace to legs. **The house went 7.0 to
+  fit the pace at 5.3, both too quick), **then 3.8 on 0.033 s** ("a little bit more slow"). Same ratio of pace to legs. **The house went 7.0 to
   7.7 cells/s on its 0.04 s legs** (10% quicker, legs untouched).
   **The angler's pace is the same on screen every way** (same pass, Richard: up/down felt
   slower). It was a speed in tiles, and a tile walked up the 2:1 screen is half as tall as one
