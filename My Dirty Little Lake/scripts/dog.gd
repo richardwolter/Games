@@ -37,12 +37,16 @@ const HEIGHT := 22.0
 ## seven tenths of the run. `_stride` steps the frames with the ground covered, `_gait_pace`
 ## says at which pace.
 ##
-## A swimming dog wears the walk, stepped at the walk's own pace (2026-10-11, second pass,
-## Richard: "the running animation for swimming on deep water is not working, use walking and
-## speed up to match"): at 1.75 tiles a second over legs planted at 0.55 the paws paddle about
-## three times as fast as they walk on land. Supersedes the gallop in the water, picked the same
-## morning.
+## A dog swimming in deep water wears the walk (2026-10-11, Richard: "the running animation for
+## swimming on deep water is not working, use walking"), its legs going `SWIM_LEGS` times the
+## walk's own cadence: quicker than a walk, still a walk (2026-10-12, Richard: three times was
+## "too sped up, the animation should look normal"). In the shallows, until it is `DEEP_FROM`
+## tiles from the nearer shore, it keeps the gallop it runs in; back under `DEEP_TO` it is
+## shallow again, the gap so the edge does not flicker between the two.
 const SWIM_SPEED := 1.75
+const SWIM_LEGS := 1.4
+const DEEP_FROM := 1.5
+const DEEP_TO := 1.1
 const WALK_SPEED := 0.55
 const RUN_SPEED := 2.5
 
@@ -1524,7 +1528,7 @@ func _barking() -> bool:
 func _still_showing() -> StringName:
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK:
-			return DogArt.gait(slot, not _on_land(), breed)
+			return DogArt.gait(slot, _deep, breed)
 		State.WANDER:
 			return DogArt.gait(slot, true, breed)
 		State.NAP:
@@ -1540,6 +1544,8 @@ func _still_showing() -> StringName:
 ## The ground covered since last frame, over the pace the frames showing are drawn for. A move
 ## longer than STEP_MOST is a dog put somewhere, not a step, and steps nothing.
 func _step_the_legs() -> void:
+	var out := _from_shore()
+	_deep = out >= DEEP_FROM or (_deep and out > DEEP_TO)
 	if _stride_from != Vector2.INF:
 		var moved := tile_pos.distance_to(_stride_from)
 		if moved <= STEP_MOST:
@@ -1547,13 +1553,26 @@ func _step_the_legs() -> void:
 	_stride_from = tile_pos
 
 
+## Is the dog in deep water (see DEEP_FROM)? Worked out once a frame, in `_step_the_legs`.
+var _deep := false
+
+
+## Tiles from the nearer shore, the island's or the bank's; nought or under on land.
+func _from_shore() -> float:
+	if _on_land():
+		return 0.0
+	return minf(Iso.past_shelf(tile_pos), -Ground.out_of_water(tile_pos.x, tile_pos.y))
+
+
 ## The speed at which the gait showing keeps its paws planted: the walk's or the gallop's. In
-## the water the walk is shown and stepped at the walk's pace, so the paws paddle faster than
-## the dog goes.
+## the water the gallop is stepped at the swim's pace; in deep water the walk at the swim's
+## pace over SWIM_LEGS, so its legs go that much quicker than on land.
 func _gait_pace() -> float:
-	if _state == State.WANDER or not _on_land():
+	if _state == State.WANDER:
 		return WALK_SPEED
-	return RUN_SPEED
+	if _on_land():
+		return RUN_SPEED
+	return SWIM_SPEED / SWIM_LEGS if _deep else SWIM_SPEED
 
 
 ## The clock a picture is stepped on: the gait's own for a moving dog, the age otherwise.

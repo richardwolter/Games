@@ -3252,8 +3252,8 @@ water and runs on grass" (the swim wore the walk frames).
   nudge and a slide along a wall all step as far as they go. **A push that makes no ground runs
   in place** at walking cadence (Richard's call), the angler indoors and out.
 - **A swimming dog wears the gallop**, churning faster than it goes (Richard's pick over a
-  sped-up walk or a slower swim). **Superseded the next day** (see The Pack Finds Its Way):
-  it swims on the walk, paddled about three times as fast.
+  sped-up walk or a slower swim). **Superseded in deep water** (see The Pack Finds Its Way):
+  there it swims on the walk, a little quickened; the shallows keep the gallop.
 - **And sinks deeper the further out it swims** (same day, Richard): `Dog._sink_here` cuts
   `SINK_EDGE` 0.3 of the frame at the water's edge, easing to `SINK_DEEP` 0.58 (head and top
   of the back) by `SINK_REACH` 3 tiles from the nearer shore, island's or bank's. Supersedes
@@ -7474,9 +7474,11 @@ angler's eyes open asleep in bed. **Lifts the lake's no-path-search rule** (2026
   one over the walkers' front band): the animals' pass, for the walkers on `IN_FRONT` only;
   behind the crate or the hut a copy over their band would also cover the building. Not
   steered round, by decision.
-- **A swimming dog wears the walk, stepped at the walk's pace** (`Dog._gait_pace`,
-  `_still_showing`): at 1.75 tiles a second the paws paddle about three times as fast as
-  they walk. In all water. Supersedes the gallop in the water (The Legs Step With the Ground).
+- **A dog in deep water swims on the walk** (`Dog._deep`, `_from_shore`, `_gait_pace`,
+  `_still_showing`): from `DEEP_FROM` (1.5) tiles off the nearer shore, back to the gallop
+  under `DEEP_TO` (1.1), the gap so the edge does not flicker. The walk's legs go
+  `SWIM_LEGS` (1.4) times their land cadence (2026-10-12, Richard: three times was "too sped
+  up, the animation should look normal"); the shallows' gallop is stepped at the swim's pace.
 - **In the house** (`ShedRoom`): the floor grid's points one from anything solid cost
   `PATH_NEAR_COST`, two from it `PATH_NEAR_COST2`, and `_line_clear(..., true)` pulls a path
   straight only clear of that first ring and of the player. **The player is on the path**
@@ -7485,9 +7487,11 @@ angler's eyes open asleep in bed. **Lifts the lake's no-path-search rule** (2026
   has moved `YOU_REPLAN` cells within `YOU_HEED` of the dog. **A dog the player walks at
   steps aside** (`_give_way`, `GIVE_REACH`, `GIVE_SPEED`, sideways off their walk; not a dog
   on its seat, not when they walk away).
-- **Eyes shut asleep in bed**: every lie strip is two frames, the second with the eyes a lid
-  line (`build_pose_mockup.lying(shut)`, `EYES`, `LID`); `ShedRoom.lie_frame` shows it from
-  `SLEEP_AFTER`, with the Zs. The side views are the same head turned; `lie_north` is the
+- **Eyes shut asleep in bed**: every lie strip is two frames, the second with each eye's two
+  by two pixels covered by a lid in the face's skin (`LID`, row 17) over a darker skin crease
+  (`CREASE`, row 18) (`build_pose_mockup.lying(shut)`, `EYES_LID`, `EYES_CREASE`; 2026-10-12,
+  Richard: the first cut, a brown line on the bottom row, left the white and the pupil
+  showing); `ShedRoom.lie_frame` shows it from `SLEEP_AFTER`, with the Zs. The side views are the same head turned; `lie_north` is the
   back of the hat twice. Re-run `build_rest_frames.py` then `slice_character.gd`.
 - **Out of scope, by decision**: dogs avoiding each other, any change to the animals, paths
   for the angler or the wildlife, the wash room's hounds, new art beyond the shut eyes.

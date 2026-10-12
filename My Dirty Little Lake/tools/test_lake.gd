@@ -11292,7 +11292,7 @@ func _check_walk_weight() -> void:
 
 ## The legs step with the ground (2026-10-11, the walk-pacing pass): every walker's speed is
 ## the one its frames are drawn for, the run frames advance by the ground covered, a push that
-## makes no ground runs in place, the swim wears the walk paddled fast, and the twitching run loops are
+## makes no ground runs in place, deep water wears the walk a little quickened, and the twitching run loops are
 ## cut short.
 func _check_walk_pacing() -> void:
 	var dt := 1.0 / 60.0
@@ -11397,12 +11397,15 @@ func _check_walk_pacing() -> void:
 	dog.call(&"_step_the_legs")
 	_check(is_equal_approx(float(dog.get(&"_stride")), dog_stride), "a dog put somewhere steps nothing", "")
 	dog.set(&"_state", Dog.State.SWIM_OUT)
+	# Deep water: the walk, its legs SWIM_LEGS times the walk's cadence (2026-10-12).
 	dog.tile_pos = Iso.ISLAND_CENTRE + Vector2(12.0, 12.0)
+	dog.set(&"_stride_from", Vector2.INF)
+	dog.call(&"_step_the_legs")
 	var shown := String(dog.call(&"_still_showing"))
-	_check(shown.begins_with("walk"), "a swimming dog paddles on the walk", shown)
-	_check(is_equal_approx(float(dog.call(&"_gait_pace")), Dog.WALK_SPEED),
-		"the swim steps the walk at the walk's own pace, so the paws paddle faster than it goes",
-		str(dog.call(&"_gait_pace")))
+	_check(shown.begins_with("walk"), "a dog swimming in deep water paddles on the walk", shown)
+	var cadence := Dog.SWIM_SPEED / float(dog.call(&"_gait_pace"))
+	_check(is_equal_approx(cadence, Dog.SWIM_LEGS) and cadence > 1.0 and cadence < 2.0,
+		"a little quicker than it walks, not three times", "%.2f" % cadence)
 	# Deeper water, deeper dog: shallow by the island's edge, head and back only far out.
 	var edge := Iso.world_to_tile(Iso.island_point(0.6, 0.0))
 	var shallow := 1.0
@@ -11411,6 +11414,13 @@ func _check_walk_pacing() -> void:
 		if not Iso.on_island_ground(at):
 			dog.tile_pos = at
 			shallow = dog.call(&"_sink_here")
+			# The shallows: still the gallop, stepped at the swim's pace.
+			dog.set(&"_stride_from", Vector2.INF)
+			dog.call(&"_step_the_legs")
+			var wading := String(dog.call(&"_still_showing"))
+			_check(wading.begins_with("run"), "in the shallows it keeps the gallop", wading)
+			_check(is_equal_approx(float(dog.call(&"_gait_pace")), Dog.SWIM_SPEED),
+				"stepped at the swim's own pace", str(dog.call(&"_gait_pace")))
 			break
 	dog.tile_pos = Iso.ISLAND_CENTRE + (edge - Iso.ISLAND_CENTRE).normalized() * 14.0
 	var deep: float = dog.call(&"_sink_here")

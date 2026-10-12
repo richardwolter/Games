@@ -211,10 +211,14 @@ def basket():
     return im
 
 
-# Asleep, the eyes are shut: the white and the pupil of each eye in the lying crop become one
-# lid line in the skin's shade (2026-10-11, Richard: "eye should close when sleeping in bed").
-EYES = ((12, 18), (13, 18), (20, 18), (21, 18))
-LID = (125, 61, 42, 255)
+# Asleep, the eyes are shut: each eye in the lying crop is two pixels by two (white and pupil,
+# rows 17 and 18), and shut it is a lid of the face's own skin over a darker skin crease along
+# its foot (2026-10-11, Richard: "it should cover with eyelids of the character's skin color";
+# the first cut drew only the bottom row as a brown line and left the top of the eye showing).
+EYES_LID = ((12, 17), (13, 17), (20, 17), (21, 17))
+EYES_CREASE = ((12, 18), (13, 18), (20, 18), (21, 18))
+LID = (243, 166, 119, 255)
+CREASE = (212, 109, 76, 255)
 
 
 def lying(shut=False):
@@ -224,8 +228,10 @@ def lying(shut=False):
     the eyes closed, for once the Zs have come."""
     im = idle("south").crop((0, 0, 32, 24))
     if shut:
-        for at in EYES:
+        for at in EYES_LID:
             im.putpixel(at, LID)
+        for at in EYES_CREASE:
+            im.putpixel(at, CREASE)
     return im
 
 
