@@ -302,7 +302,8 @@ const JOIN_ODDS := 0.6
 const BREATH := 2.4
 const BREATH_IN := 0.35
 ## Lying down, seconds before the player falls asleep and the Zs come.
-const SLEEP_AFTER := 6.0
+## 1.5 since 2026-10-12 (Richard: "activate sleeping after 1,5s of laying down"); was 6.
+const SLEEP_AFTER := 1.5
 ## Reading: the reach up to the shelf (the petting reach from behind, `pet3_north`, the arm
 ## nearly straight up), then a page turned every so often.
 const READ_REACH_ARM := 3

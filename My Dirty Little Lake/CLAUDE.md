@@ -7633,7 +7633,8 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
 - **Reading reuses the petting reach from behind** (`pet3_north`, the arm near straight up)
   for `Angler.PET_TIME`, then reads; a page turns every `PAGE_EVERY`. No reach frames of
   its own, by decision.
-- **Idle life**: a breath every `BREATH`; lying, Zs after `SLEEP_AFTER`.
+- **Idle life**: a breath every `BREATH`; lying, Zs and shut eyes after `SLEEP_AFTER`
+  (1.5 s since 2026-10-12, Richard; was 6).
 - **Dogs**: on the sofa and the bed a dog already lying there stays, **in the middle**
   (moved over to the free half it lay on the sofa's arm, Richard); on the armchair and chair (`SEAT_FOR_ONE`) it hops
   off. A dog with nowhere to lie climbs up on a free seat of the piece at `JOIN_ODDS`. **The
