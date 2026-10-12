@@ -12,12 +12,15 @@ STAGE 1 (abandoned)
     darker than the body, the near edge (lip) one step lighter, the plank seams showing through
     as dashes one step down (only well inside the water), level reflection dashes on the first
     inner rows, a glint. Looks:
-      p1 lit    drawn by hand (P1_ROWS): a flat lobe 15 x 5, rounded corners, its low right
-                side a row longer, two px off the left moulding with a row of wet wood between;
-                body WATER[3], far edge WATER[1], sides WATER[2], near lip WATER[4], a 2-px foam
-                glint. Painted as what must SHOW and run through aimed() (composed = light +
-                (1 - dim) * painted), so on the frame it is exactly those swatches: the
-                lightest water in the room
+      p1 lit    drawn by hand (P1_ROWS) inside its footprint (12 x 5, abs 90..101 x 184..188):
+                a lumpy lozenge, rounder on the window side, its low right side sagging a row,
+                a pixel of wet wood between it and the left moulding; far edge WATER[2], body
+                WATER[3], near lip WATER[4], the window's reflection in WATER[4] across its
+                widest inner row (window side), a white-then-foam glint. Painted as what must
+                SHOW and run through aimed() (composed = (light + (1 - dim) * painted) under
+                life.py's veil), a colour past what the frame can show there scaled down whole
+                (hue kept), a near-white glint clipped to the brightest there is: the lightest
+                water in the room
       p2 open   body WATER[2], dark WATER[1], lip WATER[3], dashes WATER[3], a foam glint
       p3 shade  body WATER[1], dark WATER[0], lip WATER[2], a 3-px WATER[3] dash on its far
                 edge and one foam pixel
@@ -34,8 +37,9 @@ STAGE 1 (abandoned)
     2.2 s, the flue into h4's ash-mud at rel (221, 101) (left of the joist and the seedling)
     every 3.8 s; each drop jittered +-22% of
     its period; every period halved in a full shower. A drop's life:
-      bead   SWELL 0.25 s, two ticks: a dim speck, then the 2-px teardrop exactly where the
-             fall's first tick draws it (it never jumps up on release)
+      bead   SWELL 0.25 s, two ticks: a dim speck where the drop's top pixel will be, then the
+             2-px teardrop growing down from it, exactly where the fall's first tick draws it
+             (it only ever grows and moves down: never a pixel above the speck)
       fall   DRIP_FALL 0.40 s, accelerating (y ~ s^2), 1 x 2 px (foam over WATER[4]) with a
              1-px WATER[2] trail at alpha 140 once it has fallen 2 px. p1's drop burns white-gold in the lit band (its last tick before
              landing is held inside it) and lands with a 1-tick white pixel. No four-point
@@ -58,17 +62,19 @@ STAGE 1 (abandoned)
     seams between two wet boards too, and one or two 2-3 px WATER[4] glints along a seam
     inside. No water stands on the door's lane.
   THE WALL, right half of the back paper (x 269..413, y 62..83):
-    every stain is the paper's own colour stepped down (LEVELS 1..6), never a lighter fill and
-      never a closed outline. Tongues hang from the top moulding at x 329 (strong), 354
-      (faint) and 386 (strong, mostly under the flap): widest at the moulding, fraying downward
-      in 1-px runs of uneven length, each run ending a step darker. A strong tongue's core:
-      5 rows of the deepest step under the moulding, then a dashed run (2 on, 1 off) a step
-      lighter, ending in a 2-px bead 3 clear rows above the foot band. A darker band along the
-      foot from x 298 (1.5 rows) rising to the corner (~8.5 rows), its top row the tide line;
-      an older tide line 3 rows above it, broken. Two old tide marks (HANGS) at 301 and 343:
-      a frayed soak band in their top 2-4 rows, a faint body, sides fading out in short runs,
-      the tide line along the lower edge only, broken, stepping a row every 3-5 px, a row of
-      dirt just inside it; one short streak off 301's lowest point. Mould is ten irregular
+    every stain is the paper's own colour stepped down (LEVELS 1..6), never a lighter fill.
+      BLOOMS spread from the top moulding where the roof let water in, at x 300 (old), 327
+      (wet), 345 (old), 358 (faint) and 385 (wet, mostly under the flap): each the union of
+      three to five circles hung from just above the moulding, every one rolled its own size
+      and place, so the lower edge is a run of uneven scallops, never a bowl or a goblet; where
+      two meet the deeper owns the column. A tide line (the rim, broken here and there) round
+      the edge and down the sides below the top two rows, a band inside it, a receded line a
+      row or two further in, broken, and a soaked band under the moulding (BLOOM_LOOK). STREAKS
+      run on down off the lower edge, two pixels where they leave it, one below, stepping a
+      pixel the way they lean at most twice, each ending a step darker; the two long ones off
+      the wet blooms stop 3 rows above the foot band. No cores, no straight runs. A darker
+      band along the foot from x 298 (1.5 rows) rising to the corner (~8.5 rows), its top row
+      the tide line; an older tide line 3 rows above it, broken. Mould is ten irregular
       2-5 px clusters of MOSS[0]/[1] under the torn corner, no two alike
     the flap: strip 378..390's top came unglued and hangs folded off a hinge sloping from row
       66 (left) to 70 (right): the paper's ramp two steps down (FLAP), FLAP_SIDE on its sides,
@@ -76,12 +82,15 @@ STAGE 1 (abandoned)
       shadow row under it and down its right side;
       the lap boards behind with butt joints
     the torn corner: x 402..413, a ragged diagonal tear, a fibre edge, its foot lifting off
-    water still running: a bead slides down each strong streak's core a pixel a tick, every
-      ~4 s (twice as often in rain)
+    water still running: a bead slides out of each wet bloom and down its long streak a pixel
+      a tick, every ~4 s (twice as often in rain)
     the left half (the dry side): yellowed in broad patches along its top, one step (YELLOWED)
-  COBWEBS: crisp 1-px threads at full alpha, (132,122,108) on the paper. The wall's top
-    corners only, (90, 62) and (413, 62): 3 spokes of 16 px, rings at r 6 and 12, one broken
-    strand. None in the doorway, none on the floor. The top-left one's spider lets itself down 7 px every 9 s and climbs back.
+  COBWEBS: crisp 1-px threads (WEB_MAP, by hand), each one fixed step (WEB_STEP) off what is
+    under it: darker on the paper, lighter on the torn corner's dark boards. The wall's top
+    corners only, (90, 62) and (413, 62, mirrored): two spokes at 30 and 60 degrees, the hub
+    open, two taut threads strung wall to wall across them, the outer one broken and hanging.
+    Nothing lies along the walls (that read as a bracket). None in the doorway, none on the
+    floor. The top-left one's spider lets itself down 7 px every 9 s and climbs back.
   MUSHROOMS, no ink ring, lit from the window's side like the hut's plants: m1 cream caps with a
     DEAD rim and a gill row over a paler stem, by p3; m2 two stepped bracket shelves (6 and 4
     wide) on the right wall's inner edge (banded top, lit rim, DEAD[0] underside); m3
@@ -94,7 +103,9 @@ STAGE 1 (abandoned)
     draught on the 8 fps clock.
 
 STAGE 2 (semi-fixed)
-  p1 alone, P1_ROWS[2] (9 x 4, the same rules and swatches as stage 1, a 1-px glint),
+  p1 alone, P1_ROWS[2] (8 x 4, its footprint filled: the same rules a step deeper, WATER[1]
+  far edge, WATER[2] body, WATER[3] reflection and lip, or pale water on the pale new boards
+  is not there),
   dripping every 4.4 s (no ring up in the still), its wet line only a 4-px run off its right
   edge; m6 two cream caps 3 rows below its lip. The wall's two worst strips (x 360..413)
   re-papered a hair fresher (FRESH_PAPER), joins at 360 and 390; the rest keeps stage 1's
@@ -236,15 +247,59 @@ def _light(stage):
     return _LIGHT[stage]
 
 
-def aimed(img, stage):
+def veil_alpha(stage, rain=0.0, up=None):
+    """life.py's veil over the room (HxW, 0..1), the one `over` lays on top of the frame:
+    stage 1's dim, a step lighter in stage 2, none in 3; `up` = (frm, p) its play-in. Zeros
+    when life.py is not there."""
+    key = (stage, round(rain, 2), None if up is None else (up[0], int(math.floor(up[1] * 16 + 1e-9))))
+    if key in _VEIL:
+        return _VEIL[key]
+    a = np.zeros((H, W), np.float32)
+    try:
+        import life                                 # noqa: WPS433 (read only)
+        if up is not None:
+            v = life.up_veil(up[0], key[2][1])
+            if v is not None:
+                a = np.asarray(v).astype(np.float32)[..., 3] / 255.0
+        else:
+            al = life.rainy(life.VEIL_ALPHA.get(stage), rain)
+            if al:
+                st = life.veil_steps(stage)
+                for k, v in enumerate(al):
+                    a[st == k] = v
+    except Exception:
+        pass
+    _VEIL[key] = a
+    return a
+
+
+_VEIL = {}
+VEIL_INK = (18, 20, 30)          # life.py's
+
+
+def aimed(img, stage, veil=None):
     """img (PIL RGBA) whose colours are what must SHOW on the composed frame: each pixel is
     turned into the colour that lands there once the room's dim and its light are laid over it
-    (composed = light + (1 - dim) * painted). p1 is painted this way, so it is the lightest water
-    in the room in the room's own terms. Pixels a piece or walker covers are left alone."""
+    (composed = light + (1 - dim) * painted) and, given `veil` (veil_alpha()), life.py's veil
+    over that. p1 is painted this way, so it is the lightest water in the room in the room's own
+    terms. Pixels a piece or walker covers are left alone."""
     top, a, ac = _light(stage)
     arr = np.asarray(img).astype(np.float32).copy()
     on = (arr[..., 3] > 0) & (a < 0.6)
-    conv = (arr[..., :3] - top) / np.maximum(1 - ac, 0.3)
+    want = arr[..., :3]
+    ink = np.array(VEIL_INK, np.float32)
+    va = np.zeros(want.shape[:2] + (1,), np.float32) if veil is None else np.minimum(veil, 0.9)[..., None]
+    # The brightest the frame can show here (painted 255 under the dim, the light and the
+    # veil): a colour past it is scaled down whole, keeping its hue, rather than clipped per
+    # channel (a clipped blue goes grey).
+    most = (255.0 * np.maximum(1 - ac, 0.3) + top) * (1 - va) + ink * va
+    fit = np.min(most / np.maximum(want, 1.0), axis=2, keepdims=True)
+    # ... but a near-white highlight (a glint) is clipped: the brightest the frame has there,
+    # which in the window's light is the sun's own cream.
+    white = np.min(want, axis=2, keepdims=True) > 200
+    want = np.where(white, np.minimum(want, most), want * np.minimum(1.0, fit))
+    want = (want - ink * va) / (1 - va)
+    conv = (want - top) / np.maximum(1 - ac, 0.3)
     arr[..., :3] = np.where(on[..., None], np.clip(conv, 0, 255), arr[..., :3])
     return Image.fromarray((arr + 0.5).astype(np.uint8), "RGBA")
 
@@ -364,22 +419,23 @@ def small_mask(cx, cy, w, hh):
     return pts
 
 
-# p1, the window seat's puddle, drawn by hand: a flat lobe, its corners rounded, its low (right)
-# side a row longer, held two px off the left moulding (the boards start at abs 90) so a row of
-# wet wood stands between. Painted as what must show (see aimed()): body WATER[3], far edge
-# WATER[1], sides WATER[2], near lip WATER[4], a 2-px foam glint. The lightest water in the room.
+# p1, the window seat's puddle, drawn by hand inside its footprint (layout.json: 12 x 5 at
+# rel (6, 100), abs x 90..101, y 184..188; stage 2 8 x 4, abs x 92..99, y 184..187): a lumpy
+# lozenge, rounder on the window side, its low right side sagging a row, one pixel of wet wood
+# between it and the left moulding (the boards start at abs 90). Lit by the sun off the
+# window: see paint_p1.
 P1_ROWS = {
-    1: ["..#########....",
-        "##############.",
-        ".##############",
-        "..############.",
-        "........#####.."],
-    2: [".######..",
-        "########.",
-        ".########",
-        "....####."],
+    1: ["..#####.....",
+        ".#########..",
+        ".###########",
+        "..#########.",
+        ".....####..."],
+    2: ["...######...",
+        "..########..",
+        "..########..",
+        ".....####..."],
 }
-P1_LEFT = 92
+P1_LEFT = 90
 
 
 def p1_mask(ctx, stage, rain=0.0, step=None):
@@ -412,27 +468,47 @@ def p1_mask(ctx, stage, rain=0.0, step=None):
     return pts
 
 
-def paint_p1(A, pts):
-    """p1 as it must show (A is aimed afterwards)."""
+P1_GLINT = (255, 255, 246)       # the sun's own glint on p1, white
+
+
+def paint_p1(A, pts, look=1):
+    """p1 as it must show (A is aimed afterwards). Stage 1 (look 1): water catching the
+    window's light, every step lighter than the room's other puddles. The far edge (each
+    column's top) WATER[2], the ends and body WATER[3], the near lip WATER[4] lit; across its
+    widest inner row, from the window side, the window's reflection in WATER[4]; on the first
+    inner row a glint, white then foam, nearest the window. Stage 2 (look 2, the last leak on
+    the bright new boards): the same, a step deeper all through, or pale water on pale wood
+    is not there at all."""
+    far, body, refl, lip = (WATER[2], WATER[3], WATER[4], WATER[4]) if look == 1 else         (WATER[1], WATER[2], WATER[3], WATER[3])
     if not pts:
         return
     for (x, y) in pts:
         if (x, y - 1) not in pts:
-            c = WATER[1]                        # the far edge
+            c = far                             # the far edge
         elif (x, y + 1) not in pts:
-            c = WATER[4]                        # the lit near lip
-        elif (x - 1, y) not in pts or (x + 1, y) not in pts:
-            c = WATER[2]                        # the sides
+            c = lip                             # the lit near lip
         else:
-            c = WATER[3]
+            c = body                            # the ends and the body
         A.put(x, y, c)
-    top = min(y for _, y in pts)
-    row = sorted(x for x, y in pts if y == top + 1 and (x, y - 1) in pts and (x - 1, y) in pts)
-    if len(row) >= 4:
-        gx = row[len(row) // 4]
-        A.put(gx, top + 1, FOAM)
-        if len(row) >= 9:                       # the big one: a 2-px glint
-            A.put(gx + 1, top + 1, FOAM)
+    inner = lambda x, y: all(q in pts for q in ((x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)))
+    rows = {}
+    for (x, y) in pts:
+        if inner(x, y):
+            rows.setdefault(y, []).append(x)
+    if not rows:
+        return
+    # the window's reflection: the widest inner row, its window-side two thirds
+    ry = max(rows, key=lambda y: (len(rows[y]), y))
+    xs = sorted(rows[ry])
+    for x in xs[:max(1, (len(xs) * 2 + 2) // 3)]:
+        A.put(x, ry, refl)
+    # the glint: the first inner row, a quarter in from the window side
+    gy = min(rows)
+    xs = sorted(rows[gy])
+    gx = xs[len(xs) // 4]
+    A.put(gx, gy, P1_GLINT)
+    if len(xs) >= 4:
+        A.put(gx + 1, gy, FOAM)
 
 
 def paint_small(L, pts):
@@ -621,15 +697,17 @@ def drop_streak(O, x, y_top, y_land, s, colour_head, colour_tail, lit_from=None)
 
 
 def bead(O, x, y, age):
-    """The drop letting go of the ceiling, above the frame: two ticks, a dim speck, then a
-    2-px teardrop already a pixel on its way. No hanging bead: there is no ceiling to hang
-    from on screen, and a still speck reads as a fleck of paint."""
+    """The drop letting go of the ceiling: two ticks, a dim speck where the falling drop's top
+    pixel will be, then the 2-px teardrop growing down from it, exactly where the fall's first
+    tick draws it. It only ever grows and moves down: never a pixel above the speck. No
+    hanging bead: there is no ceiling to hang from on screen, and a still speck reads as a
+    fleck of paint."""
     a = math.floor(age * 8) / 8.0
     if a < 0 or a >= SWELL:
         return
     if a < 0.125:
-        O.put(x, y, WATER[3])
-    else:                                       # the drop as it falls at s = 0: never a jump
+        O.put(x, y - 1, WATER[3])               # the speck: the drop's top pixel to be
+    else:                                       # the drop as it falls at s = 0
         O.put(x, y - 1, FOAM)
         O.put(x, y, WATER[4])
 
@@ -663,26 +741,39 @@ def splash(O, at, age, seed, light, dark, n=4, crown=None):
 
 # ======================================================================== the wall
 
-# A water stain is the paper's own colour stepped down, never a lighter fill and never a closed
-# outline: LEVELS 1..6, one step each. Stage 2 draws the same shapes one level fainter.
+# A water stain is the paper's own colour stepped down, never a lighter fill: LEVELS 1..6, one
+# step each. Stage 2 draws the same shapes one level fainter.
 LEVELS = {1: (212, 181, 137), 2: ST1, 3: ST2, 4: TIDE, 5: (118, 82, 48), 6: (98, 64, 36)}
-# Tongues hanging from the top moulding where the roof lets water in: (x, half-width at the
-# moulding, the row its middle run reaches, strong?). Widest at the moulding, fraying downward
-# in 1-px runs of uneven length, each ending a step darker. A strong tongue has a wet core:
-# CORE_TOP rows of the deepest step under the moulding, then a dashed run (2 on, 1 off) a step
-# lighter, ending in a 2-px bead 3 rows above the foot band (never touching the bottom rail).
-TONGUES = [
-    (329, 3.4, 76, True),
-    (354, 2.2, 71, False),          # faint
-    (386, 3.6, 80, True),           # the corner, the worst: only its foot shows under the flap
+# Blooms: where the roof let water in at the top moulding it soaked out into the paper and
+# dried, leaving its dirt in a tide line round the edge. Widest under the moulding, the lower
+# edge scalloped by two side lobes and a little noise, never a mirror of itself:
+# (middle x, half-width, depth in rows, kind, seed). "wet" still runs: a soaked band under the
+# moulding, a body two steps down, a dark rim, a receded line inside it, streaks. "old" dried
+# long ago: a body one step down, a darker broken rim, a receded line. "faint": body and rim
+# one step each.
+BLOOMS = [
+    (300, 7.5, 7.0, "old", 70),
+    (327, 6.5, 9.0, "wet", 3),
+    (345, 5.0, 6.0, "old", 71),
+    (358, 3.5, 4.0, "faint", 5),
+    (385, 6.5, 10.0, "wet", 4),        # the corner, the worst: mostly under the flap
 ]
-CORE_TOP = 5
-# Columns that ran further than their tongue (abs x -> the row they end on).
-LONG_RUNS = {326: 78, 331: 77, 352: 73}
-# Old tide marks, dried, hanging off the moulding: (x, half-width, the lower edge's row, seed).
-# The soak is a band in their top rows; the sides fade out in short runs with no rim; the tide
-# line runs along the lower edge only, broken, stepping a row up or down every 3-5 px.
-HANGS = [(301, 5, 70, 70), (343, 4, 72, 71)]
+BLOOM_LOOK = {   # body, soak band, rim, receded line, streak, streak tip
+    "wet": (2, 3, 4, 3, 3, 5),
+    "old": (1, 2, 3, 2, 2, 3),
+    "faint": (1, 1, 2, 0, 1, 2),
+}
+# Streaks run on down off a bloom's lower edge, narrowing from two pixels to one and wandering
+# a pixel now and then the way they lean: (bloom, x off its middle, rows below its edge (None:
+# on down to 3 rows above the foot band), lean -1 / +1, seed). The long ones still run (the
+# beads in wall_beads slide down them).
+STREAKS = [
+    (1, -2, None, -1, 81),
+    (1, 3, 4, 1, 82),
+    (0, 3, 3, 1, 83),
+    (3, -1, 4, -1, 84),
+    (4, 2, None, 1, 85),
+]
 # Mould under the torn corner: irregular clusters of 2-5 px in the hut's moss, no two alike,
 # densest under the tear and thinning out to the left and down: (x, y, pixels).
 MOULD_AT = [(409, 73, 5), (405, 74, 4), (412, 75, 3), (407, 77, 5), (402, 76, 3),
@@ -752,24 +843,22 @@ def _flap_roles():
 
 
 def wall_beads(L, t, rain):
-    """Water still running down the strong streaks: now and then a bead of it slides down the
-    wet core from under the moulding, a pixel a tick, and is gone at the core's bead. Twice as
-    often in a shower."""
+    """Water still running down the wet blooms' long streaks: now and then a bead of it slides
+    out of the soaked band and down the streak, a pixel a tick, and is gone a row short of its
+    end. Twice as often in a shower."""
     tick = int(math.floor(t * 8))
     roles = _peel_roles()
-    for i, (sx, w, end, st) in enumerate(TONGUES):
-        if not st:
-            continue
+    for i, path in enumerate(_bead_paths()):
         period = int(round((30 + 8 * i) / (1.0 + rain)))
         ph = (tick + i * 11) % period
-        y = PAPER_Y0 + ph
-        if y > _bead_row(sx, end) - 2:
+        if ph >= len(path) - 1:
             continue
-        if (sx, y) in roles:
+        x, y = path[ph]
+        if (x, y) in roles:
             continue
-        L.put(sx, y, (236, 230, 214))
-        if y - 1 >= PAPER_Y0 and (sx, y - 1) not in roles:
-            L.put(sx, y - 1, ST2)
+        L.put(x, y, (236, 230, 214))
+        if ph > 0 and path[ph - 1] not in roles:
+            L.put(path[ph - 1][0], path[ph - 1][1], ST2)
 
 
 def _tide_top():
@@ -781,9 +870,90 @@ def _tide_top():
     return out
 
 
-def _bead_row(sx, end):
-    """The lower of a strong core's two bead pixels: 3 clear rows above the foot band."""
-    return min(end, _tide_top().get(sx, PAPER_Y1) - 4)
+def _scallops(i):
+    """A bloom's scallops: (x, y, radius) circles hung from just above the moulding, three to
+    five across its width, the middle ones biggest, every one rolled its own size and place, so
+    the lower edge is a run of uneven arcs (the outline a drying stain leaves), never a bowl."""
+    bx, w, depth, kind, seed = BLOOMS[i]
+    n = 3 + int(h(seed, 9) * 2.99)
+    out = []
+    for k in range(n):
+        f = (k + 0.5) / n * 2 - 1                         # -1 .. 1 across the bloom
+        x = bx + f * w * 0.8 + (h(seed, 20 + k) - 0.5) * 2.4
+        r = depth * (0.55 + 0.45 * (1 - f * f)) * (0.7 + 0.45 * h(seed, 40 + k))
+        out.append((x, PAPER_Y0 - 0.35 * r, r))
+    return out
+
+
+def _bloom_map():
+    """({x: the last stained row}, {x: which bloom}) along the top of the right half (cached):
+    the union of every bloom's scallops; where two blooms meet the deeper one owns the column."""
+    if "bm" in _ROLES:
+        return _ROLES["bm"]
+    edge, owner = {}, {}
+    for x in range(PAPER_R[0], PAPER_R[1] + 1):
+        best, who = -1.0, None
+        for i in range(len(BLOOMS)):
+            for cx, cy, r in _scallops(i):
+                dx = x + 0.5 - cx
+                if abs(dx) < r:
+                    low = cy + math.sqrt(r * r - dx * dx)
+                    if low > best:
+                        best, who = low, i
+        if who is not None and best >= PAPER_Y0 + 0.5:
+            edge[x] = int(math.floor(best))
+            owner[x] = who
+    _ROLES["bm"] = (edge, owner)
+    return edge, owner
+
+
+def _streak_path(x, y0, n, lean, seed):
+    """[(x, y)] one per row, the pixel the streak is on; it shifts a pixel the way it leans at
+    most twice, never on its first two rows."""
+    out, shifts = [], 0
+    for k in range(n):
+        if k >= 2 and shifts < 2 and h(x, y0 + k, seed) < 0.22:
+            out.append((x, y0 + k))                    # the step: both pixels on that row
+            x += lean
+            shifts += 1
+        out.append((x, y0 + k))
+    return out
+
+
+def _streaks():
+    """[(path, kind, n)] every streak's pixels (cached)."""
+    if "st" in _ROLES:
+        return _ROLES["st"]
+    tide = _tide_top()
+    out = []
+    for bi, off, n, lean, seed in STREAKS:
+        bx, w, depth, kind, bseed = BLOOMS[bi]
+        edge = _bloom_map()[0]
+        x = bx + off
+        y0 = edge.get(x, PAPER_Y0 + depth - 1) + 1
+        if n is None:
+            n = tide.get(x, PAPER_Y1) - 4 - y0 + 1
+        out.append((_streak_path(x, y0, max(1, n), lean, seed), kind, n))
+    _ROLES["st"] = out
+    return out
+
+
+def _bead_paths():
+    """The running streaks' paths for wall_beads: down the bloom from the moulding, on down the
+    streak (one pixel a row, the later of a step's two)."""
+    if "bp" in _ROLES:
+        return _ROLES["bp"]
+    out = []
+    for (path, kind, n), (bi, off, nn, lean, seed) in zip(_streaks(), STREAKS):
+        if kind != "wet" or nn is not None:
+            continue
+        x0, y0 = path[0]
+        rows = {}
+        for p in path:
+            rows[p[1]] = p                              # the later pixel of a step wins
+        out.append([(x0, y) for y in range(PAPER_Y0, y0)] + [rows[y] for y in sorted(rows)])
+    _ROLES["bp"] = out
+    return out
 
 
 def _wall_levels():
@@ -793,7 +963,7 @@ def _wall_levels():
     lv = {}
 
     def setl(x, y, l):
-        if PAPER_R[0] <= x <= PAPER_R[1] and PAPER_Y0 <= y <= PAPER_Y1:
+        if PAPER_R[0] <= x <= PAPER_R[1] and PAPER_Y0 <= y <= PAPER_Y1 and l > 0:
             lv[(x, y)] = max(lv.get((x, y), 0), l)
 
     tide = _tide_top()
@@ -806,68 +976,42 @@ def _wall_levels():
     for x in range(332, 402):
         if vnoise(x, 9, 3.0, 44) > 0.3:
             setl(x, tide[x] - 3, 2)
-    # the tongues
-    for i, (sx, w, end, strong) in enumerate(TONGUES):
-        body = 2 if strong else 1
-        seed = 3 + i
-        by = _bead_row(sx, end) if strong else end
-        wi = int(math.ceil(w))
-        for d in range(-wi, wi + 1):
-            frac = abs(d) / (w + 0.6)
-            if frac >= 1:
-                continue
-            x = sx + d
-            if d == 0:
-                last = by
-            elif x in LONG_RUNS:
-                last = LONG_RUNS[x]
-            else:
-                n = (end - PAPER_Y0) * (1 - frac ** 1.15) * (0.4 + 0.6 * h(x, 1, seed))
-                last = PAPER_Y0 + max(1, int(round(n)))
-            for y in range(PAPER_Y0, last + 1):
-                l = body if y < last else body + 1
-                if strong and y == PAPER_Y0 and abs(d) < w - 0.5:
-                    l = body + 1                       # soaked where it came in
-                setl(x, y, l)
-        if strong:                                     # the wet core
-            for y in range(PAPER_Y0, by + 1):
-                k = y - PAPER_Y0
-                if y >= by - 1:
-                    l = 6                              # the bead
-                elif k < CORE_TOP:
-                    l = 5
-                elif (k - CORE_TOP) % 3 == 2:
-                    l = body                           # the dashed run's gap
-                else:
-                    l = 3
-                lv[(sx, y)] = l
-    # the old tide marks
-    for i, (hx, w, edge, seed) in enumerate(HANGS):
-        ys, y, nxt = {}, edge, hx - w + 3 + int(h(hx, 0, seed) * 3)
-        for x in range(hx - w, hx + w + 1):
-            if x >= nxt:
-                y = min(edge + 1, max(edge - 1, y + (1 if h(x, 1, seed) < 0.5 else -1)))
-                nxt = x + 3 + int(h(x, 2, seed) * 3)
-            ys[x] = y
-        for x in range(hx - w, hx + w + 1):
-            d = abs(x - hx)
-            side = d >= w - 1
-            bottom = ys[x]
-            if side:                                   # the sides fade out: short runs, no rim
-                bottom = PAPER_Y0 + 1 + int(h(x, 3, seed) * max(1, ys[x] - PAPER_Y0 - 4))
-            soak = (2 + int(h(x, 5, seed) * 2.6)) if d <= w - 2 else (2 if d < w else 1)   # frayed
-            for y in range(PAPER_Y0, bottom + 1):
-                l = 3 if y - PAPER_Y0 < soak else 1
-                if y == bottom and not side and h(x, 4, seed) > 0.22:
-                    l = 4                              # the tide line, broken
-                elif y == bottom - 1 and not side and d <= w - 2:
-                    l = 2                              # the dirt gathered just inside it
-                setl(x, y, l)
-        if i == 0:                                     # a short streak off its lowest point
-            lo = max(ys.values())
-            sx = max(x for x, yy in ys.items() if yy == lo and abs(x - hx) < w - 1) + 1
-            for y in range(lo + 1, lo + 4):
-                setl(sx, y, 2 if y < lo + 3 else 3)
+    # the blooms
+    edge, owner = _bloom_map()
+    inside = {(x, y) for x, last in edge.items() for y in range(PAPER_Y0, last + 1)}
+    for (x, y) in inside:
+        bx, w, depth, kind, seed = BLOOMS[owner[x]]
+        body, soak, rim, inner, _, _ = BLOOM_LOOK[kind]
+        below = (x, y + 1) not in inside
+        beside = (x - 1, y) not in inside or (x + 1, y) not in inside
+        k = edge[x] - y                                  # rows above the lower edge
+        if below or (beside and y > PAPER_Y0 + 1):
+            l = rim                                      # the tide line: dirt left at the edge
+            if h(x, y, seed + 7) < (0.3 if kind == "old" else 0.12):
+                l = rim - 1                              # the rim, broken
+            if kind == "faint" and not below:
+                l = body
+        elif k == 1 or (beside and y <= PAPER_Y0 + 1):
+            l = body + 1 if kind == "wet" else body      # the band inside the rim
+        else:
+            l = body
+            band = 1 + int(vnoise(x, 1, 3.0, seed) * 2.6)
+            if kind != "faint" and y - PAPER_Y0 < band:
+                l = soak                                 # soaked where it came in
+            # the line it dried back to once, a row or two inside the rim, broken
+            if (inner and k == 2 + (1 if vnoise(x, 2, 4.0, seed) > 0.55 else 0)
+                    and (x - 1, y) in inside and (x + 1, y) in inside and h(x, 4, seed) > 0.18):
+                l = inner
+        setl(x, y, l)
+    # the streaks: two pixels wide where they leave the edge, one below, a darker tip
+    for path, kind, n in _streaks():
+        _, _, _, _, st, tip = BLOOM_LOOK[kind]
+        last = path[-1]
+        for i, (x, y) in enumerate(path):
+            setl(x, y, tip if (x, y) == last else st)
+        x0, y0 = path[0]
+        lean = 1 if path[-1][0] >= x0 else -1
+        setl(x0 - lean, y0, max(1, st - 1))           # the shoulder where it leaves the edge
     _ROLES["lv"] = lv
     return lv
 
@@ -1009,50 +1153,47 @@ def bres(x0, y0, x1, y1):
             y0 += sy
 
 
-WEB_ON_PAPER = (132, 122, 108)      # one colour a web, full alpha: on the pale paper
-WEB_ON_DARK = (214, 208, 196)       # on dark wood or the doorway
+WEB_ON_PAPER = (132, 122, 108)      # the thread's dark: on the pale paper it is a shade
+WEB_ON_DARK = (214, 208, 196)       # the thread's light: on dark wood a catch of light
+WEB_STEP = 0.4                      # a thread is this one fixed step from what is under it
 
 
-def web_pixels(at, a0, a1, length, rings, seed):
-    """A corner web as crisp 1-px threads: three spokes from the corner (the outer two lying
-    along the walls), rings sagging a little towards the corner between them, the hub left
-    open, one broken strand hanging off the outer ring. Rings far enough apart that every gap
-    is 3 px or more, so it reads as a web and not a smudge. A set of pixels."""
+# A corner web, drawn by hand off the corner (dx right, dy down; a top-right one is mirrored).
+# Nothing lies along the walls (two threads hugging them read as a bracket, a frame drawn round
+# the corner): two spokes out of the corner at 30 and 60 degrees, the hub left open; two taut
+# threads strung from wall to wall across them, the inner one straight, the outer one bending
+# where it crosses each spoke, broken short of the left wall with its end hanging. Gaps of 2 px
+# and more everywhere but where threads cross, so it reads as a web and not a smudge.
+WEB_MAP = (
+    [(4, 2), (5, 3), (6, 3), (7, 4), (8, 5), (9, 5), (10, 6), (11, 6), (12, 7)]          # 30 deg
+    + [(2, 4), (3, 5), (3, 6), (4, 7), (5, 8), (5, 9), (6, 10), (6, 11), (7, 12)]        # 60 deg
+    + [(7, 1), (6, 2), (5, 3), (4, 4), (3, 5), (2, 6), (1, 7)]                          # inner
+    + [(14, 1), (13, 2), (12, 3), (12, 4), (11, 5), (10, 6), (9, 7), (8, 8), (7, 9),
+       (6, 10), (5, 11)]                                                                 # outer
+    + [(5, 12), (5, 13)]                                                                 # its end
+)
+
+
+def web_pixels(at, flip=False):
+    """The pixels of WEB_MAP hung off corner `at` (mirrored for a right-hand corner)."""
     ax, ay = at
-    angs = [a0, (a0 + a1) / 2, a1]
-    pix = set()
-    for k, a in enumerate(angs):
-        n = length if k != 1 else length * (0.94 + 0.06 * h(seed, 1))
-        for p in bres(ax, ay, ax + math.cos(a) * n, ay + math.sin(a) * n):
-            if k != 1 or math.hypot(p[0] - ax, p[1] - ay) >= 2.5:
-                pix.add(p)
-    for ring in rings:
-        pts = [(ax + math.cos(a) * ring, ay + math.sin(a) * ring) for a in angs]
-        for (x1, y1), (x2, y2), p, q in zip(pts, pts[1:], angs, angs[1:]):
-            m = (p + q) / 2
-            sag = 0.5 + ring * 0.07
-            mx, my = (x1 + x2) / 2 - math.cos(m) * sag, (y1 + y2) / 2 - math.sin(m) * sag
-            for seg in (bres(x1, y1, mx, my), bres(mx, my, x2, y2)):
-                pix.update(seg)
-    # a broken strand hanging from the outer ring, between the middle and the last spoke
-    m = (angs[1] + angs[2]) / 2
-    hx, hy = ax + math.cos(m) * rings[-1], ay + math.sin(m) * rings[-1]
-    if len(rings) > 1:                    # a small web has no strand to spare
-        for k in range(1, 3):
-            pix.add((int(round(hx)), int(round(hy)) + k))
-    return pix
+    return {(ax - dx if flip else ax + dx, ay + dy) for dx, dy in WEB_MAP}
 
 
-def web(L, seen, at, a0, a1, length, rings, seed, colour, avoid=None):
-    """Lay a web in one colour at full alpha; `avoid(x, y)` drops a thread pixel (water)."""
-    pix = web_pixels(at, a0, a1, length, rings, seed)
+def web(L, seen, at, flip=False, avoid=None):
+    """Lay a web one fixed step off what is under each thread: darker on the paper, lighter on
+    dark wood. `avoid(x, y)` drops a thread pixel (water)."""
+    pix = web_pixels(at, flip)
     out = set()
     for (x, y) in pix:
         if not (0 <= x < W and 0 <= y < H):
             continue
         if avoid and avoid(seen, x, y):
             continue
-        L.put(x, y, colour)
+        under = tuple(float(v) for v in seen[y, x])
+        lum = 0.3 * under[0] + 0.59 * under[1] + 0.11 * under[2]
+        to = WEB_ON_PAPER if lum > 120 else WEB_ON_DARK
+        L.put(x, y, base.mix(under, to, WEB_STEP))
         out.add((x, y))
     return out
 
@@ -1063,20 +1204,17 @@ def _is_water(seen, x, y):
 
 
 WEBS = [
-    # (corner, from angle, to angle, spoke length, rings, colour, clip off water?)
-    ((90, 62), 0.0, math.pi / 2, 16, (6, 12), WEB_ON_PAPER, False),          # paper, top left
-    ((413, 62), math.pi / 2, math.pi, 16, (6, 12), WEB_ON_PAPER, False),     # paper, top right
+    # (corner, mirrored?, clip off water?)
+    ((90, 62), False, False),          # paper, top left
+    ((413, 62), True, False),          # over the torn corner, top right
 ]
 
 
 def paint_webs(L, seen):
-    out = []
-    for i, (at, a0, a1, n, rings, colour, clip) in enumerate(WEBS):
-        out.append(web(L, seen, at, a0, a1, n, rings, 300 + i, colour, _is_water if clip else None))
-    return out
+    return [web(L, seen, at, flip, _is_water if clip else None) for at, flip, clip in WEBS]
 
 
-SPIDER_AT = (96, 68)        # on the top-left web's middle spoke
+SPIDER_AT = (98, 70)        # on the top-left web's outer thread
 SPIDER_CYCLE = 9.0
 SPIDER = (36, 28, 26)
 
@@ -1097,7 +1235,7 @@ def spider(L, t):
         drop = 7 - int((ph - 8.0) * 7)
     y = y0 + drop
     for k in range(1, drop + 1):                      # its thread
-        L.put(x, y0 + k - 1, WEB_ON_PAPER)
+        L.put(x, y0 + k - 1, base.mix(PAPER, WEB_ON_PAPER, WEB_STEP))
     L.put(x, y, SPIDER)
     L.put(x, y + 1, SPIDER)
     flick = 1 if drop and int(tick * 8) % 6 < 2 else 0
@@ -1529,7 +1667,7 @@ def _static(stage, ctx, under):
     A = Px()                                     # p1: painted as it must show, then aimed
     for pid, (pts, c) in pud.items():
         if pid == "p1":
-            paint_p1(A, pts)
+            paint_p1(A, pts, stage)
         else:
             paint_puddle(L, pts, PUDDLES[pid][0], PUDDLES[pid][1])
     if stage == 1:
@@ -1537,7 +1675,7 @@ def _static(stage, ctx, under):
     elif stage == 2:
         paint_mushrooms_s2(L)
     img = unlight(L.img(), stage)
-    img.alpha_composite(aimed(A.img(), stage))
+    img.alpha_composite(aimed(A.img(), stage, veil_alpha(stage, ctx.rain)))
     webs = None
     if stage == 1:
         # webs read what is under them: the room as drawn so far, with this module's own
@@ -1696,11 +1834,12 @@ def draw(stage, t, ctx, under, over):
     if stage not in (1, 2):
         return
     st = _static(stage, ctx, under)
+    boards = _seen(stage, under)                    # the floor as the floor drew it: its joints
     under.alpha_composite(st["img"])
     seen = _seen(stage, under)
     U, O, A = Px(), Px(), Px()
     if "p1" in st["pud"]:
-        paint_trickle(A, st["trickle"], seen, t, stage, ctx.rain)
+        paint_trickle(A, st["trickle"], boards, t, stage, ctx.rain)
     if stage == 1:
         path_skin(U, t, ctx.rain, seen)
         wall_beads(U, t, ctx.rain)
@@ -1712,7 +1851,7 @@ def draw(stage, t, ctx, under, over):
         rain_into_h3(t, ctx, O, seen,
                      st["pud"].get("p3", (set(), None))[0])
     under.alpha_composite(unlight(U.img(), stage))
-    under.alpha_composite(aimed(A.img(), stage))   # p1's water: as it must show
+    under.alpha_composite(aimed(A.img(), stage, veil_alpha(stage, ctx.rain)))   # p1's water: as it must show
     over.alpha_composite(O.img())
 
 
@@ -1821,12 +1960,13 @@ def stage_up(frm, p, ctx, under, over):
                     paint_puddle(U, pts, PUDDLES[pid][0], PUDDLES[pid][1])
         A = Px()
         if "p1" in s1["pud"]:
-            pts = p1_mask(ctx, 1, rain, step=_steps(p, 0.0, 0.6, 4))
+            step = _steps(p, 0.0, 0.6, 4)
+            pts = p1_mask(ctx, 1, rain, step=step)
             wet_halo(U, pts, PUDDLES["p1"][1])
-            paint_p1(A, pts)
+            paint_p1(A, pts, 2 if step >= 1 else 1)
             later = p > 0.15                            # h1's rim is boarded by then
-            paint_trickle(A, s2["trickle"] if later else s1["trickle"], _seen(1, under), t,
-                          2 if later else 1, sh=1)
+            paint_trickle(A, s2["trickle"] if later else s1["trickle"], _seen(2 if later else 1, under),
+                          t, 2 if later else 1, sh=1)
         # m6 pushes up beside p1, row by row from its foot
         if p > 0.55:
             M = Px()
@@ -1840,7 +1980,7 @@ def stage_up(frm, p, ctx, under, over):
             under.alpha_composite(U_img)
         else:
             under.alpha_composite(unlight(U.img(), 2))
-        under.alpha_composite(aimed(A.img(), 1))
+        under.alpha_composite(aimed(A.img(), 1, veil_alpha(1, rain, up=(1, p))))
     else:
         s2 = _static(2, ctx, under)
         L2 = Px()
@@ -1856,13 +1996,13 @@ def stage_up(frm, p, ctx, under, over):
             fade = 1.0 - _steps(p, 0.2, 0.9, 3)
             wet_halo(U, pts or s2["pud"]["p1"][0], PUDDLES["p1"][1], fade)
             if sc > 0:
-                paint_p1(A, pts)
+                paint_p1(A, pts, 2)
             if p < 0.4:
                 for x, y in s2["trickle"]:
                     if h(x, y, 77) >= p / 0.4:
                         A.put(x, y, WATER[2])
         under.alpha_composite(unlight(U.img(), 3))
-        under.alpha_composite(aimed(A.img(), 2))
+        under.alpha_composite(aimed(A.img(), 2, veil_alpha(2, rain, up=(2, p))))
 
 
 # The close-ups worth a 3x look: (name, stage, (x, y, w, h)) on the source grid. The stills

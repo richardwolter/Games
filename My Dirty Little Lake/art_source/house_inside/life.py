@@ -23,27 +23,35 @@ What this module draws (all in `over` unless stated):
            veil takes the beam one step down and half the motes go, the rest a step dimmer.
   stage 2  the veil a step lighter (room 0.10, shade side 0.17, the shaft clear) and given way
            round the lit fire and lamp (their pools, the game's sums); 20 motes.
-  stage 3  no veil, 7 motes. BEES (4), the lake's bee one pixel longer (yellow, yellow, the
-           dark band trailing; both wings flicking every other frame, folded when sat):
-           circling a bloom on the lake's orbit, flying bloom to bloom, landing a while.
-           BUTTERFLIES: a lemon one along the top run, a sky-blue one at the window's flowers
-           (and the flower vase on the table, when it stands there), a third (lemon) in off
-           the lake under the sill now and then, round the sill's blooms and away. No flier
-           ever crosses the Decorate shelf (off_shelf). Over the ivy a bee's band is ink and
-           one wing pixel always shows; its wings flick on a fixed 16 Hz clock. Butterflies: a notched
-           3x2 forewing over a 2x1 hindwing each side, the outer tip a step darker, a 1x2 INK
-           body in every frame; on the stepped 8 fps clock (open, lifting, shut, lifting), mostly open when perched; a step
-           lighter crossing the window's shaft; a faint shadow on the boards below them.
-           PETALS: one every ~4.4 s off a pink bloom on the top or side runs (never one with
-           a standing piece in its way), tumbling down (two pixels flat, one edge-on) with a
-           sway, landing on the boards (in `under`, beneath anything standing there) and
-           going in steps: whole, see-through, one pixel, gone.
+  stage 3  no veil, 7 motes. Made to read at play scale (2026-10-12; the lake's specks were
+           lost at three screen px a source px):
+           BEES (5): five px long, two rows of yellow with a black stripe, black head and
+           stinger, an ink belly; pale wings standing up and lying back on a fixed 16 Hz clock,
+           folded flat when sat. They loop round a bloom (centred a little in from it, so the
+           loop swings out over the room), fly bloom to bloom on a path bowed in over the room,
+           land a while, and three of them make a loop out over the boards near a wall ("air"
+           stops); one visits the flower vase on the table. A faint shadow on the boards.
+           BUTTERFLIES (3 residents and a visitor): seven across, two pastels each (lemon and
+           peach, sky and lilac, cabbage white and lemon) in a dark edge of their own hue, an
+           INK body and feelers. Open, lifting, shut on the stepped 8 fps clock (open the
+           longest flying; fanning slowly perched). A lemon one along the top run, a sky one
+           at the window's flowers and the vase, a white one down the right wall and up to the
+           top run; the visitor in off the lake under the sill now and then, along the sill's
+           blooms and away. Flights bow in over the room. A step lighter crossing the window's
+           shaft; a faint shadow on the boards below them. No flier ever crosses the Decorate
+           shelf (off_shelf).
+           PETALS: one every ~2.6 s off a pink bloom on the top or side runs (never one with
+           a standing piece in its way), three tones (pale, lit, dark edge): tumbling down a
+           quarter turn at a time (a three-across lens, tilted, a sliver edge-on, the dark side
+           up) with a sway, landing on the boards (in `under`, beneath anything standing there)
+           and going in steps: whole, see-through, a scrap, one pixel, gone.
   Every visit is asked of veg.py's flower_spots(3) by kind and place, never by index, and
   blooms a piece of furniture stands over are never visited.
 
 stage_up 1->2 the veil lifts in three steps; the extra dust settles out mote by mote.
-stage_up 2->3 the veil goes in three steps, the dust thins; a lemon butterfly comes in off
-              the lake and lands on its bloom once veg.py has opened it; the bees follow it in.
+stage_up 2->3 the veil goes in three steps, the dust thins; the butterflies come in off the
+              lake one by one and land on their blooms once veg.py has opened them; the bees
+              follow. Drawn in draw(3)'s order, so p = 1 is draw(3) to the pixel.
 
 Numbers are first guesses for Richard's eye. Every position is a whole source pixel.
 """
@@ -55,7 +63,7 @@ import numpy as np
 from PIL import Image
 
 import base
-from base import BLUE, PINK, RED, WHITE, YELLOW, h, put, vnoise
+from base import BLUE, CLAY, PINK, RED, WHITE, WISTERIA, YELLOW, h, put, vnoise
 
 # ======================================================================== the light
 
@@ -705,26 +713,41 @@ def bloom_open_at(at):
 
 # ======================================================================== bees
 
-# The lake's bee (scripts/flora.gd _draw_bees): a yellow pixel, a dark band trailing the way it
-# flies, a wing pixel over it flicking every other frame; circling a bloom on the lake's own
-# orbit (rx 5..10, ry 3..6, 2.2..3.5 rad/s, a wobble at 2.3x). In the house it also goes
-# bloom to bloom, and lands a while on the ones marked so: wings still, a pixel over the bloom.
-BEE_BODY = (245, 204, 71)
-BEE_BAND = (46, 33, 15)
-BEE_WING = (237, 247, 250)
-BEE_WING_A = 140          # the lake's 0.55
+# Stage 3's bees, drawn to read at the house's size (2026-10-12): the lake's bee (a yellow
+# pixel and a band) was a speck at three screen px a source px. Here a bee is five source px
+# long, facing the way it flies (dx mirrored):
+#
+#   wings  . W W . .      up beat: two pale rows standing over the back
+#          . W W . .
+#   body   k Y K Y H      lit row: stinger, yellow, black stripe, yellow, black head
+#          k y K y H      shade row: the yellow a step down
+#   belly  . k k k .      an ink line under it, so it reads on the cream paper
+#
+# On the down beat the wings lie back, one pale row trailing over the tail; sat on a bloom
+# they are folded flat on the back, still. INK, YELLOW and WHITE are base.py's.
+BEE_LIT = YELLOW[1]
+BEE_SHADE = YELLOW[0]
+BEE_INK = base.INK
+BEE_WING = WHITE[2]
+BEE_WING_LOW = WHITE[1]
+BEE_WING_A = 215
 BEE_SPEED = 34.0          # source px a second between blooms
-BEE_LAND = (0.28, 0.78)   # the share of a landing stay spent sat on the bloom
-# Each bee: (seconds into its loop at t 0, [(kind, near, seconds there, lands?)]).
+BEE_LAND = (0.30, 0.76)   # the share of a landing stay spent sat on the bloom
+BEE_SIT = 3               # sat, the bee's middle is this far above the bloom (its belly just over it)
+ROOM_MID = (252.0, 190.0) # loops and flights lean in towards here, so they swing out over the room
+# Each bee: (seconds into its loop at t 0, [(kind, near, seconds there, lands?)]). "air" is a
+# point over the room near a wall: a loop out over the boards and back to the frame.
 BEES = [
-    (1.5, [("rose_pink", (266, 53), 3.0, True), ("rose", (253, 52), 2.4, False),
-           ("rose", (236, 77), 3.2, True), ("rose", (259, 52), 2.2, False)]),
-    (0.4, [("pinkish", (89, 55), 3.4, True), ("daisy", (91, 49), 2.2, False),
-           ("rose", (85, 62), 2.8, True), ("pinkish", (85, 67), 2.0, False)]),
-    (2.6, [("rose", (416, 53), 2.6, False), ("daisy", (418, 62), 3.4, True),
-           ("rose", (419, 63), 2.4, False), ("daisy", (417, 81), 3.0, True)]),
-    (0.9, [("rose", (409, 305), 3.2, True), ("yellow", (400, 305), 2.4, False),
-           ("pinkish", (393, 305), 2.8, True), ("daisy", (406, 306), 2.2, False)]),
+    (1.5, [("rose_pink", (252, 52), 3.0, True), ("rose", (262, 53), 2.4, False),
+           ("air", (246, 104), 1.8, False), ("pinkish", (279, 55), 2.6, True)]),
+    (0.4, [("pinkish", (81, 54), 3.2, True), ("daisy", (86, 84), 2.4, False),
+           ("rose", (89, 58), 2.8, True), ("pinkish", (85, 125), 2.2, False)]),
+    (2.6, [("rose", (409, 56), 2.6, False), ("daisy", (418, 81), 3.2, True),
+           ("air", (396, 150), 1.8, False), ("rose", (418, 153), 2.6, True)]),
+    (0.9, [("rose", (412, 303), 3.0, True), ("yellow", (419, 304), 2.2, False),
+           ("pinkish", (397, 306), 2.8, True), ("air", (360, 284), 1.6, False)]),
+    (3.3, [("pinkish", (85, 207), 2.8, True), ("air", (108, 176), 2.0, False),
+           ("vase", (135, 134), 3.0, True), ("yellow", (87, 186), 2.4, True)]),
 ]
 
 
@@ -761,27 +784,44 @@ def _on_legs(legs, t):
     return legs[-1], 1.0
 
 
+def _inward(at):
+    """The unit step from `at` towards the room's middle."""
+    dx, dy = ROOM_MID[0] - at[0], ROOM_MID[1] - at[1]
+    d = max(1.0, math.hypot(dx, dy))
+    return dx / d, dy / d
+
+
 def _bee_at(b, t):
+    """(x, y, way, landed): the bee's middle, the way it faces (+1 right), whether it is sat."""
     off, plan = BEES[b]
-    leg, s = _on_legs(_legs(plan, BEE_SPEED), t + off)
+    leg, s = _on_legs(_legs(_plan_here(plan), BEE_SPEED), t + off)
     seed = b * 7.3 + 1.1
-    a = t * (2.2 + math.fmod(seed, 1.3)) + seed
+    a = t * (2.4 + math.fmod(seed, 1.1)) + seed
     if leg[0] == "stay":
         fx, fy = leg[1]
-        k = 1.0                                  # 1 circling, 0 sat on the bloom
+        k = 1.0                                  # 1 looping, 0 sat on the bloom
         if leg[3]:
             lo, hi = BEE_LAND
             if lo <= s <= hi:
-                return fx, fy - 1, 0, True
+                return fx, fy - BEE_SIT, (1 if b % 2 else -1), True
             k = min(1.0, (lo - s) / 0.18) if s < lo else min(1.0, (s - hi) / 0.18)
-        rx = 5.0 + math.fmod(seed, 5.0)
-        ry = 3.0 + math.fmod(seed * 1.7, 3.0)
-        x = fx + (math.cos(a) * rx + math.sin(a * 2.3) * 2.0) * k
-        y = fy - 1 + (math.sin(a * 1.6) * ry - 1.0) * k
-        return x, y, (1 if math.sin(a) >= 0 else -1), False
+        rx = 7.0 + math.fmod(seed, 4.0)
+        ry = 4.0 + math.fmod(seed * 1.7, 2.5)
+        # The loop is centred a little in from the bloom, so it swings out over the room and
+        # never folds against the frame or the shelf; a figure-eight wobble on top.
+        ix, iy = _inward((fx, fy))
+        cx, cy = fx + ix * rx * 0.55 * k, fy - BEE_SIT + iy * ry * 0.55 * k
+        x = cx + (math.cos(a) * rx + math.sin(a * 2.0) * 2.0) * k
+        y = cy + (math.sin(a) * ry * 0.9 + math.sin(a * 2.0 + 1.0) * 1.0) * k
+        vx = -math.sin(a) * rx + math.cos(a * 2.0) * 4.0
+        return x, y, (1 if vx >= 0 else -1), False
     (ax, ay), (bx, by) = leg[1], leg[3]
-    x = ax + (bx - ax) * s + math.sin(s * math.pi * 3 + seed) * 3.0
-    y = ay + (by - ay) * s - math.sin(s * math.pi) * 7.0 + math.sin(t * 9 + seed) * 1.0
+    ay, by = ay - BEE_SIT, by - BEE_SIT
+    d = max(1.0, math.dist((ax, ay), (bx, by)))
+    ix, iy = _inward(((ax + bx) / 2, (ay + by) / 2))
+    bow = math.sin(s * math.pi) * min(16.0, 4.0 + d * 0.35)
+    x = ax + (bx - ax) * s + ix * bow + math.sin(s * math.pi * 3 + seed) * 2.5
+    y = ay + (by - ay) * s + iy * bow + math.sin(t * 9 + seed) * 1.0
     return x, y, (1 if bx >= ax else -1), False
 
 
@@ -806,40 +846,38 @@ def _wing_beat(t, b):
     return (int(base.Ctx.step(t, 16) * 16) + b) % 2
 
 
-def _on_foliage(under, x, y):
-    """True where veg.py has drawn leaves under the bee (a green pixel in `under`)."""
-    if under is None or not (0 <= x < under.width and 0 <= y < under.height):
-        return False
-    r, g, bb, a = under.getpixel((int(x), int(y)))
-    return a > 0 and g > r + 8 and g > bb
+BEE_FLY_HIGH = 7          # px a bee over the boards is above its shadow, on screen
 
 
 def draw_bee(over, x, y, way, landed, t, b, under=None):
-    """Two yellow pixels and the dark band trailing the way it flies: one pixel longer than
-    the lake's bee, because the house is drawn one size finer (a source pixel is 3 screen px,
-    a lake art pixel about 4) and a bee in a rose bush has to read. The yellow is unbroken so
-    over the dark lake it is still one body, not two specks. Flying, both wings flick over it
-    every other frame; sat on a bloom they lie folded, one pale pixel."""
-    x, y = math.floor(off_shelf(x, y, 1)), math.floor(y)
+    x, y = math.floor(off_shelf(x, y, 3)), math.floor(y)
     way = way or 1
-    # Over the ivy the dark band is lost in the leaves' own darks: there it is ink, and a wing
-    # pixel always shows (the flick moves it rather than taking it away), so the bee still reads
-    # as body, band and wing and not as a yellow dash.
-    leafy = any(_on_foliage(under, x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0))
-    put(over, x + way, y, BEE_BODY)
-    put(over, x, y, BEE_BODY)
-    put(over, x - way, y, base.INK if leafy else BEE_BAND)
+    # Its shadow on the boards below it (flying over the room only).
+    if under is not None and not landed and _on_boards(x, y + BEE_FLY_HIGH):
+        for dx in (-1, 0, 1):
+            put(under, x + dx, y + BEE_FLY_HIGH, SHADOW_INK, 70)
     beat = _wing_beat(t, b)
-    if leafy:
-        if landed or beat == 0:
-            put(over, x, y - 1, WHITE[1])
-        else:
-            put(over, x - way, y - 1, WHITE[1])
-    elif landed:
-        put(over, x, y - 1, BEE_WING, BEE_WING_A)
-    elif beat == 0:
-        put(over, x, y - 1, BEE_WING, BEE_WING_A)
-        put(over, x - way, y - 1, BEE_WING, BEE_WING_A)
+    # Wings lying back are behind the body's top row; standing up, they are over it.
+    if landed:
+        put(over, x - way, y - 2, BEE_WING_LOW, 235)
+        put(over, x - 2 * way, y - 2, BEE_WING_LOW, 235)
+    elif beat == 1:
+        put(over, x - 2 * way, y - 2, BEE_WING, BEE_WING_A)
+        put(over, x - way, y - 2, BEE_WING, BEE_WING_A)
+        put(over, x - 3 * way, y - 1, BEE_WING_LOW, BEE_WING_A)
+    # The body: stinger, yellow, stripe, yellow, head, on two rows; an ink belly under it.
+    for dy, col in ((-1, BEE_LIT), (0, BEE_SHADE)):
+        put(over, x - 2 * way, y + dy, BEE_INK)
+        put(over, x - way, y + dy, col)
+        put(over, x, y + dy, BEE_INK)
+        put(over, x + way, y + dy, col)
+        put(over, x + 2 * way, y + dy, BEE_INK)
+    for dx in (-1, 0, 1):
+        put(over, x + dx, y + 1, BEE_INK)
+    if not landed and beat == 0:
+        for dx in (-way, 0):
+            put(over, x + dx, y - 2, BEE_WING, BEE_WING_A)
+            put(over, x + dx, y - 3, BEE_WING, BEE_WING_A)
 
 
 def draw_bees(over, t, under=None):
@@ -849,63 +887,79 @@ def draw_bees(over, t, under=None):
 
 # ======================================================================== butterflies
 
-# Two pastels, the cosy hut's: a brimstone lemon and a sky blue, a lit forewing over a
-# shaded hindwing, each wing's outer tip a step darker, and an INK body (the furniture's
-# outline colour) so the silhouette reads over the lake and over the cream paper alike.
+# Three, each two pastels (a forewing and a hindwing) with a dark edge of its own hue and an
+# INK body, so the silhouette reads over the lake, the ivy and the cream paper alike.
 BUTTER = [
-    {"wing": YELLOW[2], "hind": YELLOW[1], "edge": YELLOW[0], "body": base.INK},
-    {"wing": BLUE[2], "hind": BLUE[1], "edge": BLUE[0], "body": base.INK},
+    {"wing": YELLOW[2], "hind": CLAY[3], "edge": (122, 78, 26), "body": base.INK},       # lemon, peach
+    {"wing": BLUE[2], "hind": WISTERIA[3], "edge": (40, 48, 112), "body": base.INK},     # sky, lilac
+    {"wing": WHITE[2], "hind": YELLOW[2], "edge": (96, 84, 70), "body": base.INK},       # cabbage white
 ]
 
 
-# Frames on the stepped clock, as (dx, dy, part) round the body: w forewing, e its darker
-# outer tip, s hindwing, b body. Seen from above, seven across: open is a 3x2 forewing each
-# side, notched at its outer foot (three over two), over a smaller 2x1 hindwing, and a 1x2
-# body between them; lifting, the wings rise and narrow; shut, they stand up together over
-# the body. The 1x2 body shows in every frame.
-def _sprite(rows):
-    return [(i - 3, j - 1, ch) for j, row in enumerate(rows) for i, ch in enumerate(row) if ch in "wesb"]
+# Frames on the stepped clock, as (dx, dy, part) round the body: A forewing, B hindwing,
+# e the edge, k the body (its head the top k, two feelers over it). Seen from above: open is
+# seven across; lifting the wings rise and narrow; shut they stand up together over the body.
+def _sprite(rows, top):
+    return [(i - 3, j + top, ch) for j, row in enumerate(rows) for i, ch in enumerate(row) if ch in "ABek"]
 
 
-_OPEN = _sprite(["eww.wwe", ".wwbww.", ".ssbss."])
-_HALF = _sprite([".ew.we.", "..wbw..", "..sbs.."])
-_SHUT = _sprite(["...e...", "..wbw..", "...b..."])
-FLAP = [_OPEN, _HALF, _SHUT, _HALF]            # flying: a lazy flap, two beats a second
-PERCH = [_OPEN] * 9 + [_HALF, _SHUT, _SHUT, _SHUT, _HALF]   # perched: open, now and then a slow close
+_OPEN = _sprite(["..k.k..",
+                 "ee.k.ee",
+                 "eAAkAAe",
+                 "eAAkAAe",
+                 ".eBkBe.",
+                 "..e.e.."], -3)
+_HALF = _sprite(["..k.k..",
+                 "..eke..",
+                 ".eAkAe.",
+                 "..AkA..",
+                 "..BkB..",
+                 "...e..."], -3)
+_SHUT = _sprite(["..eAe..",
+                 "..eAe..",
+                 "..eBe..",
+                 "...k...",
+                 "...k..."], -3)
+FLAP = [_OPEN, _OPEN, _HALF, _SHUT, _HALF]    # flying: a lazy flap, open the longest (1.6 a second)
+PERCH = [_OPEN] * 7 + [_HALF, _SHUT, _SHUT, _SHUT, _HALF]   # perched: fanning slowly, open and shut
+_SPAN = {id(_OPEN): 3, id(_HALF): 2, id(_SHUT): 1}
 BUTTER_SPEED = 20.0
 BUTTER_GAP = 16.0          # a butterfly never hops between blooms closer than this
+BUTTER_SIT = 3             # perched, its middle is this far above the bloom: the flower peeps under it
 # Residents: (colour, seconds into its loop at t 0, [(kind, near, seconds perched)]).
 BUTTERFLIES = [
-    (0, 0.8, [("pinkish", (124, 55), 3.4), ("yellow", (162, 55), 2.6), ("daisy", (197, 55), 3.0),
-              ("pinkish", (217, 56), 2.4)]),
-    (1, 1.2, [("daisy", (86, 181), 3.6), ("daisy", (86, 145), 2.6), ("vase", (135, 134), 3.2),
+    (0, 0.8, [("pinkish", (132, 55), 3.4), ("yellow", (172, 55), 2.6), ("daisy", (200, 55), 3.0),
+              ("pinkish", (219, 53), 2.4)]),
+    (1, 1.2, [("daisy", (86, 181), 3.6), ("daisy", (87, 157), 2.6), ("vase", (135, 134), 3.2),
               ("daisy", (87, 212), 2.8)]),
+    (2, 2.4, [("rose", (418, 200), 3.2), ("pinkish", (416, 115), 2.8), ("rose", (369, 54), 3.0),
+              ("daisy", (418, 240), 2.6)]),
 ]
 # The visitor: (colour, its period, when it first comes, its blooms, in from, out to): in off
 # the lake under the sill, round the sill's blooms, and away again under the sill, never
 # across the Decorate shelf (x <= 420 the whole way).
-VISITOR = (0, 30.0, 3.2, [("rose", (409, 305), 3.0), ("yellow", (380, 306), 2.6),
-                         ("pinkish", (343, 303), 2.8)], (400, 345), (420, 352))
+VISITOR = (0, 30.0, 3.2, [("rose", (352, 301), 3.0), ("pinkish", (273, 301), 2.6),
+                         ("pinkish", (228, 305), 2.8)], (400, 345), (200, 352))
 
 
 def _perch_at(at):
-    """Sat on a bloom: the body's tail on its top petal, so the flower shows under the wings."""
-    return at[0], at[1] - 2
+    """Sat on a bloom: just over its top petal, so the flower shows under the wings."""
+    return at[0], at[1] - BUTTER_SIT
 
 
 def _fly_between(a, b, s, t, seed):
-    """A flutter from a to b: a bowed path, a bob with the flap, never a straight line. The
-    side wiggle scales with the leg: a short one drifts, a long one flutters (about 1.2
-    swings a second of flight), so a hop never zig-zags a pixel or two every frame."""
+    """A flutter from a to b: a path bowed in over the room, a bob with the flap, never a
+    straight line. The side wiggle scales with the leg: a short one drifts, a long one
+    flutters (about 1.2 swings a second of flight)."""
     (ax, ay), (bx, by) = a, b
     d = max(1.0, math.dist((ax, ay), (bx, by)))
-    nx, ny = -(by - ay) / d, (bx - ax) / d
-    bulge = math.sin(s * math.pi) * min(22.0, d * 0.3) * (1 if seed % 2 else -1)
+    ix, iy = _inward(((ax + bx) / 2, (ay + by) / 2))
+    bulge = math.sin(s * math.pi) * min(26.0, 6.0 + d * 0.35)
     secs = d / BUTTER_SPEED + 0.35
-    wig = 2.0 * min(1.0, d / 30.0)
-    cycles = max(1, round(secs * 1.2))
-    x = ax + (bx - ax) * s + nx * bulge + math.sin(s * math.pi * 2 * cycles + seed) * wig
-    y = ay + (by - ay) * s + ny * bulge - math.sin(s * math.pi) * 6.0 + math.sin(t * 7.5 + seed) * 1.5
+    nx, ny = -(by - ay) / d, (bx - ax) / d
+    wig = 2.0 * min(1.0, d / 30.0) * math.sin(s * math.pi * 2 * max(1, round(secs * 1.2)) + seed)
+    x = ax + (bx - ax) * s + ix * bulge + nx * wig
+    y = ay + (by - ay) * s + iy * bulge + ny * wig + math.sin(t * 7.5 + seed) * 1.5
     return x, y
 
 
@@ -955,11 +1009,10 @@ def draw_butterfly(over, x, y, colour, perched, t, seed=0, under=None):
     wing, hind, edge = c["wing"], c["hind"], c["edge"]
     if shaft_at(x, y + FLY_HIGH) >= LIT_FROM:
         wing, hind = base.mix(wing, SUN_LIT, 0.4), base.mix(hind, SUN_LIT, 0.3)
-        edge = base.mix(edge, SUN_LIT, 0.25)
-    look = {"w": wing, "e": edge, "s": hind, "b": c["body"]}
+    look = {"A": wing, "B": hind, "e": edge, "k": c["body"]}
     if under is not None and not perched and _on_boards(x, y + FLY_HIGH):
         # Its shadow on the boards below it, as wide as its wings are open.
-        span = {id(_OPEN): 3, id(_HALF): 2}.get(id(frame), 1)
+        span = _SPAN.get(id(frame), 1)
         for dx in range(-span, span + 1):
             put(under, x + dx, y + FLY_HIGH, SHADOW_INK, SHADOW_A)
     for dx, dy, part in frame:
@@ -981,20 +1034,35 @@ def draw_butterflies(over, t, under=None):
 
 # ======================================================================== petals
 
-PETAL_EVERY = 4.4          # seconds between petals, on average
-PETAL_FALL = 9.0           # source px a second
-PETAL_REST = 1.8           # seconds lying whole before it starts to go
-PETAL_GO = 0.8             # seconds each step of going lasts
-# (lit, dark) falling, in `over`; lying on the boards, in `under`, a step paler, because the
-# room's dim goes over the boards and what lies on them (it does not over what is in the air).
-PETAL_LOOK = {"pink": (PINK[2], PINK[1]), "rose_pink": (PINK[2], PINK[1]),
-              "rose_red": (RED[2], RED[1])}
-PETAL_LYING = {"pink": (PINK[3], PINK[2]), "rose_pink": (PINK[3], PINK[2]),
-               "rose_red": (RED[2], PINK[2])}
+PETAL_EVERY = 2.6          # seconds between petals, on average
+PETAL_FALL = 11.0          # source px a second
+PETAL_REST = 2.4           # seconds lying whole before it starts to go
+PETAL_GO = 0.7             # seconds each step of going lasts
+# (highlight, lit, dark edge): a petal is a few pixels of the bloom's pinks, its pale side up
+# and its dark edge under it, so it reads on the cream paper and on the warm boards alike.
+PETAL_LOOK = {"pink": (PINK[3], PINK[2], PINK[1]), "rose_pink": (PINK[3], PINK[2], PINK[1]),
+              "rose_red": (RED[2], RED[1], RED[0])}
+# Tumbling, by the quarter of its turn (dx, dy, 0 pale / 1 lit / 2 edge): flat (a lens three
+# across, its pale side up and the dark edge under it), tilted (on the slant), edge-on (two,
+# upright: a sliver), flat the other way up (the dark side showing).
+PETAL_TUMBLE = [
+    [(0, 0, 0), (1, 0, 1), (2, 0, 1), (1, 1, 2), (2, 1, 2)],
+    [(0, 0, 0), (1, 0, 1), (1, 1, 1), (2, 1, 2)],
+    [(0, 0, 1), (0, 1, 2)],
+    [(0, 0, 2), (1, 0, 2), (1, 1, 1), (2, 1, 0)],
+]
+# Lying, going a step at a time: whole, see-through, a two-pixel scrap, one faint pixel, gone.
+_LYING = [(1, 0, 0), (2, 0, 1), (0, 1, 1), (1, 1, 1), (2, 1, 2)]
+PETAL_LIE = [
+    (_LYING, 255),
+    (_LYING, 165),
+    ([(1, 0, 1), (2, 0, 2)], 150),
+    ([(1, 0, 2)], 120),
+]
 # Pictures hang flat on the wall: a petal falls in front of them. Anything else standing at the
 # wall's foot a petal would fall behind, so its blooms drop none.
 FLAT_ON_WALL = ("decor_pk_landscape", "decor_pk_portrait")
-WALL_LAND = (96, 110)      # where a petal off the top run lands: the boards at the wall's foot
+WALL_LAND = (96, 112)      # where a petal off the top run lands: the boards at the wall's foot
 
 
 def _petal_sources(ctx):
@@ -1012,9 +1080,9 @@ def _petal_sources(ctx):
         if y < 62 and 92 <= x <= 412:
             land, drift = (WALL_LAND[0] + WALL_LAND[1]) // 2, 0
         elif x < 92 and y >= 62:
-            land, drift = y + 20, 7
+            land, drift = y + 20, 9
         elif x > 412 and y >= 62:
-            land, drift = y + 20, -7
+            land, drift = y + 20, -9
         else:
             continue
         path = [(x + round(drift * i / 8), y + 2 + (land - y - 2) * i // 8) for i in range(9)]
@@ -1039,15 +1107,15 @@ def _petal_source(srcs, k):
 
 
 def _petals(ctx, t, opened=None):
-    """The petals alive at t: (x, y, look, landed, step, flat). `opened(src)` (the play-in)
+    """The petals alive at t: (x, y, look, landed, step, tumble). `opened(src)` (the play-in)
     leaves out the petals off blooms not yet open."""
     srcs = _petal_sources(ctx)
     if not srcs:
         return []
     out = []
-    life = 8.0 + PETAL_REST + 3 * PETAL_GO
+    life = 8.0 + PETAL_REST + len(PETAL_LIE) * PETAL_GO
     for k in range(int(math.floor((t - life) / PETAL_EVERY)) - 1, int(math.floor(t / PETAL_EVERY)) + 1):
-        born = k * PETAL_EVERY + (h(k, 1, 91) - 0.5) * 2.0
+        born = k * PETAL_EVERY + (h(k, 1, 91) - 0.5) * 1.6
         age = t - born
         if age < 0:
             continue
@@ -1058,49 +1126,39 @@ def _petals(ctx, t, opened=None):
             else min(IN_Y1 - 2, sy + 16 + int(h(k, 3, 91) * 10))
         drop = land - sy
         fall = drop / PETAL_FALL
-        sway = 1.6 + h(k, 6, 91) * 1.4
+        sway = 2.0 + h(k, 6, 91) * 1.8
         ph = h(k, 7, 91) * 6.3
-        w = 2 * math.pi * (0.5 + h(k, 8, 91) * 0.3)
+        w = 2 * math.pi * (0.45 + h(k, 8, 91) * 0.25)
         if age < fall:
             s = age / fall
             x = sx + drift * s + math.sin(age * w + ph) * sway * min(1.0, age * 1.2)
             y = sy + 1 + drop * s
-            # It tumbles: flat (two pixels) most of the time, edge-on (one) at the sway's turns.
-            flat = abs(math.cos(age * w + ph)) > 0.45
-            out.append((x, y, kind, False, 0, flat))
+            # It turns over a quarter at a time on the stepped clock, twice a sway.
+            tumble = int(math.floor(base.Ctx.step(age, 8) * w * 4 / math.pi + ph * 2)) % 4
+            out.append((x, y, kind, False, 0, tumble))
             continue
         rest = age - fall
         x = min(IN_X1 - 2, max(IN_X0 + 1, sx + drift + math.sin(fall * w + ph) * sway))
         step = 0 if rest < PETAL_REST else 1 + int((rest - PETAL_REST) / PETAL_GO)
-        if step > 2:
+        if step >= len(PETAL_LIE):
             continue
-        out.append((x, land, kind, True, step, True))
+        out.append((x, land, kind, True, step, 0))
     return out
 
 
 def draw_petals(under, over, ctx, t, opened=None):
     """Falling, in `over` (in the air, in front of the wall and the pictures on it); lying on
     the boards, in `under` (beneath anything that stands or walks there)."""
-    for x, y, kind, landed, step, flat in _petals(ctx, t, opened):
+    for x, y, kind, landed, step, tumble in _petals(ctx, t, opened):
         x, y = math.floor(x), math.floor(y)
+        cols = PETAL_LOOK[kind]
         if not landed:
-            lit, dark = PETAL_LOOK[kind]
-            if flat:
-                put(over, x, y, lit)
-                put(over, x + 1, y, dark)
-            else:
-                put(over, x, y, dark)
+            for dx, dy, part in PETAL_TUMBLE[tumble]:
+                put(over, x + dx, y + dy, cols[part])
             continue
-        # Lying, then going a step at a time: whole, see-through, one pixel, gone.
-        lit, dark = PETAL_LYING[kind]
-        if step == 0:
-            put(under, x, y, lit)
-            put(under, x + 1, y, dark)
-        elif step == 1:
-            put(under, x, y, lit, 150)
-            put(under, x + 1, y, dark, 150)
-        else:
-            put(under, x, y, dark, 110)
+        pix, a = PETAL_LIE[step]
+        for dx, dy, part in pix:
+            put(under, x + dx, y + dy, cols[part], a)
 
 
 # ======================================================================== the stages
@@ -1157,9 +1215,30 @@ def _settling(p, lo, hi, a, b):
 # the lake beside the room) as the first blooms open, and the bees follow from these sides.
 # Every flier homes on where stage 3 will have it at that moment, so at p = 1 the play-in is
 # draw(3) exactly and nothing pops when it hands over.
-ARRIVE_FROM = [(50.0, 46.0), (40.0, 150.0)]
-ARRIVE_START = [0.1, 0.22]
+ARRIVE_FROM = [(50.0, 46.0), (40.0, 150.0), (380.0, 345.0)]
+ARRIVE_START = [0.1, 0.22, 0.32]
 BEES_IN_FROM = {"left": (40.0, 90.0), "right": (418.0, 20.0), "low": (400.0, 345.0)}
+
+
+def _arriving_bees(over, under, p, t):
+    """The bees follow the butterflies in, one by one, each homing on where its loop has it."""
+    for b, (boff, bplan) in enumerate(BEES):
+        bplan = _plan_here(bplan)
+        at = bloom_near(bplan[0][0], bplan[0][1])
+        side = "low" if at[1] > 280 else ("left" if at[0] < 250 else "right")
+        start = 0.45 + 0.09 * b
+        q = (p - start) / max(1e-6, min(0.38, 1.0 - start))
+        if q <= 0:
+            continue
+        bx, by, bway, blanded = _bee_at(b, t)
+        if q >= 1:
+            draw_bee(over, bx, by, bway, blanded, t, b, under=under)
+            continue
+        e = 1 - (1 - q) ** 2
+        ox, oy = BEES_IN_FROM[side]
+        x = ox + (bx - ox) * e + math.sin(t * 9 + b) * 2.0 * (1 - q)
+        y = oy + (by - oy) * e - math.sin(q * math.pi) * 8.0
+        draw_bee(over, x, y, 1 if bx >= ox else -1, False, t, b, under=under)
 
 
 def stage_up(frm, p, ctx, under, over):
@@ -1174,8 +1253,10 @@ def stage_up(frm, p, ctx, under, over):
         draw_motes(over, t, MOTES[1], _settling(p, MOTES[2], MOTES[1], 0.2, 0.8), ctx=ctx)
         return
     draw_motes(over, t, MOTES[2], _settling(p, MOTES[3], MOTES[2], 0.15, 0.65), ctx=ctx)
-    # Petals start falling off a bloom once veg.py has opened it.
+    # Petals start falling off a bloom once veg.py has opened it. Drawn in draw(3)'s order
+    # (petals, bees, butterflies), so at p = 1 the frame is draw(3)'s to the pixel.
     draw_petals(under, over, ctx, t, opened=lambda src: p >= bloom_open_at((src[0], src[1])))
+    _arriving_bees(over, under, p, t)
     for n in range(len(BUTTERFLIES)):
         colour, off, plan = BUTTERFLIES[n]
         plan = _plan_here(plan)
@@ -1196,23 +1277,6 @@ def stage_up(frm, p, ctx, under, over):
         vis = _visitor_at(t)
         if vis:
             draw_butterfly(over, vis[0], vis[1], VISITOR[0], vis[2], t, seed=11, under=under)
-    # The bees follow it in, one by one, each homing on where its loop has it.
-    for b, (boff, bplan) in enumerate(BEES):
-        at = bloom_near(bplan[0][0], bplan[0][1])
-        side = "low" if at[1] > 200 else ("left" if at[0] < 250 else "right")
-        start = 0.5 + 0.1 * b
-        q = (p - start) / max(1e-6, min(0.38, 1.0 - start))
-        if q <= 0:
-            continue
-        bx, by, bway, blanded = _bee_at(b, t)
-        if q >= 1:
-            draw_bee(over, bx, by, bway, blanded, t, b, under=under)
-            continue
-        e = 1 - (1 - q) ** 2
-        ox, oy = BEES_IN_FROM[side]
-        x = ox + (bx - ox) * e + math.sin(t * 9 + b) * 2.0 * (1 - q)
-        y = oy + (by - oy) * e - math.sin(q * math.pi) * 8.0
-        draw_bee(over, x, y, 1 if bx >= ox else -1, False, t, b, under=under)
 
 
 CLOSEUPS = [

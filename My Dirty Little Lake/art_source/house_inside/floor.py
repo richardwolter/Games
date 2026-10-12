@@ -62,6 +62,19 @@ THE RULES THIS FILE KEEPS
     tapering tongue (WOOD_FACE body, pale tip, shade under), joint ends a RAFTER end-grain
     column and a nail hole. h1's earth one step lower, its band kept dark in the beam.
     Stage 2's fresh boards each their own tone (3, hashed), a sawn lip on a third of them.
+  * ROUND 4 (critics): b1 an INSET dish (the boards keep their place, wet and a step or two
+    darker; a dark step opening along its far edge, the near boards' arrises lit, joints and
+    one joint torn open, a snapped board's slot to the earth with splinters, one board's end
+    seesawed up with its shadow); b3 laid by `relief` (no ink, no black crevices: faces in
+    the wood's own side tone, the dark under a lifted board only where it overhangs, its long
+    ends sagging, splinters inside the block, shadows right and down); b2's board snapped in
+    a V open to H5. Holes: the far rim is the cut board's own dark face (not INK), broken in
+    teeth and splinters, the shadow band under it (h1: 3 rows, dark even in the beam); end
+    grain a step lighter, a shade line only on ends facing away from the window; long shards
+    off snapped ends (`shards`); h2/h3/H5 earth on MUD's clear steps with fewer, rounder
+    clods and wandering roots. Stage 2's mended boards are MEND_BODY (the floor's own wood a
+    touch warmer and lighter), seams the old floor's. 1->2: the stack and saw fall as ONE
+    object (7, 4, 1 px, its shadow under it) and land at .75.
   * Static pixels built once per stage and cached; a frame redraws the plants.
 
 STAGE-UPS (8 fps ticks; life.py's veil steps at p .625 and .875 are left alone)
@@ -70,7 +83,7 @@ STAGE-UPS (8 fps ticks; life.py's veil steps at p .625 and .875 are left alone)
         .44 while their stage-1 earth dissolves in 4 hash-ordered steps (.44 .5 .56 .69) and
         the pool dries about its middle in 4 steps two ticks apart (.44 .56 .69 .81; nothing
         else touches its pixels while they are water); the other patches land .30-.75, lb2 at
-        .81; the stack is built WITHOUT it in s2 and set down whole, A .69, B .75, saw .81.
+        .81; the stack is built WITHOUT it in s2 and falls whole, all parts together, at .75.
         Round 2: the cores are never bare: stage-2 plants stand up .31-.56 (as the first
         weeds under new boards go) and open .5-.69, and only then does the stage-1 grass
         rooted in a core thin out (.69 .75 .81). A plant outside the cores is gone the tick
@@ -160,6 +173,9 @@ EDGE_LIP = (58, 38, 30)     # the near rim's lip: the hole's lower outline
 DRY = [(36, 26, 20), (54, 39, 28), (76, 55, 37), (100, 73, 48), (126, 94, 62), (154, 120, 80)]
 WETE = [(16, 12, 12), (25, 19, 17), (36, 27, 23), (50, 38, 30), (66, 51, 38), (86, 68, 50)]
 DAMP = [mix(a, b, 0.4) for a, b in zip(DRY, WETE)]
+# round 4 (critics: h2/h3 read as noise in a void): wet earth on clear steps with more value
+# range than WETE, the base two steps up from the shadow band: ground, not a hole in the picture
+MUD = [(28, 21, 18), (44, 33, 27), (62, 47, 36), (78, 60, 44), (96, 75, 54), (120, 95, 68)]
 ASH = [(34, 31, 31), (52, 48, 46), (72, 68, 64), (95, 90, 84), (120, 114, 106), (150, 143, 132)]
 # h4's ash-mud (round 2): greys from DEAD[0] toward a wet ash grey, flatter than any earth
 ASHMUD = [(30, 26, 22), (42, 37, 31), (56, 50, 40), (70, 66, 58), (82, 78, 71), (98, 94, 87)]
@@ -173,6 +189,10 @@ NAIL_HI = (180, 176, 168)
 METAL = [(52, 54, 60), (104, 108, 116), (162, 166, 172), (220, 224, 226)]
 LIGHT = (246, 214, 150)     # the daylight slits' colour
 PALE_UNDER = (214, 176, 132)  # a sprung board's raw underside
+# stage 2's mended boards (round 4): the floor's own wood a touch warmer and lighter, by tone
+MEND_BODY = {0: (206, 141, 100), 1: (200, 134, 95), 2: (212, 149, 106)}
+MEND_SEAM = (182, 110, 66)    # the old floor's seam, a hair lighter
+MEND_LIP = (220, 162, 118)
 
 
 def dk(c, n):
@@ -451,194 +471,291 @@ def _sunk_col(snap, x, y):
     return mix(mul(tuple(int(v) for v in snap[y, x]), 0.88), DEAD[0], 0.15)
 
 
+GAP = (46, 31, 26)           # the dark under a lifted or into a sunk board (warm, not ink)
+GAP_DEEP = (32, 22, 19)
+
+
+def relief(can, off, snap, tone, xs, ks, splinter=None):
+    """ROUND 4 (critics: b1 read as tape, b3 as ink-ringed stripes): the tile's own boards laid
+    again with an offset per (plank row k, column x), px down (+, sunk) or up (-, lifted),
+    painted column by column, far boards first, as a 3/4 view shows a stepped floor:
+      * a board lower than the one beyond it shows that board's FRONT FACE between them: one
+        row of side wood (x0.66 of its own wood), then the dark under it (GAP) if the drop is
+        deeper than a plank is thick; the lower board's seam row in that shade (x0.62);
+      * a board higher than the one beyond it lays its lit arris (x1.14) over that board's
+        last rows: the far board is hidden by it, never outlined;
+      * every board's top rows its own wood through `tone(k, x, r, c)`.
+    -> (flat, top): `flat` the pixels still lying where the floor lies (for shadows),
+    `top` {(k, x): y of the board's first top row} for what is drawn on it afterwards."""
+    flat = np.ones((FH, FW), bool)
+    top = {}
+    for x in xs:
+        o_prev = 0
+        for k in range(ks[0] - 1, ks[1] + 2):
+            o = off(k, x)
+            y = 4 * k
+            if o == 0 and o_prev == 0:
+                continue
+            if o > o_prev:                                   # the face of the board beyond
+                n = o - o_prev
+                wood = tuple(int(v) for v in snap[min(FH - 1, y - 1), x])
+                for i in range(n):
+                    under = tuple(int(v) for v in snap[min(FH - 1, y + o_prev + i), x])
+                    c = (mul(wood, 0.66) if i == 0 else GAP if i == 1 else
+                         mul(under, 0.42 if i == 2 else 0.5))
+                    can.put(x, y + o_prev + i, c)
+                    flat[y + o_prev + i, x] = False
+                seam = mul(tuple(int(v) for v in snap[y, x]), 0.62)
+            elif o < o_prev:                                 # its arris over the one beyond
+                seam = mul(tuple(int(v) for v in snap[y + 1, x]), 1.14)
+            else:
+                seam = mul(tuple(int(v) for v in snap[y, x]), 0.8 if o else 1.0)
+            if 0 <= y + o < FH:
+                can.put(x, y + o, seam)
+                flat[y + o, x] = o == 0 and o_prev == 0
+            for r_ in (1, 2, 3):
+                yy = y + r_
+                if not (0 <= yy < FH and 0 <= yy + o < FH):
+                    continue
+                c = tuple(int(v) for v in snap[yy, x])
+                if o:
+                    c = tone(k, x, r_, c)
+                can.put(x, yy + o, c)
+                flat[yy + o, x] = o == 0
+            if o:
+                top[(k, x)] = y + 1 + o
+            o_prev = o
+    return flat, top
+
+
+def _shadow(can, flat, pts, k=0.72):
+    for x, y in pts:
+        if 0 <= x < FW and 0 <= y < FH and flat[y, x] and X0 <= x < X1 and Y0 <= y < Y1:
+            can.put(x, y, mul(can.get(x, y), k))
+            flat[y, x] = False            # never shaded twice
+
+
+def _splinter(can, x, y, side, n=2, old=False):
+    """A snapped end's splinters: n px of pale wood sticking out `side`, tapering, a shade
+    pixel under each."""
+    tip = mix(PALE_UNDER, DEAD[2], 0.3) if old else FRESH[4]
+    for i in range(n):
+        can.put(x + side * i, y, tip if i == n - 1 else mul(tip, 0.88))
+        can.put(x + side * i, y + 1, mul(can.get(x + side * i, y + 1), 0.6))
+
+
 def paint_b1(can):
-    """THE PATH'S END (round 3): every plank row of the block is a wet board sunk a pixel
-    (two where the snapped board's halves tip into the break), laid column by column the
-    way a stepped floor lies, far boards first:
-      * the gap on a sunk board's top edge (HOLE[0]), and under it one row of the sound
-        board above's own face in deep shade (WOOD_DEEP) where that board stands higher;
-      * the board itself cupped: its first row lit (x1.1), its second the trough (x0.9);
-      * where a sound board below meets it, that board's top arris lit (x1.15), the step's
-        lip catching the light; the sound board right of a run's end lit on its end column,
-        the sunk board's first column in the left neighbour's shadow (HOLE[2]);
-      * a split along the grain on two of the boards;
-      * the snapped board OPEN between its two halves: a slot down to the earth (the far
-        rim's cut HOLE[0], a 2-row shadow band HOLE[1] / HOLE[2], wet earth WETE[2] / WETE[3]
-        with one lit clod, the near rim's lip), each half tipped down toward the break and
-        ending in pale splinters (FRESH[4] / PALE_UNDER) pointing into it."""
+    """THE PATH'S END (round 4: the 1-px sink read as tape). The joist under the path's end
+    gave way and the boards over it dropped into a dish, drawn the way an inset reads: every
+    board of the block keeps its place but lies in the dish's shade (wet, a step darker, the
+    middle boards two), the step down from the sound boards round it a dark opening along
+    its far edge (the sound board's face over it), the sound boards' arrises lit along its
+    near edge, the dish's left ends in the shade of the step, its right ends lit (they face
+    the window). The damage on the boards themselves:
+      * the first board of the second row SNAPPED: a slot down to the wet earth between its
+        halves, each half tipped into it (its ends darker), pale splinters pointing in;
+      * the last board of the third row SEESAWED on the broken joist: its right end stands
+        1-2 px up off the floor (lit top and end grain, its face and the dark under it, its
+        shadow on the board right of it);
+      * its joints opened (dark), two boards split along the grain, two nails pulled proud."""
     R = _runs("b1")
     ks = sorted(R)
-    k_snap = ks[1]
-    x0s, x1s, _ = R[k_snap]
-    slot = (x0s + 3, x0s + 13)                       # the opened break (its first board)
     snap = can.rgb.copy()
+    k_snap = ks[1]
+    bk = 121                                          # the break in the snapped board
+    see_k, see_a, see_b = ks[2], 124, 140             # the seesaw board
 
-    def off(k, x):
-        if k not in R or not (R[k][0] <= x < R[k][1]):
-            return 0
-        if k == k_snap and slot[0] - 2 <= x < slot[1] + 2:
-            return 2                                 # the halves, tipped into the break
-        return 1
+    def sunk(k, x):
+        return k in R and R[k][0] <= x < R[k][1]
 
-    def sound(x, y):
+    def deep(k, x):                                   # the dish: 2 under the path, 1 round it
+        a = jx(k) + 16 * ((x - jx(k)) // 16)
+        return 2 if abs(a + 8 - 126) < 14 else 1
+
+    def sc(x, y):
         return tuple(int(v) for v in snap[y, x])
 
-    xs0 = min(r[0] for r in R.values()) - 1
-    xs1 = max(r[1] for r in R.values()) + 1
-    for x in range(xs0, xs1 + 1):
-        for k in range(ks[0], ks[-1] + 2):
-            o, prev = off(k, x), off(k - 1, x)
-            if o == 0 and prev == 0:
-                continue
-            y = 4 * k
-            if k == k_snap and slot[0] <= x < slot[1]:
-                continue                             # the slot, painted below
-            n = o - prev
-            for i in range(max(0, n)):               # the face of the board above
-                can.put(x, y + prev + i, WOOD_DEEP if i == n - 1 else WOOD_FACE)
-            if o > prev:
-                can.put(x, y + o, HOLE[0])           # the gap at the sunk board's top
-            elif o < prev:
-                can.put(x, y + o, mul(sound(x, y + 1), 1.15))   # the sound board's arris
-            elif o:
-                can.put(x, y + o, HOLE[1])           # two sunk boards: the seam opened
-            if o == 0:
-                for r_ in (1, 2, 3):                 # a sound board (its arris above)
-                    can.put(x, y + r_, sound(x, y + r_))
-                continue
-            for r_ in (1, 2, 3):
-                c = _sunk_col(snap, x, y + r_)
-                c = mul(c, 1.1) if r_ == 1 else mul(c, 0.9) if r_ == 2 else c
-                can.put(x, y + r_ + o, c)
-    # the ends of each run: the sound board beyond lit on its end, the sunk one in its lee
-    for k, (x0, x1, hh) in R.items():
+    xs0 = min(r[0] for r in R.values())
+    xs1 = max(r[1] for r in R.values())
+    for k in ks:
+        x0, x1, hh = R[k]
         y = 4 * k
+        for x in range(x0, x1):
+            d = deep(k, x)
+            far_open = not sunk(k - 1, x)
+            # the seam row: the step's dark opening, or an opened seam between two sunk boards
+            can.put(x, y, mix(GAP, sc(x, y), 0.25) if far_open else mul(sc(x, y), 0.6))
+            if far_open:                              # the sound board's face over the step
+                can.put(x, y - 1, mul(sc(x, y - 1), 0.7), free=True)
+            for r_ in (1, 2, 3):
+                c = mix(mul(sc(x, y + r_), 0.84 if d == 1 else 0.72), DEAD[0], 0.12)
+                if r_ == 1:
+                    c = mul(c, 0.78 if far_open else 0.9)
+                if is_jt(x, k):
+                    c = mul(sc(x, y + r_), 0.55)      # the joint opened
+                can.put(x, y + r_, c)
+            if not sunk(k + 1, x):                    # the near sound board's arris, lit
+                can.put(x, y + 4, mul(sc(x, y + 5), 1.3))
         for r_ in (1, 2, 3):
-            if off(k - 1, x1) == 0 or r_ > 1:
-                can.put(x1, y + r_, mul(sound(x1, y + r_), 1.12))
-            can.put(x0, y + r_ + 1, HOLE[2])
-    # splits along the grain (the wet wood checked)
-    for k, sx, n in ((ks[0], R[ks[0]][0] + 3, 6), (ks[2], R[ks[2]][0] + 5, 7)):
-        y = 4 * k + 1
+            can.put(x0, y + r_, mul(sc(x0, y + r_), 0.55))        # in the step's shade
+            can.put(x1, y + r_, mul(sc(x1, y + r_), 1.26))        # lit, facing the window
+    # two splits along the grain, a lit lip over each
+    for k, sx, n in ((ks[0], R[ks[0]][0] + 5, 7), (ks[2], R[ks[2]][0] + 4, 8)):
+        y = 4 * k
         for i in range(n):
-            can.put(sx + i + (1 if i >= n - 2 else 0), y + 2, HOLE[1])
-            can.put(sx + i, y + 1, mul(_sunk_col(snap, sx + i, y), 1.18))
-    # the slot: the snapped board opened down to the wet earth
+            yy = y + 2 + (1 if i >= n - 3 else 0)
+            can.put(sx + i, yy, mul(sc(sx + i, yy), 0.42))
+            can.put(sx + i, yy - 1, mul(sc(sx + i, yy - 1), 0.98))
+    # the snapped board: the slot to the wet earth, the halves tipped into it
     y = 4 * k_snap
-    a, b = slot
-    rows = [HOLE[0], HOLE[1], HOLE[2], WETE[3], WETE[4]]
-    for x in range(a, b):
-        for i, c in enumerate(rows):
-            can.put(x, y + i, c)
-        can.put(x, y + len(rows), EDGE_LIP)          # the near rim's lip
-    for cx in (a + 4, a + 5, a + 6):                 # one clod, lit top-left, shade under
-        can.put(cx, y + 3, WETE[5])
-    can.put(a + 4, y + 3, mul(WETE[5], 1.25))
-    for cx in (a + 5, a + 6, a + 7):
-        can.put(cx, y + 4, WETE[2])
-    can.put(a, y + 3, FRESH[4])                      # the left half's broken end: a
-    can.put(a + 1, y + 3, PALE_UNDER)                # 2-px tongue, its shade under it
-    can.put(a, y + 4, FRESH[3])
-    can.put(a + 1, y + 4, HOLE[0])
-    can.put(b - 1, y + 4, FRESH[4])                  # the right half's: one short splinter
+    lo, hi = bk - 1, bk + 2
+    for x in range(lo, hi):
+        for r_, c in enumerate((GAP_DEEP, HOLE[0], WETE[3], WETE[4])):
+            can.put(x, y + r_, c)
+    can.put(bk, y + 3, WETE[5])                       # one wet clod, lit
+    for x, k_ in ((lo - 1, 0.5), (lo - 2, 0.62), (hi, 0.5), (hi + 1, 0.62)):
+        for r_ in (1, 2):
+            can.put(x, y + r_, mul(sc(x, y + r_), k_))
+    _splinter(can, lo, y + 2, 1, 1)
+    can.put(lo - 1, y + 3, FRESH[3])
+    _splinter(can, hi - 1, y + 1, -1, 2)
+    # the seesaw: its right end up off the floor, 1 px then 2
+    y = 4 * see_k
+    for x in range(see_a + 9, see_b):
+        L = 1 if x < see_a + 12 else 2
+        for r_ in (0, 1, 2, 3):
+            c = sc(x, y + r_)
+            c = mul(c, 1.16) if r_ == 0 else mul(c, 1.12 if r_ == 1 else 1.04)
+            can.put(x, y + r_ - L, c)
+        can.put(x, y + 4 - L, mul(sc(x, y + 3), 0.62))            # its face
+        for i in range(1, L):
+            can.put(x, y + 4 - L + i, GAP)                        # the dark under it
+    for r_ in (0, 1, 2):
+        can.put(see_b - 1, y + r_ - 1, mul(sc(see_b - 1, y + r_), 1.26))   # its end grain
+    for x, yy in ((see_b, y + 1), (see_b, y + 2), (see_b, y + 3), (see_b + 1, y + 2),
+                  (see_b + 1, y + 3)):
+        can.put(x, yy, mul(sc(x, yy), 0.7))                       # its shadow
+    # the first row's joint torn open: a 2-px gap down to the dark, a splinter off its left
+    y = 4 * ks[0]
+    jt = jx(ks[0]) + 16 * ((R[ks[0]][0] + 16 - jx(ks[0])) // 16)
+    for x in (jt - 1, jt):
+        for r_, c in ((1, GAP_DEEP), (2, HOLE[0]), (3, GAP)):
+            can.put(x, y + r_, c)
+    _splinter(can, jt - 2, y + 2, 1, 1)
+    can.put(jt + 1, y + 1, mul(sc(jt + 1, y + 1), 1.2))
+    # two nails pulled proud where the boards tore off their joist
+    for nx, k_ in ((R[ks[0]][0] + 2, ks[0]), (R[ks[2]][0] + 2, ks[2])):
+        ny = 4 * k_ + 1
+        can.put(nx, ny, NAIL_HI)
+        can.put(nx, ny + 1, NAIL)
+        can.put(nx + 1, ny + 1, mul(sc(nx + 1, ny + 1), 0.6))
 
 
 def paint_b2(can):
-    """THE SILL ROT (round 2, redrawn: the crease broke across the grain). The open part is
-    the hole H5 (painted with the other holes); here only the row-200 board over it, snapped
-    in the middle: its halves tipped into the gap (left x0.88 then x0.75 toward the break,
-    right x0.82 then lit x1.1 at its far end), a 2-px dark wedge, splinters at both ends."""
+    """THE SILL ROT (round 4: the snapped board read flat). The open part is the hole H5
+    (painted with the other holes); here the row-200 board over it, SNAPPED in the middle
+    where the sill gave way: each half tipped down into the break (darker toward it, its seam
+    opened over it, its near end in the hole's shade), the V between them open down to the
+    earth of H5 (dark, wet earth at its foot), pale splinters off both halves pointing in;
+    the ends it pulled away from opened dark on the left, lit on the right."""
     y = 200
     x0, x1, brk = 84, 100, 91
+    snap = can.rgb.copy()
+
+    def sc(x, yy):
+        return tuple(int(v) for v in snap[yy, x])
+
     for x in range(x0, x1):
-        for r_ in range(4):
-            c = floor_c(x, y + r_)
-            if r_ == 0:                                     # its seam, opened a little
-                can.put(x, y, mul(c, 0.7) if brk - 1 <= x <= brk + 2 else c)
-                continue
-            if x < brk:
-                c = mul(c, 0.88 if x < brk - 3 else 0.75)
-            elif x > brk + 1:
-                c = mul(c, 0.82 if x < x1 - 4 else 1.1)
-            else:
-                c = HOLE[0] if not (x == brk + 1 and r_ == 3) else HOLE[1]
-            can.put(x, y + r_, c)
-    can.put(brk - 1, y + 1, FRESH[4])
-    can.put(brk - 1, y + 2, FRESH[3])
-    can.put(brk + 2, y + 1, FRESH[4])
-    for r_ in (1, 2, 3):                                    # the ends it pulled away from
-        can.put(x0, y + r_, mul(floor_c(x0, y + r_), 0.62))
-        can.put(x1 - 1, y + r_, mul(floor_c(x1 - 1, y + r_), 0.62))
+        dist = brk - 1 - x if x < brk else x - brk - 2   # px from the V's lips
+        if brk <= x <= brk + 1:
+            for r_, c in enumerate((GAP_DEEP, HOLE[0], MUD[2], MUD[3])):
+                can.put(x, y + r_, c)                  # the V, open to the earth below
+            continue
+        tip = 0.6 if dist <= 1 else 0.74 if dist <= 3 else 0.88
+        can.put(x, y, mul(sc(x, y), 0.55 if dist <= 2 else 0.8))      # the seam opened
+        for r_ in (1, 2, 3):
+            k = tip * (1.1 if r_ == 1 else 1.0 if r_ == 2 else 0.86)
+            can.put(x, y + r_, mul(sc(x, y + r_), k))
+    for xx, yy, c in ((brk - 1, y + 1, FRESH[4]), (brk - 1, y + 2, FRESH[3]),
+                      (brk + 2, y + 1, FRESH[4]), (brk + 2, y + 2, PALE_UNDER),
+                      (brk + 3, y + 1, FRESH[3])):
+        can.put(xx, yy, c)                            # splinters pointing into the V
+    for r_ in (1, 2, 3):                              # the ends it pulled away from
+        can.put(x0, y + r_, mul(sc(x0, y + r_), 0.58))
+        can.put(x1 - 1, y + r_, mul(sc(x1 - 1, y + r_), 1.16))
 
 
 B3_LIFT = {8: 1, 9: 1, 10: 2, 11: 3, 12: 4, 13: 4, 14: 3, 15: 2, 16: 2, 17: 1, 18: 1}
-B3_TONE = {"far": 0.9, "ridge": 1.1, "near": 1.0}
-B3_FACE = {1: (WOOD_FACE,), 2: (WOOD_FACE, WOOD_DEEP), 3: (WOOD_FACE_HI, WOOD_FACE, WOOD_DEEP),
-           4: (WOOD_FACE_HI, WOOD_FACE, WOOD_FACE, WOOD_DEEP)}
+B3_TONE = {"far": 0.86, "ridge": 1.1, "near": 1.0}
 
 
 def paint_b3(can):
-    """THE TENTED BOARDS (round 3): swelled up off their joists in a hump along the gable
-    wall, each board the floor's own (damp) wood lifted whole, 1 px on the outer rows to 4 on
-    the ridge (rows 48..55). Laid column by column, far boards first, as the hump stands:
-      * a board rising over the one above leaves a 2-px crevice on its top edge (HOLE[1]
-        over HOLE[2]): the far slope's boards crowd and lose rows to it;
-      * a board standing higher than the one below shows its face under itself, turned
-        down (WOOD_FACE_HI / WOOD_FACE / WOOD_DEEP, as tall as the drop), then a 1-px HOLE[0]
-        crevice; where the board below is the flat floor, a row of shadow on it (x0.75);
-      * every lifted board's top row lit a step (x1.14), its body at its slope's tone (far
-        x0.9, ridge x1.1, near x1.0): the ridge is the lightest thing in the hump;
-      * moss only in the crevices; no INK anywhere (boards are not objects);
-      * a run's end: the lifted board stops, its shadow a column on the flat board right of
-        it (x0.75), a pale splinter where it snapped off the rest of its board."""
+    """THE TENTED BOARDS (round 4: the 2-px black crevices read as ink-ringed stripes). The
+    gable wall's damp swelled the boards against it until they rose off their joists in a
+    hump, 1 px on its outer rows to 4 on the ridge (rows 48..55), each board the floor's own
+    damp wood lifted WHOLE. Laid by `relief`, so nothing is outlined: the far slope's boards
+    crowd (each hides the last rows of the one beyond, darker: they face away), the ridge is
+    the lightest wood in the hump, and down the near slope each board shows the brown front
+    face of the one above it. Where the two ridge boards meet, their seam opened along the
+    peak, moss in it. Each run's END stands up off the floor: the lifted board's end grain
+    lit, its face and the dark under it down to the boards, a pale splinter where it tore off
+    the rest of its board, and its SHADOW falling right and down on the flat boards (the
+    window is on this wall)."""
     R = _runs("b3")
     snap = can.rgb.copy()
-
-    def lift(k, x):
-        if k not in R or not (R[k][0] <= x < R[k][1]):
-            return 0
-        return B3_LIFT.get(k, 1)
-
-    def base_c(x, y):
-        return tuple(int(v) for v in snap[y, x])
-
     ks = sorted(R)
-    for x in range(X0, max(r[1] for r in R.values()) + 2):
-        for k in range(ks[0], ks[-1] + 2):
-            L, Lp, Ln = lift(k, x), lift(k - 1, x), lift(k + 1, x)
-            if not L:
-                continue
-            y = 4 * k
-            slope = "far" if k < 12 else "ridge" if k <= 13 else "near"
-            tone = B3_TONE[slope]
-            mossy = hsh(x // 3, k, 46) < 0.35
-            if L > Lp:                               # rising over the board above
-                can.put(x, y - L - 1, HOLE[1])
-                can.put(x, y - L, (MOSS[1] if x % 3 else MOSS[2]) if mossy else HOLE[2])
-            else:                                    # under the face of the one above
-                can.put(x, y - L, (MOSS[0] if x % 2 else MOSS[1]) if mossy else HOLE[0])
-            for r_ in (1, 2, 3):
-                c = mul(base_c(x, y + r_), tone)
-                if r_ == 1:
-                    c = mul(base_c(x, y + r_), tone * 1.14)
-                can.put(x, y + r_ - L, c)
-            n = L - Ln
-            if n > 0:
-                for i, c in enumerate(B3_FACE[min(4, n)]):
-                    can.put(x, y + 4 - L + i, c)
-                if Ln == 0:                          # meeting the flat floor
-                    can.put(x, y + 4, HOLE[0])
-                    can.put(x, y + 5, mul(base_c(x, y + 5), 0.75))
-    for k in ks:                                     # each run's end
+
+    def end(k):                                      # a snapped end leaves 2 px to its splinter
+        x0, x1, hh = R[k]
+        return x1 - 2 if (not is_jt(x1, k) and x1 - x0 > 8) else x1
+
+    def off(k, x):
+        if k not in R or not (R[k][0] <= x < end(k)):
+            return 0
+        L = B3_LIFT.get(k, 1)
+        if L >= 3:                                   # its long end sags toward the floor
+            L -= min(L - 2, max(0, x - (end(k) - 11)) // 5)
+        return -L
+
+    def tone(k, x, r_, c):
+        slope = "far" if k < 12 else "ridge" if k <= 13 else "near"
+        t = B3_TONE[slope]
+        if r_ == 1:
+            t *= 1.12
+        if end(k) - x <= 1:
+            t *= 1.12                                 # its end grain
+        return mul(c, t)
+
+    xs = range(X0, max(r[1] for r in R.values()) + 2)
+    flat, top = relief(can, off, snap, tone, xs, (ks[0], ks[-1]))
+    # the ridge: the two top boards' seam opened along the peak, moss in it
+    y = 4 * 13 + off(13, X0)
+    for x in range(X0, min(R[12][1], R[13][1]) - 2):
+        c = GAP if hsh(x // 2, 13, 47) < 0.6 else (MOSS[1] if x % 3 else MOSS[2])
+        can.put(x, y, c)
+    # each run's end: its end grain, the dark under it, its splinter, its shadow
+    for k in ks:
         x0, x1, hh = R[k]
         y = 4 * k
-        L = lift(k, x1 - 1)
-        for r_ in (1, 2, 3):
-            if not lift(k, x1):
-                can.put(x1, y + r_, mul(base_c(x1, y + r_), 0.75))
-        if not is_jt(x1, k):
-            can.put(x1, y + 2 - L, PALE_UNDER)       # where it snapped off the rest
-            can.put(x1, y + 3 - L, mul(base_c(x1, y + 3), 0.75))
+        x1 = end(k)
+        e = x1 - 1
+        L = -off(k, e)
+        # down its end the dark under the board, to the flat boards (if the next row is not
+        # lifted here too, `relief` drew the face; past the next row's end it is open)
+        if off(k + 1, e) == 0:
+            for i in range(1, L):
+                can.put(e, y + 4 - L + i, GAP)
+        if x1 < R[k][1]:                              # inside the block, tapering off its end
+            _splinter(can, x1, y + 2 - L, 1, 2, old=True)
+            can.put(x1, y + 3 - L, mul(snap[y + 3, x1].tolist(), 0.9))
+        sh = [(x1 + i, y + r_) for i in range(max(1, (L + 1) // 2)) for r_ in (1, 2, 3)]
+        sh += [(x1 + (L + 1) // 2, y + r_) for r_ in (2, 3)]
+        _shadow(can, flat, sh)
+    # the hump's near foot: its shadow on the first flat row under each column
+    for x in xs:
+        for k in range(ks[-1] + 1, ks[0] - 1, -1):
+            if off(k, x) == 0 and off(k - 1, x) < 0:
+                _shadow(can, flat, [(x, 4 * k + 1)], 0.78)
 
 
 def relay_dish(R: Relay, hole):
@@ -909,28 +1026,61 @@ class Hole:
             for x in range(FW):
                 if not self.m[y, x]:
                     continue
-                if self.face[y, x]:                 # the far rim's cut, an INK edge
-                    c = FRESH[1] if self.sawn else INK
+                if self.face[y, x]:                 # the far rim's cut: the board's face
+                    c = FRESH[1] if self.sawn else mul(floor_c(x, max(0, y - 1)), 0.5)
                     can.put(x, y, c)
                     continue
                 d = self.depth[y, x]
-                if d < self.band:
-                    c = HOLE[1] if self.steps is None else HOLE[self.steps[0]]
+                if d < self.band:                   # the shadow band under the far rim
+                    c = HOLE[min(d, 2)] if self.steps is None else (HOLE[0] if d == 0 else self.earth[1])
                     if self.band_in_beam is not None:
                         c = self.band_in_beam[min(d, len(self.band_in_beam) - 1)]
-                        if self.lit and BEAM[y, x] > 0.42:
-                            c = HOLE[max(0, HOLE.index(c) - 1)]
                 else:
                     side = (not self.m[y, x - 1]) or (x + 1 < FW and not self.m[y, x + 1])
                     side = side and X0 <= x - 1 and x + 1 < X1
                     c = HOLE[0] if side else E[self.earth_idx(x, y)]
                 can.put(x, y, c)
-        for x in range(FW):                       # the near rim's lip
+        for x in range(FW):                       # the near rim's lip, its arris lit
             for y in range(FH - 1):
                 if self.m[y, x] and not self.m[y + 1, x] and y + 1 < Y1:
                     can.put(x, y + 1, FRESH[1] if self.sawn else EDGE_LIP)
+                    if not self.sawn and y + 2 < Y1 and not self.m[y + 2, x] and (y + 2) % 4:
+                        can.put(x, y + 2, mul(floor_c(x, y + 2), 1.1))
+        if not self.sawn:
+            self.rim(can)
 
-    def texture(self, can: Can, clods=1.0, pebbles=1.0, roots=2, crumbs=1.0, sheen=0):
+    def rim(self, can: Can):
+        """Round 4 (critics: no splinters, no end grain on the sun hole's rim): the far rim is
+        BROKEN, not cut. Every 6-11 px along it the board above hangs a tooth 1 px further
+        into the hole (its own wood, lit at its end), and between teeth a pale splinter
+        points down into the shadow band, a shade pixel beside it."""
+        r = random.Random(self.seed * 13 + 5)
+        tip = mix(PALE_UNDER, DEAD[2], 0.35) if self.old else FRESH[4]
+        for y in range(Y0 + 1, FH - 3):
+            xs = [x for x in range(FW) if self.face[y, x]]
+            if not xs:
+                continue
+            x = xs[0] + r.randint(1, 4)
+            while x < xs[-1] - 1:
+                if self.face[y, x] and self.interior[y + 1, x]:
+                    if r.random() < 0.5:                        # a tooth, 2-3 px
+                        w = r.choice((2, 3))
+                        for i in range(w):
+                            xx = x + i
+                            if not (self.face[y, xx] and self.interior[y + 1, xx]):
+                                break
+                            can.put(xx, y, mul(floor_c(xx, y - 1), 1.1 if i == 0 else 0.96))
+                            can.put(xx, y + 1, mul(floor_c(xx, y - 1), 0.5))
+                        x += w
+                    else:                                       # a splinter
+                        can.put(x, y + 1, tip)
+                        if r.random() < 0.5 and self.interior[y + 2, x]:
+                            can.put(x, y + 2, mul(tip, 0.8))
+                        if self.interior[y + 1, x + 1]:
+                            can.put(x + 1, y + 1, HOLE[0])
+                x += r.randint(6, 11)
+
+    def texture(self, can: Can, clods=1.0, pebbles=1.0, roots=2, crumbs=1.0, sheen=0, big=False):
         """Round 2: on the flat base, CLODS (2x1 to 3x2: a body one step up, one lit pixel on
         its top, one shade pixel under it) and PEBBLES (2x1 stone, an INK pixel under). They
         keep 2 px apart; no lone mid-tone pixels. Roots hang off the far wall."""
@@ -952,23 +1102,29 @@ class Hole:
                     return False
             return True
 
-        tries = int(area / 22 * clods) + 2
+        tries = int(area / (80 if big else 22) * clods) + 2
+        sizes = ((4, 2), (5, 2), (5, 3), (6, 2), (3, 2)) if big else \
+            ((3, 1), (2, 2), (3, 2), (3, 2), (4, 2))
         for _ in range(tries * 3):
             if tries <= 0:
                 break
             x, y = r.randint(x0, x1), r.randint(y0, y1)
-            w, hh = r.choice(((3, 1), (2, 2), (3, 2), (3, 2), (4, 2)))
+            w, hh = r.choice(sizes)
             body = [(x + i, y + j) for i in range(w) for j in range(hh)]
-            under = [(x + i, y + hh) for i in range(1, w)]
+            if big:                                    # a rounded lump, not a brick
+                body = [(bx, by) for bx, by in body
+                        if not ((bx in (x, x + w - 1)) and (by in (y, y + hh - 1)))]
+            under = [(x + i, y + hh) for i in range(1, w - (1 if big else 0))]
             if not free(body + under):
                 continue
             tries -= 1
             e = self.earth_idx(x, y)
             for bx, by in body:
                 can.put(bx, by, E[clampi(e + 1, 0, len(E) - 1)])
-            can.put(x, y, E[clampi(e + 2, 0, len(E) - 1)])                 # lit top-left
-            if w >= 3:
-                can.put(x + 1, y, E[clampi(e + 2, 0, len(E) - 1)])
+            if not big:
+                can.put(x, y, E[clampi(e + 2, 0, len(E) - 1)])             # lit top-left
+            for i in range(1, (w - 2) if big else (2 if w >= 3 else 1)):
+                can.put(x + i, y, E[clampi(e + 2, 0, len(E) - 1)])
             for ux, uy in under:                                            # its shade
                 can.put(ux, uy, E[clampi(e - 1, 0, len(E) - 1)] if e > 0 else HOLE[0])
             for bx, by in body + under:
@@ -985,8 +1141,8 @@ class Hole:
             lit = 1 if (self.lit and BEAM[y, x] > 0.42) else 0
             can.put(x, y, STONE[2 + lit])
             can.put(x + 1, y, STONE[1 + lit])
-            can.put(x, y + 1, INK)
-            can.put(x + 1, y + 1, INK)
+            can.put(x, y + 1, STONE[0] if big else INK)
+            can.put(x + 1, y + 1, HOLE[0] if big else INK)
             for px, py in pts:
                 taken[py, px] = True
         tops = [(x, y) for y in range(1, FH) for x in range(FW)
@@ -1000,12 +1156,15 @@ class Hole:
             if any(abs(x - u) < 5 for u in used):
                 continue
             used.append(x)
-            n = r.randint(3, 5)
-            for i in range(n):
+            n = r.randint(3, 5) + (2 if self.steps is not None else 0)
+            rx, drift = x, r.choice((-1, 1))
+            for i in range(n):                  # a root hanging off the far rim, wandering
                 yy = y + i
-                if not self.interior[yy, x]:
+                if i >= 3 and i % 2 == 1 and r.random() < 0.6:
+                    rx += drift
+                if not self.interior[yy, rx]:
                     break
-                can.put(x, yy, ROOT[0] if i < self.band else ROOT[1] if i < n - 1 else ROOT[0])
+                can.put(rx, yy, ROOT[0] if i < self.band else ROOT[1] if i < n - 1 else ROOT[0])
 
     def ragged(self, can: Can, n):
         """Break the near rim: `n` snapped teeth of the near board standing up into the hole
@@ -1035,10 +1194,51 @@ class Hole:
                         c = mix(c, DEAD[2], 0.3)
                     can.put(x + i, y - j, c)
                 if self.interior[y - hgt, x + i]:
-                    can.put(x + i, y - hgt, INK)
+                    can.put(x + i, y - hgt, HOLE[0])
             for xx in (x - 1, x + w):
                 if self.interior[y, xx]:
-                    can.put(xx, y, INK)
+                    can.put(xx, y, HOLE[0])
+
+    def shards(self, can: Can, n):
+        """Round 4: a few long splinters off snapped board ends (never off a joint): 3-4 px
+        of the board's wood running out into the hole to a pale point, a step down on the
+        way, the hole's shade under every pixel of it."""
+        r = random.Random(self.seed * 91 + 3)
+        tip = mix(PALE_UNDER, DEAD[2], 0.35) if self.old else FRESH[4]
+        cands = []
+        for y, x0, x1, hh in self.runs:
+            k = y // 4
+            for side, xe in ((-1, x0), (1, x1)):
+                bx = xe - 1 if side < 0 else xe
+                if not (X0 <= bx < X1) or is_jt(xe, k) or is_jt(bx, k):
+                    continue
+                cands.append((y + 2, side, bx))
+        r.shuffle(cands)
+        done = []
+        for rr, side, bx in cands:
+            if len(done) >= n:
+                break
+            if any(abs(rr - d) < 6 for d in done):
+                continue
+            x = bx - side                              # walk to the earth's first pixel
+            while self.inside(x, rr) and not self.interior[rr, x]:
+                x -= side
+            while 0 <= x < FW and not self.inside(x, rr):
+                x -= side
+            if not (self.inside(x, rr) and self.interior[rr, x]):
+                continue
+            L = r.choice((3, 4, 5)) if not self.old else r.choice((3, 4))
+            pts = [(x - side * i, rr + (1 if i >= L - 1 else 0)) for i in range(L)]
+            if not all(self.inside(px, py) and self.interior[py, px] and self.depth[py, px] >= 1
+                       for px, py in pts):
+                continue
+            wood = floor_c(bx, rr)
+            for i, (px, py) in enumerate(pts):
+                c = mul(wood, 1.06) if i < L - 2 else (mix(wood, tip, 0.5) if i == L - 2 else tip)
+                can.put(px, py, c)
+                if self.inside(px, py + 1) and self.interior[py + 1, px]:
+                    can.put(px, py + 1, HOLE[0])
+            done.append(rr)
 
     def ends(self, can: Can):
         """Board ends at the hole (round 2). Sawn (stage-2 cores): square, pale end grain.
@@ -1067,11 +1267,12 @@ class Hole:
                 old = self.old
                 if joint:                           # the board came out whole at its joint:
                     for j, rr in enumerate(rows):   # a column of end grain, a nail hole
-                        can.put(bx, rr, base.RAFTER[1] if j < len(rows) - 1 else base.RAFTER[0])
+                        g = mul(floor_c(bx, rr), 1.1 if j == 0 else 0.92 if j == len(rows) - 1 else 1.0)
+                        can.put(bx, rr, mix(g, DEAD[2] if old else FRESH[3], 0.3))
                         ix = bx - side
-                        if self.inside(ix, rr) and self.interior[rr, ix]:
-                            can.put(ix, rr, INK)
-                    can.put(bx + side, rows[len(rows) // 2], HOLE[0])
+                        if side < 0 and self.inside(ix, rr) and self.interior[rr, ix]:
+                            can.put(ix, rr, HOLE[0])
+                    can.put(bx + side, rows[len(rows) // 2], mul(floor_c(bx + side, rows[len(rows) // 2]), 0.62))
                     continue
                 # snapped (round 3): the plank's wood carried 0-3 px further than its
                 # neighbours (so the rim does not step by the same amount row after row),
@@ -1098,17 +1299,16 @@ class Hole:
                         if old:
                             wc = mix(wc, DEAD[1], 0.2)
                         if j == tongue and i >= n - 1 and n >= 2:
-                            wc = tip_c if i == n else WOOD_FACE
+                            wc = tip_c if i == n else mul(wc, 1.08)
                         can.put(sx, rr, wc)
                     ex = bx - side * n
                     if not (j == tongue and n >= 2):
-                        g = mul(floor_c(bx, rr), 1.12)
-                        if old:
-                            g = mix(g, DEAD[2], 0.33)
+                        g = mul(floor_c(bx, rr), 1.16)       # the end grain, a step up
+                        g = mix(g, DEAD[3], 0.3) if old else mix(g, FRESH[4], 0.3)
                         can.put(ex, rr, g)
                     ix = ex - side
-                    if self.inside(ix, rr) and self.interior[rr, ix]:
-                        can.put(ix, rr, INK if not (j == tongue and n >= 2) else HOLE[0])
+                    if side < 0 and self.inside(ix, rr) and self.interior[rr, ix]:
+                        can.put(ix, rr, HOLE[0])
                     if j == tongue and n >= 2:      # the shade under the tongue
                         below = rr + 1
                         nb = lens[j + 1] if j + 1 < len(lens) else 0
@@ -1165,16 +1365,17 @@ def joist(can, hole: Hole, x0, w, kind="old", end=None, seed=1, shade=1):
 
 # ------------------------------------------------------------------ the holes
 
-H1 = Hole(runs_of(FEAT["h1"]["block"]), DRY, 2, seed=11, lit=True, shade_len=3, lit_cap=3,
+H1 = Hole(runs_of(FEAT["h1"]["block"]), DRY, 3, seed=11, lit=True, shade_len=3, lit_cap=3,
           lit_most=0, lift=-1)
-H1.band_in_beam = (HOLE[1], HOLE[2])
-H2 = Hole(runs_of(FEAT["h2"]["block"]), WETE, 2, seed=22, old=True)
-H2.steps = (0, 2, 3, 4)
-H3 = Hole(runs_of(FEAT["h3"]["block"]), WETE, 2, seed=33, lift=1, old=True)
-H3.steps = (0, 3, 4, 5)
+H1.band_in_beam = (HOLE[0], HOLE[1], HOLE[2])
+H2 = Hole(runs_of(FEAT["h2"]["block"]), MUD, 2, seed=22, old=True)
+H2.steps = (0, 2, 3, 3)
+H3 = Hole(runs_of(FEAT["h3"]["block"]), MUD, 2, seed=33, lift=1, old=True)
+H3.steps = (0, 2, 3, 3)
 H4 = Hole(runs_of(FEAT["h4"]["block"]), ASHMUD, 2, seed=44, old=True)
 # b2, the sill rot: the hole under the snapped row-200 board (its rows 204..213)
-H5 = Hole([r for r in runs_of(FEAT["b2"]["block"]) if r[0] >= 204], DAMP, 2, seed=55, old=True)
+H5 = Hole([r for r in runs_of(FEAT["b2"]["block"]) if r[0] >= 204], MUD, 2, seed=55, old=True)
+H5.steps = (0, 2, 3, 3)
 H1C = Hole(runs_of(FEAT["h1"]["block_s2"]), DAMP, 2, seed=11, lit=True, sawn=True, shade_len=3,
            lit_cap=3, lit_most=1, lift=-1)
 H1C.band_in_beam = (HOLE[1], HOLE[2])
@@ -1571,15 +1772,13 @@ def fresh_board(can, x, y, w, hh, tone=0, level=0.0, seam_old=True, seed=0, dy=0
     """A fresh tan board (or a run of them, joint to joint), the tile's own geometry. `level`
     0 fresh .. 1 the floor's own tone (weathered); `dy` drawn that many px high (dropping)."""
     k = y // 4
-    # round 3: each board its own tone, half a FRESH step either way (0 as cut, 1 a step
-    # darker, 2 paler): a patch is boards, not one sheet of new material
-    if tone == 1:
-        ramp = [mix(c, FRESH[max(0, i - 1)], 0.5) for i, c in enumerate(FRESH)]
-    elif tone == 2:
-        ramp = [mix(c, FRESH[min(5, i + 1)], 0.4) for i, c in enumerate(FRESH)]
-    else:
-        ramp = list(FRESH)
-    lipped = hsh(x, y, seed + 19) < 0.35            # only some boards show a sawn end lip
+    # round 4 (critics: the patches were loud tan stripes competing with the furniture): a
+    # mended board is the floor's own wood a touch warmer and lighter (MEND_BODY, about one
+    # value step over the old boards' (194, 125, 96)), its tone half a step either way; its
+    # seams the old floor's own seam, its joints and grain only a step under its body
+    body = MEND_BODY[tone]
+    joint = mix(body, MEND_SEAM, 0.6)
+    lipped = hsh(x, y, seed + 19) < 0.2             # only a few boards show a sawn end lip
     grain = hsh(x, y, seed + 17) < 0.35
     gx = x + 3 + int(hsh(x, y, seed + 18) * max(1, w - 9))
     for yy in range(y, y + hh):
@@ -1589,15 +1788,15 @@ def fresh_board(can, x, y, w, hh, tone=0, level=0.0, seam_old=True, seed=0, dy=0
                 continue
             pu = (xx - jx(k)) % 16
             if row == 0:
-                c = mix(ramp[1], (116, 68, 46), 0.45) if seam_old else ramp[2]
+                c = MEND_SEAM if seam_old else mix(body, MEND_SEAM, 0.75)
             elif pu == 0 and xx != x:
-                c = ramp[1]                            # the joint between two new boards
+                c = joint                              # the joint between two new boards
             elif pu == 1 and lipped:
-                c = mix(ramp[4], FRESH[5], 0.3)        # a paler sawn end after a joint
+                c = MEND_LIP                           # a paler sawn end after a joint
             else:
-                c = ramp[3]
+                c = body
                 if grain and row == 2 and gx <= xx < gx + 5:
-                    c = mix(ramp[3], ramp[2], 0.6)
+                    c = mix(body, joint, 0.4)
             if level > 0:
                 c = mix(c, floor_c(xx, yy), level)
             can.put(xx, yy - dy, c)
@@ -1605,14 +1804,14 @@ def fresh_board(can, x, y, w, hh, tone=0, level=0.0, seam_old=True, seed=0, dy=0
         for xx in range(x, x + w):
             pu = (xx - jx(k)) % 16
             if pu == 2 and X0 <= xx < X1:
-                c = mix(ramp[1], NAIL, 0.4)
+                c = mix(joint, NAIL, 0.25)
                 if level > 0:
                     c = mix(c, floor_c(xx, y + 2), min(1.0, level * 1.3))
                 can.put(xx, y + 2 - dy, c)
     if gap_end is not None and level < 0.5:
         for yy in range(y + 1, y + hh):
             if yy % 4:
-                can.put(gap_end, yy - dy, mix(FRESH[0], HOLE[1], 0.5))
+                can.put(gap_end, yy - dy, mix(joint, HOLE[1], 0.3))
 
 
 PATCHES = ["f1", "f2", "f3", "f4", "f5", "f6", "f7"]
@@ -1830,10 +2029,10 @@ def build(stage, pool=1.0, stack=True):
         for hole in (H1, H2, H3, H4, H5):
             hole.paint(can)
         H1.texture(can, clods=1.2, pebbles=0.6, roots=3)
-        H2.texture(can, clods=0.9, pebbles=0.25, roots=3, sheen=1)
-        H3.texture(can, clods=0.9, pebbles=0.3, roots=3, sheen=1)
+        H2.texture(can, clods=1.0, pebbles=0.5, roots=4, sheen=1, big=True)
+        H3.texture(can, clods=1.0, pebbles=0.5, roots=4, sheen=1, big=True)
         H4.texture(can, clods=0.6, pebbles=0.5, roots=0)
-        H5.texture(can, clods=1.0, pebbles=1.0, roots=1, sheen=1)
+        H5.texture(can, clods=1.0, pebbles=0.6, roots=2, sheen=1, big=True)
         joist(can, H1, 64, 3, seed=1, shade=2)
         joist(can, H2, 286, 3, end=199, seed=2)
         joist(can, H3, 304, 3, seed=3)
@@ -1844,6 +2043,10 @@ def build(stage, pool=1.0, stack=True):
         paint_h3_moss(can, H3)
         for hole in (H1, H2, H3, H4, H5):
             hole.ends(can)
+        H1.shards(can, 9)
+        H2.shards(can, 4)
+        H3.shards(can, 2)
+        H5.shards(can, 1)
         H4.ragged(can, 4)
         H2.ragged(can, 3)
         debris(can)
@@ -2445,7 +2648,6 @@ LAST_DOWN = 0.8125                                           # lb2 and the stack
 DISSOLVE_TICKS = (0.4375, 0.5, 0.5625, 0.6875)               # the cores' contents go
 POOL_STEPS = (1.0, 0.7, 0.45, 0.2, 0.0)                      # the low corner's pool dries
 POOL_TICKS = (0.4375, 0.5625, 0.6875, 0.8125)                # two ticks apart (round 3)
-STACK_LAND = {"A": 0.6875, "B": 0.75, "saw": LAST_DOWN}      # the stack set down part by part
 SAW_FROM = 0.4375                                            # 2 plank rows a tick from here
 # round 2: the core is never bare. Stage 2's plants stand up from the tick the first weeds
 # under the new boards start to go (.3125) and open from .5; the stage-1 grass inside the
@@ -2582,21 +2784,24 @@ def _up_12(p, ts, under, ctx):
             if dy == 0:
                 can.rgb[sl] = s2[sl][..., :3]
                 can.a[sl] = s2[sl][..., 3] > 0
-    # the stack (round 3): set down part by part, each whole, through _drop_state: A, then B
-    # across it, the saw last; nothing of a part shows before its own drop starts
-    dys, shown = {}, []
-    for part in ST_PARTS:
-        dy, age = _drop_state(p, STACK_LAND[part])
-        if dy is None:
-            continue
-        dys[part] = dy
-        shown.append(part)
-        if dy == 0:
-            sa, sb = {"A": (79, 84), "B": (81, 85), "saw": (87, 90)}[part]   # seeds that puff
-            _puff(ov, 204 if part != "saw" else 209, 197 if part != "saw" else 202, age, sa)
-            _puff(ov, 236 if part != "saw" else 231, 197 if part != "saw" else 202, age, sb)
-    if shown:
-        stack_and_saw(can, tuple(shown), dys)
+    # the stack (round 4, critics: set down part by part, A then B then the saw, it read as
+    # building itself in slices): the two boards and the saw on them fall together as ONE
+    # whole object, 7 px, then 4, then 1 above their place, their shadow on the boards under
+    # them darkening as they come down, and land with a puff at both ends
+    ticks = int(round((STACK_FALL_LAND - p) / DROP))
+    if 0 < ticks <= len(STACK_FALL):
+        dy = STACK_FALL[ticks - 1]
+        sh = STACK_SHADOW
+        k_ = 0.9 if dy >= 7 else 0.82 if dy >= 4 else 0.74
+        can.rgb[sh] = (can.rgb[sh] * k_).astype(np.int32)
+        can.a[sh] = True
+        stack_and_saw(can, ST_PARTS, {part: dy for part in ST_PARTS})
+    elif ticks <= 0:
+        age = (p - STACK_FALL_LAND) * 2.0
+        _puff(ov, 204, 197, age, 79)
+        _puff(ov, 236, 197, age, 84)
+        _puff(ov, 209, 202, age, 87)
+        stack_and_saw(can, ST_PARTS)
     _blit(under, can.image())
     # plants: stage 1's under a landed board are gone; those in the cores wither tips
     # down with the dissolve; the rest (the door's tufts, the leaves) are pulled one by one
@@ -2656,6 +2861,26 @@ def _weather(p, bx, by, keeper, since):
 
 
 ST_PARTS = ("A", "B", "saw")
+STACK_FALL = (1, 4, 7)          # px above its place, 1, 2, 3 ticks before it lands
+STACK_FALL_LAND = 0.75          # (it shows from .5625, off the veil's .625 / .875 steps but one)
+
+
+def _stack_masks():
+    tmp = Can()
+    tmp.a[:] = False
+    stack_and_saw(tmp)
+    m = tmp.a.copy()
+    sh = np.zeros_like(m)          # its shadow: the footprint's lower rows, down-right a px
+    ys, xs = np.nonzero(m)
+    for x, y in zip(xs, ys):
+        if y + 1 < FH and not m[y + 1, x]:
+            for dx in (0, 1):
+                if x + dx < FW:
+                    sh[y + 1, x + dx] = True
+    return m, sh & ~m | m
+
+
+STACK_MASK, STACK_SHADOW = _stack_masks()
 
 
 def _up_23(p, ts, under, ctx):

@@ -2848,10 +2848,15 @@ The room inside the house wears the hut's three stages. Picked off a mockup Rich
 - **Borrowed lakes show stage 3** (the room as it always was), unless `Lake.force_house`.
 - **Known, accepted**: the play-ins are the mockup's, baked; the stage-1 dim and the motes
   assume a middling hour; the shed's prompts are under the stage-1 veil.
-- **Open, from the mockup's critics** (to fix in the modules, then re-bake): broken runs on
-  the door path and by the left wall read as stains, wallpaper streaks odd-shaped, the window
-  puddle too dark, stage 2's patches loud, stage 3's bees and petals small, drips hop a pixel
-  as they let go, the stage-up's saw stack builds in slices.
+- **Fixed off the critics' list** (2026-10-12, one fixer a module, re-baked): broken runs drawn
+  as lifted and sunk wood with lit edges and gaps (`relief`), hole rims splintered with a shadow
+  band and calmer earth (`MUD`), stage 2's patches the floor's own wood a touch warmer, the
+  stage-up's boards and saw dropping whole; water stains as blooms with tide lines and narrowing
+  streaks, the window puddle the lightest water (painted through the stage-1 veil), drips no
+  longer hopping, corner webs instead of the bracket, a visible stage 2 puddle; stage 1's frame
+  thick with dead ivy and moss mats, no green leaf; stage 3 with five striped bees, three
+  butterflies and a visitor, tumbling three-tone petals. **Open**: h1's shadow band is lifted by
+  the sunbeam, h2/h3 clods read a little like bricks up close, stage 3's loop seam is 637 px off.
 - Probe: `tools/shot_house.tscn` (desktop build, own save) saves `tools/last_house_{s1,s2,s3,
   s1_rain,up12,up23}.png` and `last_house.log`. `test_lake`'s `_check_house` guards the sets,
   the holes per stage, blocking, puddles, the latch, the shelf return, the stage-ups once,

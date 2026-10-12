@@ -5,19 +5,23 @@ front sill, the door's jambs and lintel) and what hangs off it: over the lake ou
 frame, down the back wall's paper, into the top of the doorway. Everything is drawn in
 `under` (the furniture covers it where it stands against the walls).
 
-  Stage 1  ABANDONED: dead ivy (base.DEAD) running most of every run: stems in DEAD[0]/[1]
-           in broken pieces, an old trunk 2 px thick at each root (its lit top/left side
-           DEAD[2]), 1-px stubs where leaves fell, brittle twigs (curves turning 45 degrees at
-           most every 3 px, one every 5..14 px), dry leaf pairs (DEAD[3]/[2], on the wood
-           only) every 14..24 px, sparse tangles of bare twigs at the corners and the lintel,
-           curled brown leaves, dry strands over the lake and dead roots dangling into the
-           doorway. MOSS patches (CUSHIONS), the neglected hut's roof moss lying in the
-           wood: flat and ragged, 1-2 px thick (3 at a corner), 3-12 px long, hugging a
-           board against its groove and wicking a pixel into it; MOSS[2] body, MOSS[1] in
-           the crease and at the ends, a scattered MOSS[3] speck; gaps of 6-40 px, now and
-           then two or three touching, longer and thicker toward the corners; over the
-           outer edge only at the two bottom corners; no leaf shapes, so
-           the green leaf first appears with the ivy in stage 2.
+  Stage 1  ABANDONED: dead ivy (base.DEAD) over the whole frame, as overgrown as the
+           neglected hut: the stems in DEAD[0]/[1] in broken pieces, an old trunk 2 px thick
+           at each root (its lit top/left side DEAD[2]), and a second dead runner along each
+           outer run crossing the first (DEAD_STEMS, stage 1 only); 1-px stubs where leaves
+           fell, brittle twigs every 4..10 px (curves turning 45 degrees at most every 3 px),
+           small leaves gone brown (BrownLeaf: DEAD[1] body, DEAD[0] curl, one DEAD[2]),
+           curled leaves and dry pairs (DEAD[3]/[2] on some, on the wood only), tangles of
+           bare twigs at the corners and the lintel, dead strands hanging over the lake, down
+           the paper and into the doorway, each with dry leaves along it. No living green
+           leaf. MOSS mats (_moss_mats): grown off 1-D noise along each board of the
+           moulding, so every mat is its own length and its thickness wobbles across the
+           board; it hugs the crease (or one edge of a stile), bridges or wicks into the
+           groove (MOSS[0]); ragged corner cushions spill a pixel over the outer edge and
+           hang a short drip off the sill; scraps under 6 px dropped (a sliver read as a
+           leaf). Kept dull, the hut's roof moss under the room's dim: MOSS[1] body with
+           lumps of MOSS[2] and dimples of MOSS[0], a broken MOSS[2] lit top edge, MOSS[0]
+           underneath, a rare MOSS[3] spark.
   Stage 2  SEMI-FIXED: the same stems greened (base.LEAF) and grown on from every root (the
            corners, both jambs); leaf clusters at the corners and over the door's lintel;
            strands hanging off the sill and the left side onto the lake; five tendrils over
@@ -438,6 +442,18 @@ STEMS = [
      {1: [(0, 14), (20, 50)], 2: [(0, 30)], 3: [(0, 73)]}),
 ]
 
+# Stage 1 only: a second dead runner along each outer run, crossing the first, so the frame
+# reads as overgrown by the dead ivy the way the neglected hut is: (segments, seed, spans).
+# They drop in the 1 -> 2 play-in (only the first plan lives again).
+DEAD_STEMS = [
+    ([("left", 300, 58)], 111, [(0, 34), (39, 112), (118, 132), (137, 226)]),
+    ([("right", 300, 58)], 112, [(0, 52), (58, 120), (125, 190), (196, 236)]),
+    ([("top", 90, 232)], 113, [(0, 46), (51, 98), (104, 140)]),
+    ([("top", 414, 272)], 114, [(0, 30), (35, 88), (94, 140)]),
+    ([("sill", 89, 252)], 115, [(0, 58), (63, 120), (126, 160)]),
+    ([("sill", 416, 258)], 116, [(0, 40), (46, 104), (109, 156)]),
+]
+
 # The old woody trunk at each root, px from the root (2 px thick, brown in every stage).
 TRUNK = {"left": 22, "sill_l": 14, "top_l": 10, "jamb_l": 12, "jamb_r": 10, "right": 20,
          "sill_r": 16, "top_r": 8}
@@ -509,6 +525,22 @@ STRANDS = [
     ("paper", 372, 60, {3: 6}, "pink", 48),
     ("paper", 392, 60, {2: 6, 3: 9}, "wisteria", 49),
     ("paper", 403, 60, {2: 4, 3: 6}, "curl", 50),
+    # stage 1 only: dead strands hanging over the lake and down the paper
+    ("sill", 140, 304, {1: 4}, "leaf", 61),
+    ("sill", 183, 304, {1: 6}, "leaf", 62),
+    ("sill", 229, 304, {1: 3}, "leaf", 63),
+    ("sill", 318, 304, {1: 5}, "leaf", 64),
+    ("sill", 352, 304, {1: 7}, "leaf", 65),
+    ("left", 86, 104, {1: 5}, "leaf", 66),
+    ("left", 86, 150, {1: 6}, "leaf", 67),
+    ("left", 86, 262, {1: 7}, "leaf", 68),
+    ("right", 417, 124, {1: 5}, "leaf", 69),
+    ("right", 417, 206, {1: 6}, "leaf", 70),
+    ("right", 417, 248, {1: 4}, "leaf", 71),
+    ("paper", 112, 60, {1: 4}, "curl", 72),
+    ("paper", 168, 60, {1: 5}, "curl", 73),
+    ("paper", 318, 60, {1: 4}, "curl", 74),
+    ("paper", 356, 60, {1: 6}, "curl", 75),
     ("door", 244, 55, {1: 6, 2: 3, 3: 5}, "leaf", 51),
     ("door", 250, 55, {1: 4}, "leaf", 52),
     ("door", 257, 55, {1: 7, 2: 4, 3: 4}, "wisteria", 53),
@@ -648,8 +680,35 @@ class DryPair(Item):
 
     def draw(self, cv, a, b, q):
         if a == "dead" and (b == "dead" or q < 0.45):
+            # (2026-10-12: with the pairs twice as many, only some keep the pale pixel, or
+            # the frame read as straw)
+            pale = h(self.pts[0][0], self.pts[0][1], 131) < 0.45
             for x, y, k in self.pts:
-                cv.put(x, y, DEAD[k])
+                cv.put(x, y, DEAD[k if pale or k < 3 else 2])
+
+
+BROWN_LEAVES = (["ab", ".c"], ["ab", "bc"], [".a", "bc"], ["a.", "bb", ".c"], ["ab.", ".bc"])
+
+
+class BrownLeaf(Item):
+    """Stage 1: a small dry leaf gone brown on a dead runner, two or three px: DEAD[1] body,
+    DEAD[0] curled under, one DEAD[2] where the light catches it (darker than the curled
+    leaves, so the dead ivy reads brown and not as straw). Over the lake a step darker."""
+
+    def __init__(self, x, y, v, t0):
+        self.x, self.y, self.v, self.t0 = x, y, v, t0
+        self.states = {1: "dead"}
+
+    def draw(self, cv, a, b, q):
+        if a == "dead" and (b == "dead" or q < 0.45):
+            for j, r in enumerate(BROWN_LEAVES[self.v % len(BROWN_LEAVES)]):
+                for i, ch in enumerate(r):
+                    if ch == ".":
+                        continue
+                    x, y = self.x + i, self.y + j
+                    wet = not (0 <= x < W and 0 <= y < H and inside_mask()[y, x])
+                    k = {"a": 2, "b": 1, "c": 0}[ch] - (1 if wet and ch == "a" else 0)
+                    cv.put(x, y, DEAD[k])
 
 
 def _curve(x, y, ang, n, seed):
@@ -1030,6 +1089,13 @@ class Strand(Item):
                 cv.put(px, py, DEAD[1])
                 if k % 3 == 1 and rnd(k, 5) < 0.5:
                     cv.put(px + (1 if rnd(k, 6) < 0.5 else -1), py, DEAD[0])
+                elif k % 3 == 2 and 1 < k < m - 2 and rnd(k, 10) < 0.55:
+                    # a dry leaf still hanging on: two px, the lit one over the dark one
+                    sd = 1 if rnd(k, 11) < 0.5 else -1
+                    cv.put(px + sd, py, DEAD[2])
+                    cv.put(px + sd * 2, py + 1, DEAD[1])
+                    if rnd(k, 12) < 0.5:
+                        cv.put(px + sd, py + 1, DEAD[1])
                 continue
             cv.put(px, py, LEAF[1] if k % 2 else LEAF[2])
             step = 2 if k < m * 0.5 else 3
@@ -1050,7 +1116,7 @@ class Strand(Item):
                 leaf(cv, dx_, dy_, "round", d, dark=0, sheen=0.4, seed=self.seed + 50)
         tipx, tipy = hx + drift + off(m), hy + m
         if is_dead(n - 1):
-            if rnd(0, 9) < 0.35:
+            if rnd(0, 9) < 0.6:
                 dead_leaf(cv, tipx - 1, tipy, self.seed)
             return
         if end_q is None:
@@ -1146,8 +1212,12 @@ def plan():
                     continue
                 rr = h(lx, ly, seed + 4)
                 st = {}
-                if _in(spans, 1, i) and rr < 0.13 + 0.12 * d:
+                if _in(spans, 1, i) and rr < 0.18 + 0.14 * d:
                     st[1] = "dead"
+                elif _in(spans, 1, i) and rr < 0.4 + 0.2 * d and _reach(lx + 1, ly + 1):
+                    # a small leaf gone brown, still hanging on (stage 1 only)
+                    twigs.append(BrownLeaf(lx - (sd < 0 and not oy), ly - (sd < 0 and bool(oy)),
+                                           int(rr * 50), 0.1 + 0.6 * i / n3))
                 elif _in(spans, 1, i) and rr < 0.7:
                     # a stub where a leaf fell: one or two px of dead stalk
                     sx, sy = x + ox * sd, y + oy * sd
@@ -1185,8 +1255,8 @@ def plan():
         while i < len(path):
             x, y = path[i]
             at = i
-            i += 5 + int(h(x, y, seed + 46) * 9.99)
-            if not _in(spans, 1, at) or h(x, y, seed + 40) > 0.62:
+            i += 4 + int(h(x, y, seed + 46) * 6.99)
+            if not _in(spans, 1, at) or h(x, y, seed + 40) > 0.8:
                 continue
             lane = _lane_of(x, y, segs)
             ox, oy = OUTWARD[lane]
@@ -1207,7 +1277,7 @@ def plan():
         while i < len(path):
             x, y = path[i]
             at = i
-            i += 14 + int(h(x, y, seed + 49) * 10.99)
+            i += 8 + int(h(x, y, seed + 49) * 7.99)
             if not _in(spans, 1, at):
                 continue
             lane = _lane_of(x, y, segs)
@@ -1286,6 +1356,8 @@ def plan():
                     elif lane == "right" and y > 74 and all(abs(y - py_) > 7 for py_ in sides):
                         rblooms.append(Raceme(XR + 1, y + 1, n, rst, t0, True,
                                               lead=[(XR, y)]))
+    for segs, seed, spans1 in DEAD_STEMS:
+        _dead_runner(segs, seed, spans1, stems, leaves, twigs)
     # clusters (2026-10-11, second review: single pixels in four greens read as noise): built
     # from leaf stamps (3x2, 2x3, 4x2 and 4x3 ovals: LEAF[3] lit top-left, LEAF[2] body,
     # LEAF[1] underside) overlapping back to front over a LEAF[0] body that shows only in the
@@ -1305,8 +1377,7 @@ def plan():
             cblooms.append(Bloom(x, y, kind, bst, 0.3 + 0.5 * h(x, y, 7)))
     for cx, cy, rx, ry, seed, n in TANGLES:
         twigs.extend(_tangle(cx, cy, rx, ry, seed, n))
-    for c in CUSHIONS:
-        mosses.extend(_cushion_items(c))
+    mosses.extend(_moss_items())
     for args in STRANDS:
         strands.append(Strand(*args))
     # the authored cluster flowers first, then the stems' own: a bloom too close to one
@@ -1315,6 +1386,46 @@ def plan():
     blooms = _spaced(cblooms + rblooms + blooms)
     _plan["items"] = (mosses, stems, twigs, leaves, blooms, strands, clumps)
     return _plan["items"]
+
+
+def _dead_runner(segs, seed, spans1, stems, leaves, twigs):
+    """One of DEAD_STEMS: a dead stem in broken pieces, curled brown leaves every few px on
+    alternate sides, bare twigs off it; all stage 1 only."""
+    path = lane_path(segs, seed)
+    n = len(path)
+    inn = lambda i: any(a <= i <= b for a, b in spans1)
+    for i, (x, y) in enumerate(path):
+        if inn(i) and _reach(x, y, 1):
+            stems.append(StemPx(x, y, {1: "dead"}, 0.05 + 0.7 * i / n, h(x, y, seed + 30) < 0.15))
+    i, alt = 3 + int(h(seed, 1, 120) * 4), 0
+    while i < n:
+        x, y = path[i]
+        at = i
+        i += 4 + int(h(x, y, seed + 121) * 5.99)
+        if not inn(at):
+            continue
+        lane = _lane_of(x, y, segs)
+        ox, oy = OUTWARD[lane]
+        alt = 1 - alt
+        sd = 1 if alt else -1
+        if h(x, y, seed + 122) < 0.62:
+            lx, ly = x + ox * sd - (1 if oy == 0 and sd < 0 else 0), y + oy * sd - (1 if oy and sd < 0 else 0)
+            if _reach(lx, ly) and _reach(lx + 2, ly + 2):
+                if h(x, y, seed + 128) < 0.3:     # now and then a curled leaf, mostly brown ones
+                    leaves.append(Leaf(lx, ly, "small", (ox * sd, oy * sd), 0, {1: "dead"},
+                                       0.1 + 0.6 * at / n, seed + at))
+                else:
+                    twigs.append(BrownLeaf(lx, ly, int(h(x, y, seed + 129) * 5), 0.1 + 0.6 * at / n))
+        elif h(x, y, seed + 123) < 0.8:
+            ang = math.atan2(oy * sd, ox * sd) + (0.5 if h(x, y, seed + 124) < 0.5 else -0.5)
+            pts = []
+            for p_ in _curve(x, y, ang, 3 + int(h(x, y, seed + 125) * 3.99), seed + at):
+                if not _reach(p_[0], p_[1], 1):
+                    break
+                pts.append(p_)
+            if len(pts) >= 2:
+                curl = int(h(x, y, seed + 126) * 6) if h(x, y, seed + 127) < 0.3 else None
+                twigs.append(Twig(pts, 0.1 + 0.6 * at / n, curl))
 
 
 def _tangle(cx, cy, rx, ry, seed, n):
@@ -1595,6 +1706,199 @@ def _cushion_items(c):
             st[2] = True
         items.append(MossPx(x, y, MOSS[t], st,
                             0.05 + 0.4 * h(x, y, seed + 5) + 0.2 * h(seed, 1, 2), flat=True))
+    return items
+
+
+# Stage 1's moss mats (2026-10-12, review: the patches read as stamped domes, and too thin
+# next to the neglected hut's roof). Mats grown off value noise over the moulding, stretched
+# along each run so they creep along the boards (13 px features along, ~4 across), broken
+# at the edges by a finer noise, thicker at the four corners (where they spill a pixel or
+# two over the outer edge and hang a short drip onto the lake), wetter on the shade side and
+# at the leak. Tones the hut's way, kept dull: MOSS[1] body, MOSS[2] where light reaches its
+# top (and the stiles' left) edge, MOSS[0] on its lower edge and down in a crease; a MOSS[3]
+# spark now and then on a lit edge. Flat: no shadow. Stage 2's damp remnants (the old
+# CUSHIONS marked kept2) are laid into the stage 1 mats, so the 1 -> 2 play-in dissolves the
+# mats down to them.
+MOSS_CORNERS = ((XL + 3, YT + 4, 11, 401), (XR - 3, YT + 4, 9, 402), (XL + 4, YB - 4, 16, 403),
+                (XR - 4, YB - 4, 14, 404))
+# The boards a mat lies along: (axis, from, to, wood rows/cols outer edge first, the crease
+# beside the inner edge or None, id). The top run and the wall foot are two boards with a
+# groove between; the stiles one board between two outlines.
+MOSS_BOARDS = [
+    ("x", XL + 6, XR - 6, (53, 54, 55), 56, 0),
+    ("x", XL + 6, XR - 6, (60, 59, 58, 57), 56, 1),
+    ("x", XL + 6, XR - 6, (306, 305, 304, 303), 302, 2),
+    ("x", XL + 6, XR - 6, (299, 300, 301), 302, 3),
+    ("x", XL + 6, XR - 6, (85, 86, 87), 88, 4),
+    ("x", XL + 6, XR - 6, (92, 91, 90, 89), 88, 5),
+    ("y", YT + 10, YB - 10, (85, 86, 87, 88), None, 6),
+    ("y", YT + 10, YB - 10, (418, 417, 416, 415), None, 7),
+]
+MOSS_CUT = 0.54
+
+
+def _moss_boost(x, y):
+    dc = min(math.hypot(x - cx, y - cy) for cx, cy, _r, _s in MOSS_CORNERS)
+    m = 0.22 * math.exp(-dc / 26.0)
+    if x > XR - 8:
+        m += 0.05                              # the shade side, wetter
+    if 84 <= y <= 94 and 345 <= x <= 405 or y >= 297 and 276 <= x <= 300:
+        m += 0.12                              # the leak
+    return m
+
+
+def _moss_mats():
+    if "moss" in _masks:
+        return _masks["moss"]
+    f = frame_mask()
+    allowed = allowed_mask(BOARD)
+
+    def ok(x, y):
+        if not (0 <= x < W and 0 <= y < H) or not allowed[y, x]:
+            return False
+        if x < XL + 9 and WINDOW_GAP[0] - 1 <= y <= WINDOW_GAP[1] + 1:
+            return False
+        return not (DOOR[0] - 7 <= x <= DOOR[1] + 7 and 55 <= y < 84)
+
+    px, crease = set(), set()
+    hugs = {}                                  # (board, s) -> the mat hugs its crease side
+    # mats along the boards: a thickness off 1-D noise along the board, so each mat is its
+    # own length (2..30 px) and wanders in and out across the board; it hugs the crease (or,
+    # on a stile, one outline) and its free edge is ragged
+    for axis, s0, s1, rows, cr, b in MOSS_BOARDS:
+        wide = len(rows)
+        seg, hug_in = -1, True
+        prev = False
+        for s in range(s0, s1 + 1):
+            mid = rows[wide // 2]
+            x, y = (s, mid) if axis == "x" else (mid, s)
+            v = 0.66 * vnoise(s, b * 13, 13, 410) + 0.34 * vnoise(s, b * 13 + 7, 4, 411)
+            v += _moss_boost(x, y)
+            on = v > MOSS_CUT - (0.05 if axis == "y" else 0.0)   # the stiles stay wetter
+            if on and not prev:
+                seg += 1
+                hug_in = h(seg, b, 412) < (0.7 if cr is not None else 0.5)
+            prev = on
+            if not on:
+                continue
+            # a wobbly profile, not a lens (a smooth bulge read as a stamped dome)
+            t = 1 + int((v - MOSS_CUT) * 15.0 + (vnoise(s, b * 7, 2.5, 416) - 0.5) * 2.6)
+            if h(s, b, 413) < 0.3:
+                t += 1 if h(s, b, 414) < 0.5 else -1
+            t = max(1, min(wide, t))
+            order = rows[::-1] if hug_in else rows
+            for k in range(t):
+                rx = order[k]
+                x, y = (s, rx) if axis == "x" else (rx, s)
+                if ok(x, y) and f[y, x]:
+                    px.add((x, y))
+            hugs[(b, s)] = hug_in and t >= 1
+    # the creases: moss bridges a groove where mats lie against it on both sides, and wicks
+    # into it a pixel at a time from one
+    for axis, s0, s1, rows, cr, b in MOSS_BOARDS:
+        if cr is None or b % 2:
+            continue
+        inner = rows[-1]
+        other = [r for a_, _s0, _s1, r_, c_, b_ in MOSS_BOARDS if b_ == b + 1 for r in [r_[-1]]][0]
+        for s in range(s0, s1 + 1):
+            A, B = (s, inner) in px, (s, other) in px
+            if A and B or (A or B) and h(s, cr, 415) < 0.22:
+                if ok(s, cr) and f[cr, s]:
+                    crease.add((s, cr))
+    # the corners: a ragged cushion over both runs, the outline and a pixel or two out over
+    # the edge onto the lake, the bottom two with a short drip hanging off it
+    spill = set()
+    for cx, cy, r, sd in MOSS_CORNERS:
+        for y in range(cy - r - 2, cy + r + 3):
+            for x in range(cx - r - 2, cx + r + 3):
+                if not ok(x, y):
+                    continue
+                d = math.hypot(x - cx, (y - cy) * 1.2)
+                v = (1 - d / r) * 0.8 + 0.5 * vnoise(x, y, 4, sd) + 0.25 * vnoise(x, y, 2, sd + 1)
+                if v < 0.62:
+                    continue
+                if f[y, x]:
+                    if x in (XL, XR) or y in (YT, YB) or not inside_mask()[y, x]:
+                        if v > 0.72:
+                            px.add((x, y))
+                    else:
+                        px.add((x, y))
+                elif (not inside_mask()[y, x] and v > 0.74 and d < r * 0.85
+                      and (y == YB + 1 and XL <= x <= XR
+                           or x in (XL - 1, XR + 1) and YT + 4 <= y <= YB)):
+                    spill.add((x, y))      # a pixel over the edge: sideways, or down off the sill
+        if cy == YB:
+            for x in range(cx - r, cx + r + 1):
+                if (x, YB) in px and h(x, cy, sd + 2) < 0.3 and ok(x, YB + 1):
+                    n = 1 + int(h(x, cy, sd + 3) * 2.99)
+                    for k in range(1, n + 1):
+                        spill.add((x, YB + k))
+    # drop scraps under 6 px: a sliver of green that small reads as a leaf, not as moss
+    allm = px | crease | spill
+    seen = set()
+    for p_ in list(allm):
+        if p_ in seen:
+            continue
+        comp, todo = [], [p_]
+        seen.add(p_)
+        while todo:
+            x, y = todo.pop()
+            comp.append((x, y))
+            for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                q_ = (x + a, y + b)
+                if q_ in allm and q_ not in seen:
+                    seen.add(q_)
+                    todo.append(q_)
+        if len(comp) < 6:
+            for q_ in comp:
+                px.discard(q_)
+                crease.discard(q_)
+                spill.discard(q_)
+    allm = px | crease | spill
+    out = {}
+    for (x, y) in px:
+        vert = x < XL + 6 or x > XR - 6
+        above, below, left = (x, y - 1) in allm, (x, y + 1) in allm, (x - 1, y) in allm
+        t = 1
+        if not above and not below and not vert:
+            t = 2 if h(x, y, 309) < 0.35 else 1   # a one-row film: mostly the dull body
+        elif not above or vert and not left and h(x, y, 310) < 0.45:
+            # the lit edge in runs (a broken line of light, not a ruled one)
+            t = 2 if vnoise(x, y, 3, 311) > 0.3 else 1
+            if t == 2 and h(x, y, 307) < 0.05:
+                t = 3
+        elif not below:
+            t = 0
+        else:
+            # the body is lumpy, not a flat slab: small cushions catching the light, and
+            # dimples between them (off a fine noise, so they clump rather than speckle)
+            bump = vnoise(x, y, 2.5, 420)
+            if bump > 0.76 or h(x, y, 308) < 0.04:
+                t = 2
+            elif bump < 0.24:
+                t = 0
+        out[(x, y)] = t
+    for k in crease:
+        out[k] = 0
+    for k in spill:
+        out[k] = 1 if (k[0], k[1] - 1) not in allm else 0
+    _masks["moss"] = out
+    return out
+
+
+def _moss_items():
+    items = []
+    allowed = allowed_mask(BOARD)
+    for (x, y), t in _moss_mats().items():
+        if not (0 <= x < W and 0 <= y < H) or not allowed[y, x]:
+            continue
+        items.append(MossPx(x, y, MOSS[t], {1: True},
+                            0.05 + 0.4 * h(x, y, 255) + 0.2 * vnoise(x, y, 20, 256), flat=True))
+    # stage 2's damp remnants, laid into the mats (in both stages, so the play-in dissolves
+    # the mats down to them)
+    for c in CUSHIONS:
+        if c[6]:
+            items.extend(_cushion_items(c))
     return items
 
 
