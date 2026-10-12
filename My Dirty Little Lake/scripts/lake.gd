@@ -354,9 +354,8 @@ var _economy: EconomyConfig
 ## beside the pump the key is the pump's and everywhere else round the hut it is the door's.
 ## By eye on `tools/shot_pump.tscn`. Moved from (2.1, -0.5) with the smaller pump
 ## (2026-10-01, Richard: "smaller and closer to the shed"): slid along the gable towards the
-## near corner, which is what brings it in on the screen. It cannot come in along x: a dog
-## rounds the hut `Dog.AVOID_CLEAR` past its keep (1.62 tiles out), and the pump's square
-## and keep have to start beyond that or the dog brushes it (`test_lake`'s "never touched").
+## near corner, which is what brings it in on the screen. It was kept clear of the line a
+## dog rounded the hut on; since 2026-10-11 the dogs plan their way round (`DogPaths`).
 const PUMP_AT := Vector2(2.05, 0.3)
 const PUMP_RANGE := 1.5
 
@@ -1427,6 +1426,12 @@ func _ready() -> void:
 	_grow_nature()
 	_start_weather()
 	_mark("nature")
+	# The pack's way round things (2026-10-11): the piers and the logs it is built round, and
+	# the grid itself built now, with the crate, the pump and the hive in place, rather than
+	# on the first dog's first step.
+	DogPaths.setup(_dropoffs, _grounds)
+	DogPaths.solid_at(_dog.crate_tile, _dog.crate_tile)
+	_mark("dog paths")
 
 	_flock = Flock.new()
 	_flock.name = &"Flock"
@@ -6141,6 +6146,7 @@ func _process(delta: float) -> void:
 	_push_engine()
 	_update_hud()
 	_sort_walkers()
+	_cover_walkers()
 	_island.queue_redraw()
 
 
@@ -6180,6 +6186,31 @@ func _sort_walkers() -> void:
 	for dog in _dogs:
 		dog.z_index = _walker_layer(dog.position)
 	_order_walkers()
+
+
+## The plants and tufts standing in front of a walker, drawn again over it (2026-10-11,
+## Richard: the dogs were drawn over the plants they stood behind; the angler too). The
+## animals' own rule (`Flora.cover`, `Ground.cover`) on a layer over the walkers' front band
+## (`Flora.FRONT_LAYER`); only walkers on that band and on screen. Boxes are generous halves and
+## heights of what each is drawn at, world px.
+const WALKER_COVER_DOG := Vector2(15.0, 24.0)
+const WALKER_COVER_ANGLER := Vector2(13.0, 42.0)
+
+
+func _cover_walkers() -> void:
+	if _flora == null and _grounds.is_empty():
+		return
+	var view := _visible_world_rect().grow(40.0)
+	var bodies: Array = []
+	if _angler != null and _angler.visible and _angler.z_index == IN_FRONT 			and view.has_point(_angler.position):
+		bodies.append(Wildlife._body(_angler.position, WALKER_COVER_ANGLER.x, WALKER_COVER_ANGLER.y))
+	for dog in _dogs:
+		if is_instance_valid(dog) and dog.visible and dog.z_index == IN_FRONT 				and view.has_point(dog.position):
+			bodies.append(Wildlife._body(dog.position, WALKER_COVER_DOG.x, WALKER_COVER_DOG.y))
+	if _flora != null:
+		_flora.cover(bodies, true)
+	for g in _grounds:
+		g.cover(bodies, true)
 
 
 ## Walkers on one layer are drawn by their feet, the shed's rule (2026-09-28, Richard: the

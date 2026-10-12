@@ -211,11 +211,22 @@ def basket():
     return im
 
 
-def lying():
+# Asleep, the eyes are shut: the white and the pupil of each eye in the lying crop become one
+# lid line in the skin's shade (2026-10-11, Richard: "eye should close when sleeping in bed").
+EYES = ((12, 18), (13, 18), (20, 18), (21, 18))
+LID = (125, 61, 42, 255)
+
+
+def lying(shut=False):
     """Face up on a pillow at the bed's far end: the hat, the face and the beard down to the
     chin (2026-10-03: it was the hat alone, sixteen rows, and read as a hat on the headboard).
-    The room draws the bed's own blanket back over the chin (`ShedRoom.LIES`)."""
-    return idle("south").crop((0, 0, 32, 24))
+    The room draws the bed's own blanket back over the chin (`ShedRoom.LIES`). `shut` draws
+    the eyes closed, for once the Zs have come."""
+    im = idle("south").crop((0, 0, 32, 24))
+    if shut:
+        for at in EYES:
+            im.putpixel(at, LID)
+    return im
 
 
 def lying_back():
@@ -224,10 +235,10 @@ def lying_back():
     return idle("north").crop((0, 0, 32, 15))
 
 
-def lying_side(head_left=True):
+def lying_side(head_left=True, shut=False):
     """Seen from the side: the face-up head turned a quarter, the crown towards the pillow.
     A whole quarter turn, so no pixel is resampled."""
-    return lying().rotate(90 if head_left else -90, expand=True)
+    return lying(shut).rotate(90 if head_left else -90, expand=True)
 
 
 def big(im, k=MAN):

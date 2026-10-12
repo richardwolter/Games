@@ -34,24 +34,38 @@ const HEIGHT := 22.0
 ## planted, `DogArt.STEP` sheet pixels a frame drawn at HEIGHT over the sheet's 29 rows, a
 ## tile walked sideways on screen being Angler.SIDEWAYS world pixels. They were 1.6 and 6.2,
 ## which ran the ground two and a half to three times faster than the legs went. The swim is
-## seven tenths of the run and wears the gallop, not the walk: the legs churn faster than the
-## dog goes, as paddling does, where the walk's frames went three times too slowly. `_stride`
-## steps the frames with the ground covered, `_gait_pace` says at which pace.
+## seven tenths of the run. `_stride` steps the frames with the ground covered, `_gait_pace`
+## says at which pace.
+##
+## A swimming dog wears the walk, stepped at the walk's own pace (2026-10-11, second pass,
+## Richard: "the running animation for swimming on deep water is not working, use walking and
+## speed up to match"): at 1.75 tiles a second over legs planted at 0.55 the paws paddle about
+## three times as fast as they walk on land. Supersedes the gallop in the water, picked the same
+## morning.
 const SWIM_SPEED := 1.75
 const WALK_SPEED := 0.55
 const RUN_SPEED := 2.5
 
-## The dog feels this far ahead of itself, in tiles, for the hut, the crate, the pump and
-## the beehive (the last a rectangle off its own tile, see `_bumped`),
-## and bends round them by their corners instead of walking into a wall and scraping along
-## it (2026-09-22, Richard: "avoid running against it completely"). `AVOID_CLEAR` is how far
-## outside a box's own walk margin the corner it makes for stands. `_hug` and the axis slides
+## The way round things is a path on the pack's grid (`DogPaths`, 2026-10-11, `/grill-me`
+## with Richard: "make dogs smarter when avoiding obstacles"): the hut, the crate, the pump,
+## the hive, the piers and the driftwood, each kept a cell clear of where a gap allows. It
+## replaces feeling a tile ahead and bending round a building's corner (2026-09-22), which
+## rocked at corners and could not see its way out of a pocket. `_hug` and the axis slides
 ## stay underneath as the last resort for something already touching.
-const AVOID_AHEAD := 1.0
-const AVOID_CLEAR := 0.35
-## How close to a corner counts as round it. Tighter than `CLOSE`: let go a third of a tile
-## short, the next leg ran along the face inside the clearance and scraped.
-const AVOID_AT := 0.1
+##
+## A point of the path counts as reached within `PATH_AT` tiles; every `PATH_CHECK` seconds
+## the dog asks whether it can still see the next one (a nudge from the angler can put a
+## corner between them) and plans again if not.
+const PATH_AT := 0.3
+const PATH_CHECK := 0.3
+
+## Animals that stay put — the capybaras, the peacock, the snakes, a turtle basking on the
+## sand — are steered round as the dog goes, not put on the grid (they move): one within
+## `STAYER_LOOK` tiles ahead of its line and within its reach of it bends the line away,
+## harder the closer it is (`STAYER_PUSH`). `STAYER_BODY` is the dog's own half-width.
+const STAYER_LOOK := 1.8
+const STAYER_PUSH := 1.6
+const STAYER_BODY := 0.3
 
 ## The angler never stops for a dog; a dog inside `NUDGE_REACH` tiles of them is pushed
 ## clear at `NUDGE_SPEED` tiles a second, sideways off the angler's walk when they are
@@ -417,10 +431,18 @@ static var _pack_hush: float = 0.0
 static var calm := PackedVector2Array()
 const CALM_REACH := 0.7
 
+## Animals that stay put, world px, and how far round each one a dog keeps, in tiles. Set by
+## Wildlife every frame. See STAYER_LOOK.
+static var stayers := PackedVector2Array()
+static var stayer_reach := PackedFloat32Array()
+
 ## Where the angler stood last frame, for which way they are walking when they meet a dog.
 var _angler_was := Vector2.INF
-## The corner the dog is making for to get round a building, or INF on a straight line.
-var _around := Vector2.INF
+## The path being walked (`DogPaths.plan`): the points still to reach, tile space, the last
+## the target it was planned for (`_path_to`), and when it is next asked whether it still holds.
+var _path := PackedVector2Array()
+var _path_to := Vector2.INF
+var _path_check: float = 0.0
 var _voice_roll: float = 0.0
 ## The tile index this dog has claimed, or -1.
 var _claim: int = -1
@@ -700,7 +722,6 @@ func _give_way(delta: float) -> void:
 	var wanted := tile_pos + away * NUDGE_SPEED * delta
 	if _may_stand(wanted):
 		tile_pos = wanted
-		_around = Vector2.INF
 
 
 ## How many pieces are in this dog's mouth. Asked by the lake, which cannot call the run
@@ -1125,60 +1146,60 @@ func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 	return tile_pos.distance_to(tile) <= CLOSE
 
 
-## Which way to step for `tile`: straight at it, unless a building stands within
-## `AVOID_AHEAD` along that line, in which case towards the corner of it that is the
-## shorter way round. The corner is held until it is reached or the line ahead is clear,
-## so the dog does not re-decide at every step and rock. A target inside the building's
-## own margin (the drop spot beside the crate is close to it) is walked at straight: the
-## step's own `_may_stand` still refuses the box.
+## Which way to step for `tile`: along the path to it (`DogPaths.plan`), planned when the
+## target changes and again when the next point of it can no longer be seen, then bent round
+## any animal that stays put (`_round_stayers`).
 func _steer(tile: Vector2, gap: Vector2) -> Vector2:
-	var straight := gap.normalized()
-	if _around != Vector2.INF:
-		if tile_pos.distance_to(_around) <= AVOID_AT:
-			_around = Vector2.INF
-		else:
-			return (_around - tile_pos).normalized()
-	if gap.length() <= AVOID_AHEAD:
-		return straight
-	var box := _bumped(tile_pos + straight * AVOID_AHEAD)
-	if box.is_empty():
-		return straight
-	var mid: Vector2 = box[0]
-	var half: Vector2 = box[1] + Vector2(AVOID_CLEAR, AVOID_CLEAR)
-	if absf(tile.x - mid.x) <= half.x and absf(tile.y - mid.y) <= half.y:
-		return straight
-	# The corner that is the shorter way round, among the ones the dog can see: a corner
-	# whose straight line from here crosses the box is the far corner, and heading for it
-	# is heading through the wall. Not the corner it is standing on — from there the next
-	# corner along the face is the way, and picking itself again is the rock that was
-	# found on the hut.
-	var best := Vector2.INF
-	var shortest := INF
-	for sx: float in [-1.0, 1.0]:
-		for sy: float in [-1.0, 1.0]:
-			var corner := mid + Vector2(half.x * sx, half.y * sy)
-			if tile_pos.distance_to(corner) <= AVOID_AT * 2.0:
-				continue
-			if not _may_stand(corner) or _crosses(tile_pos, corner, mid, box[1]):
-				continue
-			var length := tile_pos.distance_to(corner) + corner.distance_to(tile)
-			if length < shortest:
-				shortest = length
-				best = corner
-	if best == Vector2.INF:
-		return straight
-	_around = best
-	return (best - tile_pos).normalized()
+	if _path.is_empty() or _path_to == Vector2.INF or tile.distance_squared_to(_path_to) > 0.0004:
+		_plan(tile)
+	elif _now() >= _path_check:
+		_path_check = _now() + PATH_CHECK
+		if not DogPaths.clear(tile_pos, _path[0], false, crate_tile):
+			_plan(tile)
+	while _path.size() > 1 and tile_pos.distance_to(_path[0]) <= PATH_AT:
+		_path.remove_at(0)
+	var way := _path[0] - tile_pos if not _path.is_empty() else gap
+	if way.length_squared() < 0.000001:
+		way = gap
+	return _round_stayers(way.normalized(), tile)
 
 
-## Does the line from `a` to `b` pass through the box? Sampled along its length, which is
-## enough for a box a tile or two across and a line a few tiles long.
-func _crosses(a: Vector2, b: Vector2, mid: Vector2, half: Vector2) -> bool:
-	for i in range(1, 12):
-		var at := a.lerp(b, float(i) / 12.0)
-		if absf(at.x - mid.x) < half.x and absf(at.y - mid.y) < half.y:
-			return true
-	return false
+func _plan(tile: Vector2) -> void:
+	_path_to = tile
+	_path_check = _now() + PATH_CHECK
+	_path = DogPaths.plan(tile_pos, tile, crate_tile)
+
+
+## The heading bent away from every animal that stays put near the line ahead. An animal
+## the target is beside is not steered round: the dog is going to it.
+func _round_stayers(way: Vector2, tile: Vector2) -> Vector2:
+	if stayers.is_empty():
+		return way
+	var bend := Vector2.ZERO
+	for i in stayers.size():
+		var at := Iso.world_to_tile(stayers[i])
+		var reach := (stayer_reach[i] if i < stayer_reach.size() else 0.4) + STAYER_BODY
+		if tile.distance_to(at) < reach:
+			continue
+		var rel := at - tile_pos
+		var apart := rel.length()
+		if apart < reach:
+			# Already inside its room: straight out.
+			var out := rel / apart if apart > 0.001 else Vector2(-way.y, way.x)
+			bend -= out * (reach - apart) / reach * 2.0
+			continue
+		var along := rel.dot(way)
+		if along <= 0.0 or along > STAYER_LOOK + reach:
+			continue
+		var side := rel - way * along
+		var lateral := side.length()
+		if lateral >= reach:
+			continue
+		var away := -side / lateral if lateral > 0.001 else Vector2(-way.y, way.x)
+		bend += away * (reach - lateral) / reach * (1.0 - 0.5 * along / (STAYER_LOOK + reach))
+	if bend == Vector2.ZERO:
+		return way
+	return (way + bend * STAYER_PUSH).normalized()
 
 
 ## The thing on the island the dog has just walked into, as `[middle, half-extent]` in tile
@@ -1257,7 +1278,7 @@ func _fresh_aim() -> void:
 	_closest = INF
 	_aiming = Vector2.INF
 	_hug_along = Vector2.ZERO
-	_around = Vector2.INF
+	_path_to = Vector2.INF
 
 
 ## Somewhere off to one side to make for while whatever is in the way is got round.
@@ -1303,6 +1324,13 @@ func _may_stand(tile: Vector2) -> bool:
 	# wall it in.
 	if Yard.covers(crate_tile, tile, Yard.WALK_KEEP) \
 			and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
+		return false
+	# Round the piers and the driftwood (2026-10-11), on the same terms, and onto a pier when
+	# what it is going for is there: the strand's rubbish lies under the jetties too, and a
+	# piece a dog may not reach is a lake that never ends.
+	if DogPaths.on_pier(tile) and not DogPaths.on_pier(tile_pos) and not DogPaths.on_pier(_target):
+		return false
+	if DogPaths.on_log(tile) and not DogPaths.on_log(tile_pos):
 		return false
 	if Iso.island_fraction(tile.x, tile.y) < 1.0:
 		return true
@@ -1496,7 +1524,7 @@ func _barking() -> bool:
 func _still_showing() -> StringName:
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK:
-			return DogArt.gait(slot, false, breed)
+			return DogArt.gait(slot, not _on_land(), breed)
 		State.WANDER:
 			return DogArt.gait(slot, true, breed)
 		State.NAP:
@@ -1519,12 +1547,13 @@ func _step_the_legs() -> void:
 	_stride_from = tile_pos
 
 
-## The speed at which the gait showing keeps its paws planted: the walk's, the gallop's, or in
-## the water the swim's, which the gallop churns through faster than the dog goes.
+## The speed at which the gait showing keeps its paws planted: the walk's or the gallop's. In
+## the water the walk is shown and stepped at the walk's pace, so the paws paddle faster than
+## the dog goes.
 func _gait_pace() -> float:
-	if _state == State.WANDER:
+	if _state == State.WANDER or not _on_land():
 		return WALK_SPEED
-	return RUN_SPEED if _on_land() else SWIM_SPEED
+	return RUN_SPEED
 
 
 ## The clock a picture is stepped on: the gait's own for a moving dog, the age otherwise.

@@ -1028,6 +1028,7 @@ func _lay_props() -> void:
 	_tuft_feet.resize(0)
 	_tufts_by_cell.clear()
 	_over_stale = true
+	_front_stale = true
 	if _props.is_empty():
 		return
 	if _placed.is_empty():
@@ -1292,7 +1293,17 @@ var _over_colors := PackedColorArray()
 var _over_indices := PackedInt32Array()
 
 
-func cover(bodies: Array) -> void:
+## The walkers' copy, over their front layer (`Flora.FRONT_LAYER`, the same rule).
+var _front: Node2D
+var _front_keys := PackedInt32Array()
+var _front_stale := true
+var _front_points := PackedVector2Array()
+var _front_uvs := PackedVector2Array()
+var _front_colors := PackedColorArray()
+var _front_indices := PackedInt32Array()
+
+
+func cover(bodies: Array, front: bool = false) -> void:
 	if _prop_atlas == null:
 		return
 	if _over == null:
@@ -1304,6 +1315,15 @@ func cover(bodies: Array) -> void:
 		_over.material = material
 		_over.draw.connect(_draw_over)
 		add_child(_over)
+	if _front == null:
+		_front = Node2D.new()
+		_front.name = &"OverWalkers"
+		_front.z_index = Flora.FRONT_LAYER
+		_front.z_as_relative = false
+		_front.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_front.material = material
+		_front.draw.connect(_draw_front)
+		add_child(_front)
 	if _tufts_by_cell.is_empty():
 		for i in _tuft_feet.size():
 			var t := Iso.world_to_tile(_tuft_feet[i])
@@ -1334,23 +1354,49 @@ func cover(bodies: Array) -> void:
 						seen[i] = true
 						picked.append(i)
 	picked.sort()
-	if picked == _over_keys and not _over_stale:
-		return
-	_over_keys = picked
-	_over_stale = false
-	_over_points.resize(0)
-	_over_uvs.resize(0)
-	_over_colors.resize(0)
-	_over_indices.resize(0)
+	if front:
+		if picked == _front_keys and not _front_stale:
+			return
+		_front_keys = picked
+		_front_stale = false
+	else:
+		if picked == _over_keys and not _over_stale:
+			return
+		_over_keys = picked
+		_over_stale = false
+	var points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
 	for i in picked:
 		var q := _tuft_quads[i]
-		var base := _over_points.size()
+		var base := points.size()
 		for c in 4:
-			_over_points.append(_prop_points[q + c])
-			_over_uvs.append(_prop_uvs[q + c])
-			_over_colors.append(_prop_colors[q + c])
-		_over_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
-	_over.queue_redraw()
+			points.append(_prop_points[q + c])
+			uvs.append(_prop_uvs[q + c])
+			colors.append(_prop_colors[q + c])
+		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	if front:
+		_front_points = points
+		_front_uvs = uvs
+		_front_colors = colors
+		_front_indices = indices
+		_front.queue_redraw()
+	else:
+		_over_points = points
+		_over_uvs = uvs
+		_over_colors = colors
+		_over_indices = indices
+		_over.queue_redraw()
+
+
+func _draw_front() -> void:
+	if _front_indices.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(
+		_front.get_canvas_item(), _front_indices, _front_points, _front_colors, _front_uvs,
+		PackedInt32Array(), PackedFloat32Array(), _prop_atlas.get_rid()
+	)
 
 
 func _draw_over() -> void:

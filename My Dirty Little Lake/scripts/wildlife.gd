@@ -451,6 +451,8 @@ func reset() -> void:
 		(_streaks[id] as HullFoam).queue_free()
 	_streaks.clear()
 	Dog.calm = PackedVector2Array()
+	Dog.stayers = PackedVector2Array()
+	Dog.stayer_reach = PackedFloat32Array()
 	_birds.clear()
 	_track_at.resize(0)
 	_track_age.resize(0)
@@ -531,6 +533,7 @@ func _process(delta: float) -> void:
 		if c["kind"] == &"capy" and not bool(c["wet"]):
 			_calm.append(c["at"])
 	Dog.calm = _calm
+	_hand_stayers()
 	_bird_in -= delta
 	for s: Dictionary in _birds:
 		_bird_step(s, delta, seen_by_ducks)
@@ -576,6 +579,30 @@ func _cover_plants() -> void:
 		flora.cover(bodies)
 	for g in grounds:
 		g.cover(bodies)
+
+
+## The animals that stay put, for the dogs to steer round (Dog.stayers, 2026-10-11): the
+## capybaras on land, the peacock, the snakes and a turtle basking or tucked on the sand. Each
+## with how far round it a dog keeps, in tiles: its drawn half-width. Not the ones that run —
+## a dog coming is what sends a bunny off.
+func _hand_stayers() -> void:
+	var at := PackedVector2Array()
+	var reach := PackedFloat32Array()
+	var tile := Iso.tile_circle_extent(1.0)
+	for c: Dictionary in _critters_on_land:
+		var kind: StringName = c["kind"]
+		if kind == &"capy" and bool(c["wet"]):
+			continue
+		if kind == &"capy" or kind == &"peacock" or kind == &"snake":
+			at.append(c["at"])
+			reach.append(float(KINDS[kind]["half"]) / tile)
+	for t: Dictionary in _turtles:
+		var state := int(t["state"])
+		if (state == Turtle.BASK or state == Turtle.TUCK) and not _wet(t["at"]):
+			at.append(t["at"])
+			reach.append(14.0 * TURTLE_DRAWN / tile)
+	Dog.stayers = at
+	Dog.stayer_reach = reach
 
 
 static func _body(at: Vector2, half: float, tall: float) -> Array:

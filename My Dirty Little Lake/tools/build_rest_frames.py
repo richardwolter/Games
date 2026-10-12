@@ -8,10 +8,12 @@ paint over the strips; re-running this overwrites them.
 
     sit_south   2 frames  facing the room: rest, breath in (the chest opens, the head stays)
     sit_north   2 frames  back to the room: rest, breath in
-    lie_south   1 frame   face up on a pillow at the far end, down to the chin
-    lie_north   1 frame   the back of the hat, for a pillow behind the near board
-    lie_west    1 frame   lie_south turned a quarter, crown to the left (a side view)
-    lie_east    1 frame   the same, crown to the right
+    lie_south   2 frames  face up on a pillow at the far end, down to the chin: awake, then
+                          the eyes shut, shown once the Zs come (`ShedRoom.SLEEP_AFTER`)
+    lie_north   2 frames  the back of the hat, for a pillow behind the near board (the same
+                          picture twice: no eyes to shut, but every lie strip is two frames)
+    lie_west    2 frames  lie_south turned a quarter, crown to the left (a side view)
+    lie_east    2 frames  the same, crown to the right
                           (the blanket over the rest is the bed's own art, `ShedRoom.LIES`)
     read_south  10 frames five books, each read then page turning (`pose.COVERS`)
 
@@ -46,10 +48,10 @@ def main():
     strips = {
         "sit_south": [pose.sit_front(0)[0], pose.sit_front(1)[0]],
         "sit_north": [pose.sit_back(0)[0], pose.sit_back(1)[0]],
-        "lie_south": [pose.lying()],
-        "lie_north": [pose.lying_back()],
-        "lie_west": [pose.lying_side(True)],
-        "lie_east": [pose.lying_side(False)],
+        "lie_south": [pose.lying(), pose.lying(True)],
+        "lie_north": [pose.lying_back(), pose.lying_back()],
+        "lie_west": [pose.lying_side(True), pose.lying_side(True, True)],
+        "lie_east": [pose.lying_side(False), pose.lying_side(False, True)],
         "read_south": [
             pose.book_reader(page, cover)
             for cover in range(len(pose.COVERS))

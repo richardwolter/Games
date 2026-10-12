@@ -3247,7 +3247,8 @@ water and runs on grass" (the swim wore the walk frames).
   nudge and a slide along a wall all step as far as they go. **A push that makes no ground runs
   in place** at walking cadence (Richard's call), the angler indoors and out.
 - **A swimming dog wears the gallop**, churning faster than it goes (Richard's pick over a
-  sped-up walk or a slower swim).
+  sped-up walk or a slower swim). **Superseded the next day** (see The Pack Finds Its Way):
+  it swims on the walk, paddled about three times as fast.
 - **And sinks deeper the further out it swims** (same day, Richard): `Dog._sink_here` cuts
   `SINK_EDGE` 0.3 of the frame at the water's edge, easing to `SINK_DEEP` 0.58 (head and top
   of the back) by `SINK_REACH` 3 tiles from the nearer shore, island's or bank's. Supersedes
@@ -4520,7 +4521,8 @@ Every mechanic a player meets mid-run is named the first time it happens.
   dog's `over`; the path is pulled straight wherever the next point is in plain sight. A
   dog only picks a spot on its own patch of floor (a flood-fill label), and a walker in the
   way is slid past and, after `DOG_BLOCKED`, thought round. **The lake's dogs keep their no-
-  search rule**; the shed's clutter is what needed one. Supersedes "a slide that makes no
+  search rule**; the shed's clutter is what needed one. (Superseded 2026-10-11: the lake's
+  dogs plan too, and the shed's route round the player; see The Pack Finds Its Way.) Supersedes "a slide that makes no
   ground gives up and picks a new target".
 - **The find-caught card fades as one**: see The Find-Caught Card.
 - `test_lake` guards the board order and the Catch row, the camera tip (none before ten
@@ -7424,7 +7426,8 @@ buildings before it touches them, and the pack is heard more, from all over the 
   inside the clearance and scraped. A target inside the box's own margin (the drop spot by
   the crate) is walked at straight. **`_hug` and the axis slides stay underneath** as the
   last resort for something already touching; `test_lake` sends a dog through the crate
-  and through the hut and asks `_hug` never engaged. No A*, by decision.
+  and through the hut and asks `_hug` never engaged. No A*, by decision. **Superseded
+  2026-10-11** (The Pack Finds Its Way): a path on `DogPaths`' grid replaces the corners.
 - **Barks per dog, never over each other, faint from afar** (`_voice_next` is each dog's,
   `VOICE_GAP` 6-14 s from 8-18 shared; `_pack_hush`/`VOICE_APART` 1.2 s pack-wide;
   `FAR_SHARE` 0.33 of `VOICE_ODDS` beyond `HEAR`, played through `Sfx.play(&"bark",
@@ -7437,6 +7440,56 @@ buildings before it touches them, and the pack is heard more, from all over the 
   guards the speeds, both walks round, the nudge (clear of a standing angler, sideways off
   a walking one, the angler unmoved, the dog's mood kept), the per-dog gap, the faint far
   bark and two dogs not barking together.
+
+### The Pack Finds Its Way, and the Angler Shuts His Eyes (2026-10-11, `/grill-me` with Richard)
+Richard: dogs stuck and rocking at corners, odd routes, clipping piers, logs, plants and
+animals, bumping the player in the house; the gallop in deep water not working; and the
+angler's eyes open asleep in bed. **Lifts the lake's no-path-search rule** (2026-09-16 and
+09-22) and supersedes `Dog._steer`'s corners (`AVOID_*`, `_around`, `_crosses`, gone).
+- **One path grid for the pack on the lake** (`scripts/dog_paths.gd`, `DogPaths`): `RES` 2
+  points a tile over everything a dog may stand on (island, water, the bank's beach to
+  `Dog.BEACH_WALK`), solid in the hut, crate, pump and hive (their walk margins) and **on
+  the piers** (jetty a tile wide out `JETTY_OUT`, platform two by two landward, `PIER_KEEP`)
+  and **the driftwood logs** (drawn box grown `LOG_GROW` px). A cell one from a thing costs
+  `NEAR_COST` more, two from it less; a pulled-straight line may not cross the first ring.
+  Built once at load (`Lake._ready`, about 66 ms, `_mark("dog paths")`), again only if the
+  crate, pump, hive or piers move. `Dog._steer` plans on a new target (`_plan`), asks every
+  `PATH_CHECK` whether it still sees the next point (a nudge can hide it) and plans again if
+  not. `_hug`, the slides and `_way_round` stay as the last resort.
+- **Piers and logs are walls in `Dog._may_stand` too**, on the margin's terms (never
+  refused to a dog already inside), **except a pier the dog's target is on**: the strand's
+  rubbish lies under the jetties, and a piece no dog can reach is a lake that never ends.
+- **Animals that stay put are steered round, not gridded** (`Dog.stayers`/`stayer_reach`,
+  handed in by `Wildlife._hand_stayers` each frame: capybaras on land, the peacock, snakes,
+  a turtle basking or tucked on land): one within `STAYER_LOOK` ahead and within its drawn
+  half-width plus `STAYER_BODY` bends the heading (`_round_stayers`, `STAYER_PUSH`). The
+  animals are untouched, so the peacock's bug does not come back. `Dog.calm` still pushes.
+- **Plants and tufts in front of a dog or the angler are drawn again over them**
+  (`Lake._cover_walkers`, `Flora.cover`/`Ground.cover` with `front`, `Flora.FRONT_LAYER` 10,
+  one over the walkers' front band): the animals' pass, for the walkers on `IN_FRONT` only;
+  behind the crate or the hut a copy over their band would also cover the building. Not
+  steered round, by decision.
+- **A swimming dog wears the walk, stepped at the walk's pace** (`Dog._gait_pace`,
+  `_still_showing`): at 1.75 tiles a second the paws paddle about three times as fast as
+  they walk. In all water. Supersedes the gallop in the water (The Legs Step With the Ground).
+- **In the house** (`ShedRoom`): the floor grid's points one from anything solid cost
+  `PATH_NEAR_COST`, two from it `PATH_NEAR_COST2`, and `_line_clear(..., true)` pulls a path
+  straight only clear of that first ring and of the player. **The player is on the path**
+  (`_route`'s `you`: grid points within `YOU_ROUTE` made solid for the one search, bar those
+  by either end; partial if the player fills the only gap), planned again when the player
+  has moved `YOU_REPLAN` cells within `YOU_HEED` of the dog. **A dog the player walks at
+  steps aside** (`_give_way`, `GIVE_REACH`, `GIVE_SPEED`, sideways off their walk; not a dog
+  on its seat, not when they walk away).
+- **Eyes shut asleep in bed**: every lie strip is two frames, the second with the eyes a lid
+  line (`build_pose_mockup.lying(shut)`, `EYES`, `LID`); `ShedRoom.lie_frame` shows it from
+  `SLEEP_AFTER`, with the Zs. The side views are the same head turned; `lie_north` is the
+  back of the hat twice. Re-run `build_rest_frames.py` then `slice_character.gd`.
+- **Out of scope, by decision**: dogs avoiding each other, any change to the animals, paths
+  for the angler or the wildlife, the wash room's hounds, new art beyond the shut eyes.
+- All numbers first guesses. Bench (`bench_frames`): standing 4.0 ms, walking 4.0, cleaned
+  8.1. `test_lake`'s `_check_dog_paths` (round a jetty, a log, a standing animal; onto a pier
+  for a piece under it), `_check_house_manners` (round the player, give way, the rings), the
+  eyes in `_check_shed_rest`, the walkers' plant cover beside the animals', and the swim.
 
 ### The Pack in the Shed (2026-09-19, `/grill-me` with Richard, issue #30)
 One dog could be in the shed; up to the whole pack can be now, and they lie on the
@@ -8028,7 +8081,7 @@ nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOS
   and `_way_round` and the stuck timers are still the last resort.
 - **No path planning, by decision** (Richard, over corner waypoints and over A*): the dog
   still discovers a wall by touching it. Two convex boxes a tile and a third apart do not
-  need a search.
+  need a search. **Lifted 2026-10-11**, see The Pack Finds Its Way.
 - **The pack loafs away from the box and the hut, and away from each other**
   (`Dog._elbow_room`, `_somewhere_on_land`, `IDLE_CLEAR` 3.2 / `SHED_CLEAR` 4.0 /
   `PACK_APART` 3.6 tiles, 2026-09-16, Richard: they cluster around the box). A spot is

@@ -144,6 +144,22 @@ const PATH_RES := 2
 const PATH_LOOK := 0.2
 const DOG_BLOCKED := 0.7
 
+## Smarter in the house (2026-10-11, `/grill-me` with Richard: dogs stuck, bumping the player,
+## ugly paths). A grid point next to the furniture or a wall costs `PATH_NEAR_COST` more, one
+## a point further `PATH_NEAR_COST2`, and a pulled-straight line may not run through the first
+## ring: paths go down the middle of a gap instead of scraping along a sofa's edge. The player
+## is on the dog's path as an obstacle (`YOU_ROUTE` cells round them), so a dog curves round
+## them from the start instead of walking up and stalling; it plans again when the player has
+## moved `YOU_REPLAN` cells while within `YOU_HEED` of it. And a dog the player walks at steps
+## aside (`GIVE_REACH` cells, at `GIVE_SPEED` cells a second), the lake's give-way brought in.
+const PATH_NEAR_COST := 3.0
+const PATH_NEAR_COST2 := 1.0
+const YOU_ROUTE := 1.9
+const YOU_REPLAN := 0.8
+const YOU_HEED := 6.0
+const GIVE_REACH := 2.0
+const GIVE_SPEED := 3.6
+
 ## How long the dog keeps doing one thing, in seconds, and how long it settles for when it
 ## has found the bed.
 const DOG_MOOD_LEAST := 2.5
@@ -758,6 +774,8 @@ class ShedDog extends RefCounted:
 	var path: Array[Vector2] = []
 	var routed_to := Vector2(INF, INF)
 	var blocked: float = 0.0
+	## Where the player stood when the path was planned (see YOU_REPLAN).
+	var routed_you := Vector2(INF, INF)
 
 
 ## The walking grids `_path_grid` has built, by exemption, for the furniture `_grids_for`
@@ -997,7 +1015,9 @@ func _process(delta: float) -> void:
 			_wash_plank.pulse = wash_pulse_amount()
 	_pad_tick()
 	_tick_turn_hint(delta)
+	var you_was := _you_at
 	_walk_you(delta)
+	_you_walk = _you_at - you_was
 	_tick_house(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
@@ -1006,6 +1026,33 @@ func _process(delta: float) -> void:
 	for dog in _dogs:
 		_drive_dog(dog, delta)
 	queue_redraw()
+
+
+## How far the player moved this frame, in cells: which way they are walking when a dog is
+## in the way (`_give_way`).
+var _you_walk := Vector2.ZERO
+
+
+## A dog the player is walking at steps aside: sideways off their walk, onto floor it may stand
+## on. A dog on its seat stays put, and so does one the player is walking away from.
+func _give_way(dog: ShedDog, delta: float) -> void:
+	if _you_walk.length_squared() < 0.000001 or not dog.over.is_empty():
+		return
+	var gap := dog.at - _you_at
+	var apart := gap.length()
+	if apart >= GIVE_REACH or _you_walk.dot(gap) <= 0.0:
+		return
+	var side := Vector2(-_you_walk.y, _you_walk.x).normalized()
+	if side.dot(gap) < 0.0:
+		side = -side
+	var step := side * GIVE_SPEED * delta
+	var others := _others_than(dog)
+	var from := dog.at
+	var moved := _slid(from, step, func(where: Vector2) -> bool:
+		return _clear_of_all(where, from, others, dog.over))
+	if moved != from:
+		dog.left = moved.x < from.x
+		dog.at = moved
 
 
 ## One dog's frame.
@@ -1029,6 +1076,7 @@ func _drive_dog(dog: ShedDog, delta: float) -> void:
 		_drop_seat(dog)
 		dog.at = _dog_somewhere(dog)
 		dog.target = dog.at
+	_give_way(dog, delta)
 	if dog.state == &"walk" or dog.state == &"walk2":
 		if _dog_walk(dog, delta) or dog.mood <= 0.0:
 			_dog_think(dog)
@@ -1435,17 +1483,23 @@ func _dog_clock(dog: ShedDog) -> float:
 func _dog_walk(dog: ShedDog, delta: float) -> bool:
 	if dog.at.distance_to(dog.target) <= 0.25:
 		return true
-	# A new target is routed once; a target nothing leads to is given up on the spot.
-	if not dog.routed_to.is_equal_approx(dog.target):
+	# A new target is routed once; a target nothing leads to is given up on the spot. Routed
+	# again when the player, near enough to matter, has moved since.
+	var you_moved := dog.routed_you.distance_to(_you_at) > YOU_REPLAN \
+		and dog.at.distance_to(_you_at) < YOU_HEED
+	if not dog.routed_to.is_equal_approx(dog.target) or you_moved:
+		if not dog.routed_to.is_equal_approx(dog.target):
+			dog.blocked = 0.0
 		dog.routed_to = dog.target
-		dog.blocked = 0.0
-		dog.path = _route(dog.at, dog.target, dog.over)
+		dog.routed_you = _you_at
+		dog.path = _route(dog.at, dog.target, dog.over, _you_at)
 		if dog.path.is_empty():
 			return true
 	if dog.path.is_empty():
 		return true
-	# Pull the path straight: skip a corner whenever the next point is in plain sight.
-	while dog.path.size() > 1 and _line_clear(dog.at, dog.path[1], dog.over):
+	# Pull the path straight: skip a corner whenever the next point is in plain sight — clear of
+	# the furniture's first ring and of the player.
+	while dog.path.size() > 1 and _line_clear(dog.at, dog.path[1], dog.over, true):
 		dog.path.remove_at(0)
 	var aim: Vector2 = dog.path[0]
 	var gap := aim - dog.at
@@ -1502,6 +1556,25 @@ func _path_grid(over: Dictionary) -> Dictionary:
 			free[y * wide + x] = 1 if ok else 0
 			if not ok:
 				grid.set_point_solid(Vector2i(x, y), true)
+	# The rings round everything solid: dearer, and the first one no straight line through.
+	var near := PackedByteArray()
+	near.resize(wide * tall)
+	for y in tall:
+		for x in wide:
+			if free[y * wide + x] == 0:
+				continue
+			var ring := 3
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					var nx := x + dx
+					var ny := y + dy
+					if nx < 0 or ny < 0 or nx >= wide or ny >= tall or free[ny * wide + nx] == 0:
+						ring = mini(ring, maxi(absi(dx), absi(dy)))
+			if ring == 1:
+				near[y * wide + x] = 1
+				grid.set_point_weight_scale(Vector2i(x, y), 1.0 + PATH_NEAR_COST)
+			elif ring == 2:
+				grid.set_point_weight_scale(Vector2i(x, y), 1.0 + PATH_NEAR_COST2)
 	# Patches of floor, by flood fill over the same eight neighbours the search walks.
 	var label := PackedInt32Array()
 	label.resize(wide * tall)
@@ -1531,7 +1604,7 @@ func _path_grid(over: Dictionary) -> Dictionary:
 					label[n] = patch
 					stack.append(n)
 		patch += 1
-	var out := {"grid": grid, "free": free, "label": label}
+	var out := {"grid": grid, "free": free, "label": label, "near": near}
 	_grids[key] = out
 	return out
 
@@ -1579,24 +1652,73 @@ func _reaches(from: Vector2, to: Vector2, over: Dictionary = {}) -> bool:
 
 
 ## The way from `from` to `to` round the furniture, in cells, `to` last; empty when there is
-## none.
-func _route(from: Vector2, to: Vector2, over: Dictionary = {}) -> Array[Vector2]:
+## none. With `you` given, round the player as well: the grid points within YOU_ROUTE of them
+## are made solid for this one search (and put back after, the grid being shared), bar those
+## by either end, so a dog standing beside the player, or going to a seat beside them, still
+## has a way. Partial when the player stands in the only gap: as far as the dog can get.
+func _route(
+	from: Vector2, to: Vector2, over: Dictionary = {}, you: Vector2 = Vector2(INF, INF)
+) -> Array[Vector2]:
 	var way: Array[Vector2] = []
 	if not _reaches(from, to, over):
 		return way
 	var paths := _path_grid(over)
 	var grid: AStarGrid2D = paths["grid"]
-	for point: Vector2i in grid.get_id_path(_grid_near(from, paths), _grid_near(to, paths)):
+	var free: PackedByteArray = paths["free"]
+	var wide := COLS * PATH_RES
+	var tall := ROWS * PATH_RES
+	var shut: Array[Vector2i] = []
+	if you.x != INF:
+		var mid := Vector2i((you * float(PATH_RES)).floor())
+		var reach := ceili(YOU_ROUTE * PATH_RES)
+		for dy in range(-reach, reach + 1):
+			for dx in range(-reach, reach + 1):
+				var point := mid + Vector2i(dx, dy)
+				if point.x < 0 or point.y < 0 or point.x >= wide or point.y >= tall:
+					continue
+				if free[point.y * wide + point.x] == 0:
+					continue
+				var at := _grid_at(point)
+				if at.distance_to(you) > YOU_ROUTE:
+					continue
+				if at.distance_to(from) < 0.75 or at.distance_to(to) < 0.75:
+					continue
+				grid.set_point_solid(point, true)
+				shut.append(point)
+	var points := grid.get_id_path(_grid_near(from, paths), _grid_near(to, paths), true)
+	for point in shut:
+		grid.set_point_solid(point, false)
+	for point: Vector2i in points:
 		way.append(_grid_at(point))
 	way.append(to)
 	return way
 
 
-## Is the straight line between two spots on the floor clear of the furniture?
-func _line_clear(from: Vector2, to: Vector2, over: Dictionary = {}) -> bool:
+## Is the straight line between two spots on the floor clear of the furniture? `strict` asks
+## more: clear of the first ring round it too (bar where the line starts and ends) and not
+## within the player's room, which is what pulling a dog's path straight wants.
+func _line_clear(from: Vector2, to: Vector2, over: Dictionary = {}, strict: bool = false) -> bool:
 	var steps := maxi(1, ceili(from.distance_to(to) / PATH_LOOK))
+	var near := PackedByteArray()
+	var wide := COLS * PATH_RES
+	if strict:
+		near = _path_grid(over)["near"]
+	var start := Vector2i((from * float(PATH_RES)).floor())
+	var end := Vector2i((to * float(PATH_RES)).floor())
+	var you_in := from.distance_to(_you_at) < YOU_ROUTE
 	for i in range(1, steps + 1):
-		if not _dog_may_stand(from.lerp(to, float(i) / float(steps)), over):
+		var at := from.lerp(to, float(i) / float(steps))
+		if not _dog_may_stand(at, over):
+			return false
+		if not strict:
+			continue
+		if not you_in and at.distance_to(_you_at) < YOU_ROUTE and to.distance_to(_you_at) >= YOU_ROUTE:
+			return false
+		var point := Vector2i((at * float(PATH_RES)).floor())
+		if point == start or point == end:
+			continue
+		var index := point.y * wide + point.x
+		if index >= 0 and index < near.size() and near[index] == 1:
 			return false
 	return true
 
@@ -4241,7 +4363,9 @@ func _draw_lying(piece: StringName, view: int, box: Rect2, drawn: float, scale: 
 		&"east": &"lie_east"}.get(face, &"lie_south") as StringName
 	if not _you_poses.has(pose):
 		return
-	var frame: Dictionary = (_you_poses[pose] as Array)[0]
+	# Awake, then asleep with the eyes shut once the Zs come (the strip's second frame).
+	var frames := _you_poses[pose] as Array
+	var frame: Dictionary = frames[mini(lie_frame(_rest_age), frames.size() - 1)]
 	var region: Rect2 = frame["region"]
 	var ink: Rect2 = frame["ink"]
 	var at: Vector2 = spot["at"]
@@ -4284,6 +4408,12 @@ func _draw_lying(piece: StringName, view: int, box: Rect2, drawn: float, scale: 
 	if _rest_age >= SLEEP_AFTER:
 		var top := Vector2(origin.x + ink.get_center().x * scale, origin.y + ink.position.y * scale)
 		_draw_zs(top + Vector2(ink.size.x * 0.3 * scale, 0.0), scale)
+
+
+## Which frame of a lying strip shows after `age` seconds in bed: the eyes open, then shut
+## from the moment the Zs come.
+static func lie_frame(age: float) -> int:
+	return 1 if age >= SLEEP_AFTER else 0
 
 
 ## The body under the blanket: two folds along it from the cover line to the feet and a lit

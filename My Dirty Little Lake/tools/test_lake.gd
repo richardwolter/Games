@@ -1837,13 +1837,14 @@ func _stage_dog_manners(dogs: Array) -> void:
 				hugged = true
 			if float(dog.get(&"_stuck")) > 0.0:
 				stuck = true
-			if dog.get(&"_around") != Vector2.INF:
+			if (dog.get(&"_path") as PackedVector2Array).size() > 1:
 				bent = true
 			if arrived:
 				break
 		_check(arrived, "a dog sent through %s arrives on the far side" % trial[0], str(dog.tile_pos))
-		_check(bent, "having bent round a corner of it", "")
+		_check(bent, "having planned a way round it", "")
 		_check(not hugged and not stuck, "and never touched it on the way", "hug %s stuck %s" % [hugged, stuck])
+	_check_dog_paths(dog)
 	# The nudge: a still dog beside the angler is pushed clear, the angler does not move.
 	var angler: Angler = _main.get(&"_angler")
 	var angler_was := angler.tile_pos
@@ -1885,6 +1886,80 @@ func _stage_dog_manners(dogs: Array) -> void:
 			"two dogs do not bark over each other", "")
 	for o: Dog in others:
 		o.set(&"_mood_left", 0.0)
+
+
+## The pack finds its way (2026-10-11, `/grill-me` with Richard: "make dogs smarter when
+## avoiding obstacles"): a path on `DogPaths`' grid round the piers and the logs as well as
+## the buildings, never through a jetty or a log, round an animal that stays put, and out of a
+## pocket a look a tile ahead could not see out of. Every walk is the real `_step_towards`.
+func _check_dog_paths(dog: Dog) -> void:
+	var walk := func(from: Vector2, to: Vector2, pace: float, frames: int, watch: Callable) -> bool:
+		dog.tile_pos = from
+		dog.set(&"_state", Dog.State.IDLE)
+		dog.call(&"_fresh_aim")
+		dog.set(&"_speed", 0.0)
+		for i in frames:
+			if bool(dog.call(&"_step_towards", to, pace, 1.0 / 60.0)):
+				return true
+			watch.call(dog.tile_pos)
+		return false
+	var dropoffs: Array = _main.get(&"_dropoffs")
+	_check(DogPaths.piers.size() == dropoffs.size() and dropoffs.size() > 0,
+		"the dogs' grid knows every pier", "%d" % DogPaths.piers.size())
+	if not dropoffs.is_empty():
+		var stop: Dropoff = dropoffs[0]
+		var across := Vector2(-stop.axis.y, stop.axis.x)
+		var a := stop.foot + stop.axis * 1.5 - across * 1.8
+		var b := stop.foot + stop.axis * 1.5 + across * 1.8
+		_check(DogPaths.solid_at(stop.foot + stop.axis * 1.5, dog.crate_tile), "a jetty is solid on the grid", "")
+		var through := [false]
+		var arrived: bool = walk.call(a, b, Dog.SWIM_SPEED, 1200, func(at: Vector2) -> void:
+			if DogPaths.on_pier(at, 0.0):
+				through[0] = true)
+		_check(arrived and not through[0], "a dog swims round a jetty, not through it",
+			"arrived %s through %s at %s" % [arrived, through[0], dog.tile_pos])
+		# A piece under the jetty is still reached: the strand's rubbish lies there too.
+		dog.set(&"_target", stop.foot + stop.axis * 0.4)
+		_check(bool(dog.call(&"_may_stand", stop.foot + stop.axis * 0.4)),
+			"but a dog may go onto a pier for a piece lying under it", "")
+		dog.set(&"_target", Vector2.ZERO)
+	_check(DogPaths.logs.size() > 0, "the dogs' grid knows the driftwood", "%d" % DogPaths.logs.size())
+	var tried := false
+	for box: Rect2 in DogPaths.logs:
+		var mid := Iso.world_to_tile(box.get_center() + Vector2(0.0, box.size.y * 0.3))
+		var left := Iso.world_to_tile(box.get_center() + Vector2(-box.size.x * 0.5 - 40.0, box.size.y * 0.3))
+		var right := Iso.world_to_tile(box.get_center() + Vector2(box.size.x * 0.5 + 40.0, box.size.y * 0.3))
+		dog.tile_pos = mid + Vector2(9.0, 9.0)
+		if not (DogPaths.on_ground(left) and DogPaths.on_ground(right)) \
+				or DogPaths.on_log(left) or DogPaths.on_log(right) or not DogPaths.on_log(mid):
+			continue
+		tried = true
+		var over := [false]
+		var arrived: bool = walk.call(left, right, Dog.RUN_SPEED, 900, func(at: Vector2) -> void:
+			if DogPaths.on_log(at, 0.0):
+				over[0] = true)
+		_check(arrived and not over[0], "a dog runs round a driftwood log, not over it",
+			"arrived %s over %s" % [arrived, over[0]])
+		break
+	_check(tried, "a log with beach either side to try the dogs on", "")
+	# A capybara standing in the line is steered round.
+	var keep_at := Dog.stayers
+	var keep_reach := Dog.stayer_reach
+	var from := Iso.ISLAND_CENTRE + Vector2(-3.0, -3.4)
+	var to := Iso.ISLAND_CENTRE + Vector2(3.0, -3.4)
+	var middle := (from + to) * 0.5
+	Dog.stayers = PackedVector2Array([Iso.tile_to_world(middle.x, middle.y)])
+	Dog.stayer_reach = PackedFloat32Array([0.4])
+	var closest := [INF]
+	var round_it: bool = walk.call(from, to, Dog.RUN_SPEED, 900, func(at: Vector2) -> void:
+		closest[0] = minf(closest[0], at.distance_to(middle)))
+	Dog.stayers = keep_at
+	Dog.stayer_reach = keep_reach
+	_check(round_it and closest[0] > 0.45, "a dog steers round an animal standing in its way",
+		"arrived %s, closest %.2f tiles" % [round_it, closest[0]])
+	var wild_src := FileAccess.get_file_as_string("res://scripts/wildlife.gd")
+	_check(wild_src.contains("Dog.stayers = at") and wild_src.contains("&\"peacock\"") ,
+		"the animals that stay put are handed to the dogs", "")
 
 
 ## The pack's coats and gaits, the sit, and the gripped carry (2026-09-22, Richard).
@@ -4493,6 +4568,66 @@ func _check_shed_paths(room: ShedRoom) -> void:
 	_main.call(&"_set_shed", was_open)
 
 
+## Smarter in the house (2026-10-11, `/grill-me` with Richard): a dog curves round the player
+## from the start instead of walking up and stalling, a dog the player walks at steps aside, and
+## a path keeps clear of the furniture's first ring.
+func _check_house_manners(room: ShedRoom) -> void:
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	decor.clear()
+	var dogs: Array = room.dogs()
+	var kept_dogs := dogs.duplicate()
+	dogs.clear()
+	var you_was: Vector2 = room.get(&"_you_at")
+	var you := Vector2(float(ShedRoom.COLS) * 0.5, float(ShedRoom.ROWS) * 0.5)
+	room.set(&"_you_at", you)
+	var dog := ShedRoom.ShedDog.new()
+	dog.at = you + Vector2(-6.0, 0.0)
+	dog.target = you + Vector2(6.0, 0.0)
+	dog.state = &"walk"
+	var planned: Array = room.call(&"_route", dog.at, dog.target, {}, you)
+	var off_line := 0.0
+	for p: Vector2 in planned:
+		off_line = maxf(off_line, absf(p.y - you.y))
+	_check(off_line >= ShedRoom.ROOM_PERSONAL, "a dog's path curves round the player",
+		"%.2f cells off the line" % off_line)
+	var arrived := false
+	var held := 0.0
+	for _i in 900:
+		if bool(room.call(&"_dog_walk", dog, 1.0 / 60.0)):
+			arrived = dog.at.distance_to(dog.target) <= 0.3
+			break
+		held = maxf(held, dog.blocked)
+	_check(arrived and held < ShedRoom.DOG_BLOCKED * 0.5,
+		"and walks round them without being held up", "arrived %s, held %.2f s" % [arrived, held])
+	# Give way: the player walking straight at a dog moves it sideways.
+	dog.at = you + Vector2(1.8, 0.05)
+	dog.over = {}
+	room.set(&"_you_walk", Vector2(0.12, 0.0))
+	var start := dog.at
+	for _i in 10:
+		room.call(&"_give_way", dog, 1.0 / 60.0)
+	var moved := dog.at - start
+	_check(absf(moved.y) > 0.05 and absf(moved.y) > absf(moved.x) * 3.0,
+		"a dog the player walks at steps aside", str(moved))
+	room.set(&"_you_walk", Vector2(-0.12, 0.0))
+	start = dog.at
+	room.call(&"_give_way", dog, 1.0 / 60.0)
+	_check(dog.at == start, "and stays put when the player walks away from it", "")
+	room.set(&"_you_walk", Vector2.ZERO)
+	# The furniture's rings: dearer, and no straight line through the first.
+	var src := FileAccess.get_file_as_string("res://scripts/shed_room.gd")
+	_check(src.contains("set_point_weight_scale(Vector2i(x, y), 1.0 + PATH_NEAR_COST)")
+		and src.contains("_line_clear(dog.at, dog.path[1], dog.over, true)"),
+		"a dog's path keeps a ring clear of the furniture", "")
+	room.set(&"_you_at", you_was)
+	dogs.assign(kept_dogs)
+	decor.assign(kept)
+	_main.call(&"_set_shed", was_open)
+
+
 ## The pack in the shed (2026-09-19, issue #30): up to as many dogs as the player owns, each
 ## lying on a seat the catalogue authored, one dog to a seat.
 ##
@@ -4570,6 +4705,25 @@ func _check_shed_rest(room: ShedRoom) -> void:
 	# Every face of a bed is lain in, the head on that face's pillow (2026-10-03).
 	for pose in ["lie_north", "lie_west", "lie_east"]:
 		_check(poses.has(pose), "the angler's sheet has %s" % pose, "")
+	# Asleep, the eyes shut (2026-10-11): every lie strip is two frames, awake then asleep, and
+	# the second shows from the moment the Zs come.
+	var two := true
+	for pose in ["lie_south", "lie_north", "lie_west", "lie_east"]:
+		two = two and (poses.get(pose, []) as Array).size() == 2
+	_check(two, "every lying strip is awake, then asleep", "")
+	_check(ShedRoom.lie_frame(ShedRoom.SLEEP_AFTER - 0.1) == 0 and ShedRoom.lie_frame(ShedRoom.SLEEP_AFTER) == 1,
+		"the eyes shut when the Zs come", "")
+	var sheet := Image.load_from_file(ProjectSettings.globalize_path(String(book.get("sheet", ""))))
+	if sheet != null and poses.has("lie_south"):
+		var awake: Array = (poses["lie_south"] as Array)[0]["region"]
+		var asleep: Array = (poses["lie_south"] as Array)[1]["region"]
+		var differ := 0
+		for y in int(awake[3]):
+			for x in int(awake[2]):
+				if sheet.get_pixel(int(awake[0]) + x, int(awake[1]) + y) \
+						!= sheet.get_pixel(int(asleep[0]) + x, int(asleep[1]) + y):
+					differ += 1
+		_check(differ >= 2 and differ <= 8, "and only the eyes change", "%d pixels" % differ)
 	for bed: StringName in [&"decor_pk_bed", &"decor_pk_fancy_bed", &"decor_bed"]:
 		if not sheets.has(bed):
 			continue
@@ -4956,6 +5110,7 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 	_check_shed_rest(room)
 	_check_shed_cues(room)
 	_check_shed_paths(room)
+	_check_house_manners(room)
 	_check_house(room)
 	# The room has to be on screen: `_room_shown` is what rolls the dogs, and it does
 	# nothing at all for a room nobody is looking at. Opening it also re-points `decor` at
@@ -8633,6 +8788,20 @@ func _check_land_animals(wild: Wildlife) -> void:
 			"%s %s" % [over_behind, over_front])
 		_check(int((flora.get(&"_over") as Node2D).z_index) > int((wild.get(&"_ground") as Node2D).z_index)
 			and Flora.OVER_LAYER < Lake.IN_FRONT, "over the animals and under the walkers", "")
+		# The walkers' own copy (2026-10-11): the same rule, over the walkers' front band.
+		flora.cover([Wildlife._body(foot + Vector2(0.0, -3.0), 15.0, 24.0)], true)
+		var walker_behind: bool = (flora.get(&"_front_keys") as PackedInt32Array).has(plant)
+		flora.cover([Wildlife._body(foot + Vector2(0.0, 6.0), 15.0, 24.0)], true)
+		var walker_front: bool = (flora.get(&"_front_keys") as PackedInt32Array).has(plant)
+		_check(walker_behind and not walker_front,
+			"a plant is drawn over a dog or the angler behind it, not one in front of it",
+			"%s %s" % [walker_behind, walker_front])
+		_check(int((flora.get(&"_front") as Node2D).z_index) == Lake.IN_FRONT + 1,
+			"one layer over the walkers' front band", "")
+		flora.cover([], true)
+		var src := FileAccess.get_file_as_string("res://scripts/lake.gd")
+		_check(src.contains("_cover_walkers()") and src.contains("g.cover(bodies, true)"),
+			"the lake hands the walkers to the plants and the tufts every frame", "")
 	else:
 		_check(false, "a grown plant to test the plants over the animals with", "none")
 	var calm: PackedVector2Array = Dog.calm
@@ -11123,7 +11292,7 @@ func _check_walk_weight() -> void:
 
 ## The legs step with the ground (2026-10-11, the walk-pacing pass): every walker's speed is
 ## the one its frames are drawn for, the run frames advance by the ground covered, a push that
-## makes no ground runs in place, the swim wears the gallop, and the twitching run loops are
+## makes no ground runs in place, the swim wears the walk paddled fast, and the twitching run loops are
 ## cut short.
 func _check_walk_pacing() -> void:
 	var dt := 1.0 / 60.0
@@ -11230,7 +11399,10 @@ func _check_walk_pacing() -> void:
 	dog.set(&"_state", Dog.State.SWIM_OUT)
 	dog.tile_pos = Iso.ISLAND_CENTRE + Vector2(12.0, 12.0)
 	var shown := String(dog.call(&"_still_showing"))
-	_check(shown.begins_with("run"), "a swimming dog paddles on the gallop", shown)
+	_check(shown.begins_with("walk"), "a swimming dog paddles on the walk", shown)
+	_check(is_equal_approx(float(dog.call(&"_gait_pace")), Dog.WALK_SPEED),
+		"the swim steps the walk at the walk's own pace, so the paws paddle faster than it goes",
+		str(dog.call(&"_gait_pace")))
 	# Deeper water, deeper dog: shallow by the island's edge, head and back only far out.
 	var edge := Iso.world_to_tile(Iso.island_point(0.6, 0.0))
 	var shallow := 1.0

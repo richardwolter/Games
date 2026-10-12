@@ -207,6 +207,15 @@ func _ready() -> void:
 	_over.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_over.material = material
 	add_child(_over)
+	_front = Over.new()
+	_front.name = &"OverWalkers"
+	_front.flora = self
+	_front.front = true
+	_front.z_index = FRONT_LAYER
+	_front.z_as_relative = false
+	_front.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_front.material = material
+	add_child(_front)
 	_sheet = load(SHEET) as Texture2D
 	if FileAccess.file_exists(TABLE):
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(TABLE))
@@ -793,6 +802,7 @@ func _lay() -> void:
 	_quad_at.resize(_foot.size())
 	_quad_at.fill(-1)
 	_over_stale = true
+	_front_stale = true
 	for k in _foot.size():
 		if _age[k] < 0.0:
 			continue
@@ -928,23 +938,44 @@ var _over_points := PackedVector2Array()
 var _over_uvs := PackedVector2Array()
 var _over_colors := PackedColorArray()
 var _over_indices := PackedInt32Array()
+## The same for the walkers (2026-10-11, Richard: dogs drawn over the plants they are behind):
+## the dogs and the angler on the walkers' front layer (Lake.IN_FRONT, 9) hand their boxes in
+## with `front`, and the plants in front of them are drawn again one layer over it. Walkers
+## behind the crate or the hut are left alone: a copy over their layer would also be over the
+## building, and few plants grow that close to either.
+const FRONT_LAYER := 10
+var _front: Over
+var _front_keys := PackedInt32Array()
+var _front_stale := true
+var _front_points := PackedVector2Array()
+var _front_uvs := PackedVector2Array()
+var _front_colors := PackedColorArray()
+var _front_indices := PackedInt32Array()
 
 
 class Over:
 	extends Node2D
 	var flora: Flora
+	var front := false
 
 	func _draw() -> void:
-		if flora == null or flora._sheet == null or flora._over_indices.is_empty():
+		if flora == null or flora._sheet == null:
+			return
+		var indices := flora._front_indices if front else flora._over_indices
+		if indices.is_empty():
 			return
 		RenderingServer.canvas_item_add_triangle_array(
-			get_canvas_item(), flora._over_indices, flora._over_points, flora._over_colors,
-			flora._over_uvs, PackedInt32Array(), PackedFloat32Array(), flora._sheet.get_rid()
+			get_canvas_item(), indices,
+			flora._front_points if front else flora._over_points,
+			flora._front_colors if front else flora._over_colors,
+			flora._front_uvs if front else flora._over_uvs,
+			PackedInt32Array(), PackedFloat32Array(), flora._sheet.get_rid()
 		)
 
 
 ## The plants over these animals: `bodies` is a list of [drawn box, feet's y], world px.
-func cover(bodies: Array) -> void:
+## `front` draws them over the walkers instead (FRONT_LAYER).
+func cover(bodies: Array, front: bool = false) -> void:
 	if _over == null or _foot.is_empty():
 		return
 	if _by_cell.is_empty():
@@ -979,23 +1010,40 @@ func cover(bodies: Array) -> void:
 						seen[k] = true
 						picked.append(k)
 	picked.sort()
-	if picked == _over_keys and not _over_stale:
-		return
-	_over_keys = picked
-	_over_stale = false
-	_over_points.resize(0)
-	_over_uvs.resize(0)
-	_over_colors.resize(0)
-	_over_indices.resize(0)
+	if front:
+		if picked == _front_keys and not _front_stale:
+			return
+		_front_keys = picked
+		_front_stale = false
+	else:
+		if picked == _over_keys and not _over_stale:
+			return
+		_over_keys = picked
+		_over_stale = false
+	var points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
 	for k in picked:
 		var q := _quad_at[k]
-		var base := _over_points.size()
+		var base := points.size()
 		for i in 4:
-			_over_points.append(_points[q + i])
-			_over_uvs.append(_uvs[q + i])
-			_over_colors.append(_colors[q + i])
-		_over_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
-	_over.queue_redraw()
+			points.append(_points[q + i])
+			uvs.append(_uvs[q + i])
+			colors.append(_colors[q + i])
+		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	if front:
+		_front_points = points
+		_front_uvs = uvs
+		_front_colors = colors
+		_front_indices = indices
+		_front.queue_redraw()
+	else:
+		_over_points = points
+		_over_uvs = uvs
+		_over_colors = colors
+		_over_indices = indices
+		_over.queue_redraw()
 
 
 ## How many plants are drawn over an animal this frame. For the harness.
