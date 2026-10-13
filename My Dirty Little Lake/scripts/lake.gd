@@ -887,8 +887,11 @@ const HINT_TEXT := {
 	&"pigeon": "CUE_PIGEON",
 	&"ferry": "CUE_FERRY",
 	&"meter": "CUE_METER",
+	# The demo's hive (2026-10-13, Richard): E at it says "Not in the demo", once a save.
+	&"hive_demo": "DEMO_LOCKED",
 }
-const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter"]
+const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter",
+	&"hive_demo"]
 var _cues_seen: Dictionary = {}
 var _hints: Array[StringName] = []
 var _hint_up: StringName = &""
@@ -2980,7 +2983,7 @@ func _at_pump() -> bool:
 ## and E beside it falls through to whatever else is in reach. Measured to the footprint's
 ## own middle, which is not the tile the hive stands on: the shelf runs off one side of it.
 func _at_hive() -> bool:
-	if Hive.tile == Vector2.INF or _hive == null or not _hive.actionable():
+	if Hive.tile == Vector2.INF or _hive == null or not (_hive.actionable() or _hive_tease()):
 		return false
 	return _angler.tile_pos.distance_to(Hive.tile + Hive.centre) < HIVE_RANGE
 
@@ -3024,9 +3027,20 @@ func _set_hive_room(open: bool) -> void:
 
 ## E at the hive: only over the bare lake, the pump's rule, and only with something to do.
 func _open_hive_room() -> void:
-	if _panelled() or _hive == null or not _hive.actionable():
+	if _panelled() or _hive == null:
+		return
+	if not _hive.actionable():
+		if _hive_tease():
+			_owe_hint(&"hive_demo")
 		return
 	_set_hive_room(true)
+
+
+## The demo's hive still has its card to give (2026-10-13, Richard): the key chip stands over
+## it in reach and E puts the card up. Once asked for, the hive is scenery, chip and all.
+func _hive_tease() -> bool:
+	return Demo.on() and not (
+		_cues_seen.has(&"hive_demo") or &"hive_demo" in _hints or _hint_up == &"hive_demo")
 
 
 ## The catch is done: the colony is in and the paint comes back, still to be smoked and
@@ -5949,6 +5963,11 @@ func _hint_target(kind: StringName) -> Rect2:
 			return _skin.get_global_transform() * _skin.stock_box()
 		&"meter":
 			return _skin.get_global_transform() * _skin.meter_box()
+		&"hive_demo":
+			if _hive == null:
+				return Rect2()
+			var at := get_viewport().get_canvas_transform() * _hive.to_global(_hive.ready_point())
+			return Rect2(at - Vector2(22.0, 22.0), Vector2(44.0, 44.0))
 	return Rect2()
 
 
@@ -6110,6 +6129,7 @@ func _process(delta: float) -> void:
 	# and can land a frame late).
 	if _hive != null:
 		_hive.lit = _at_hive() and not _menu_open and not _hive_open
+		_hive.tease = _hive_tease()
 	_push_sun()
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
@@ -6840,7 +6860,7 @@ func demo_bought_out() -> bool:
 
 
 ## The thanks, the credits and the Wishlist door, once a save; the farewell flag is the
-## demo's "done" (Habibs on the record player comes with it, as it does for a cleaned lake).
+## demo's "done". The demo has no end song: the playlist carries on under it.
 func _end_demo() -> void:
 	_demo_finale = false
 	if _farewell_shown:

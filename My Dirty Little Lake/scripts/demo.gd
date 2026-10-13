@@ -4,7 +4,8 @@
 ## The demo is the full game with every upgrade track capped short, so the net never reaches
 ## past the water round the island. Buying the last level the demo sells brings down one
 ## tornado; taming it, or letting it go, ends the demo with the thanks, the credits and a
-## Wishlist door. No hive swarm, no scheduled tornado, its own save file.
+## Wishlist door. No hive swarm (the hive says "Not in the demo" once), no scheduled tornado,
+## its own save file.
 class_name Demo
 extends RefCounted
 
@@ -30,8 +31,8 @@ const CAPS := {
 	&"dog_wait": 0,
 	&"dog_strength": 1,
 	&"dog_count": 1,
-	&"recycle_bonus": 1,
-	&"bird_worth": 1,
+	&"recycle_bonus": 0,
+	&"bird_worth": 0,
 	&"lucky_haul": 3,
 	&"double_cast": 3,
 }
@@ -58,6 +59,10 @@ const HEAVY_KEEP := 0.12
 ## Share of the tier 3-4 pieces the island's ring keeps in the demo (the full game trades them
 ## all out): a few heavy pieces right by the island that the demo's net can never lift.
 const RING_TEASE := 0.06
+## The songs the demo plays (2026-10-13, Richard's pick). The record player lists the rest as
+## "Not in the demo" (`MusicStation.demo_locked`), the demo's export leaves their files out,
+## and the demo's ending has no end song: the playlist carries on under it.
+const SONGS: Array[StringName] = [&"movimento_tranquilo", &"beatgucci", &"save_me", &"indie_boi"]
 ## Net hits to tame the finale tornado.
 const TORNADO_HITS := 5
 

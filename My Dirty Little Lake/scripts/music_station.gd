@@ -44,9 +44,8 @@ const ENDING_SONG := &"habibs"
 ## Every song the record player offers, in the order a list plays them.
 const SONGS: Array[StringName] = [&"movimento_tranquilo", &"beatgucci", &"save_me",
 	&"tudo_que_eu_fiz", &"goin", &"indie_boi", &"habibs"]
-## Loobas' songs (2026-10-12, `/grill-me` with Richard), a friend of his: the full game's
-## only, by decision. The demo plays and offers Nuven's alone (`songs()`, `playlist()`), and
-## its export leaves these files out.
+## Loobas' songs (2026-10-12, `/grill-me` with Richard), a friend of his: they wear the blue
+## LOOBAS label and his credit.
 const LOOBAS: Array[StringName] = [&"movimento_tranquilo", &"tudo_que_eu_fiz"]
 ## The two places a list plays in.
 const LAKE := &"lake"
@@ -277,18 +276,30 @@ class Track:
 		return false
 
 
-## Every song this build offers: `SONGS`, less Loobas' in the demo.
+## Every song this build plays: `SONGS`, or in the demo only `Demo.SONGS` (2026-10-13,
+## Richard). The record player still lists all of `SONGS` (`shown()`); the rest read "Not in
+## the demo" there and their files are not in the demo's export.
 static func songs() -> Array[StringName]:
 	if not Demo.on():
 		return SONGS
 	var out: Array[StringName] = []
 	for slug in SONGS:
-		if not LOOBAS.has(slug):
+		if Demo.SONGS.has(slug):
 			out.append(slug)
 	return out
 
 
-## The lake's list by default in this build: `PLAYLIST`, less Loobas' in the demo.
+## Every song the record player lists, played or not: one row and one band of the record each.
+static func shown() -> Array[StringName]:
+	return SONGS
+
+
+## Whether a song is listed but not played in this build.
+static func demo_locked(slug: StringName) -> bool:
+	return SONGS.has(slug) and not songs().has(slug)
+
+
+## The lake's list by default in this build: `PLAYLIST`, less what the demo does not play.
 static func playlist() -> Array[StringName]:
 	var out: Array[StringName] = []
 	var offered := songs()
@@ -319,7 +330,9 @@ func _ready() -> void:
 	for slug in MusicStation.songs():
 		_lake.players[slug] = [_player(slug, "", "lake_"), _player(slug, "_radio", "lake_")]
 		_shed.players[slug] = [null, _player(slug, "_radio", "shed_")]
-	_ending = _player(ENDING_SONG, "", "end_")
+	# The demo has no end song (2026-10-13): the playlist carries on under its ending.
+	if MusicStation.songs().has(ENDING_SONG):
+		_ending = _player(ENDING_SONG, "", "end_")
 	_lake.start(_lake.song)
 	_shed.start(_shed.song)
 	_push()
@@ -337,6 +350,8 @@ func leave_rooms() -> void:
 
 
 func set_ending(on: bool) -> void:
+	if not MusicStation.songs().has(ENDING_SONG):
+		on = false
 	if on and not ending and is_zero_approx(_ending_at) and _ending != null:
 		_ending.play()
 	ending = on
@@ -475,7 +490,7 @@ func take_picks(saved: Dictionary) -> void:
 	if lake.is_empty():
 		lake = MusicStation.playlist()
 	elif not saved.has("loobas"):
-		lake = _read_list(lake + LOOBAS, [])
+		lake = _read_list(lake + LOOBAS, MusicStation.playlist())
 	_lake.take(lake)
 	_shed.take(_read_list(saved.get("shed"), [SHED_SONG]))
 	synced = bool(saved.get("synced", false))

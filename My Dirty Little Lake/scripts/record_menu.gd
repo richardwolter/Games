@@ -194,7 +194,7 @@ func close() -> void:
 
 ## How many art pixels taller than `ART` the board is for the songs this build offers.
 static func extra() -> float:
-	return maxf(0.0, MusicStation.songs().size() - ROWS_BASE) * ROW_GAP
+	return maxf(0.0, MusicStation.shown().size() - ROWS_BASE) * ROW_GAP
 
 
 static func art() -> Vector2:
@@ -207,7 +207,7 @@ static func sync_box() -> Rect2:
 
 ## [art file, face, rim, lit ring round the hole] for the label a song plays on.
 static func label_for(slug: StringName) -> Array:
-	if MusicStation.LOOBAS.has(slug) and not Demo.on():
+	if MusicStation.LOOBAS.has(slug):
 		return [LOOBAS_ART, LOOBAS, LOOBAS_LO, LOOBAS_HI]
 	return [LABEL_ART, LABEL, LABEL_LO, LABEL_HI]
 
@@ -220,7 +220,7 @@ func _shown_band() -> int:
 
 ## The art file of the label on the platter now, for the harness.
 func shown_label() -> String:
-	var songs := MusicStation.songs()
+	var songs := MusicStation.shown()
 	var i := _shown_band()
 	return label_for(songs[i] if i >= 0 and i < songs.size() else &"")[0]
 
@@ -259,8 +259,10 @@ func _panel(r: Rect2, face: Color, lit: Color) -> void:
 ## Every place something answers a click, by key: `tick:<place>:<slug>`, `sync`, `skip`.
 func _targets() -> Dictionary:
 	var out := {}
-	for i in MusicStation.songs().size():
-		var slug: StringName = MusicStation.songs()[i]
+	for i in MusicStation.shown().size():
+		var slug: StringName = MusicStation.shown()[i]
+		if MusicStation.demo_locked(slug):
+			continue
 		var y := ROWS_AT.y + i * ROW_GAP + 3.0
 		out[StringName("tick:lake:" + String(slug))] = _box(Rect2(TICK_X[0] - 3, y - 3, 13, 13))
 		out[StringName("tick:shed:" + String(slug))] = _box(Rect2(TICK_X[1] - 3, y - 3, 13, 13))
@@ -311,7 +313,7 @@ func press(key: StringName) -> bool:
 		# needle has set down on its band (Richard, 2026-09-28).
 		if _lift >= 0.0 or _skipping:
 			return false
-		var next := MusicStation.songs().find(m.next_in(MusicStation.SHED))
+		var next := MusicStation.shown().find(m.next_in(MusicStation.SHED))
 		m.hold(MusicStation.SHED)
 		_skipping = true
 		_from = _band
@@ -352,7 +354,7 @@ func _process(delta: float) -> void:
 		_from = _band
 		_cross = 0.0
 	_seen = changes
-	var live := MusicStation.songs().find(m.playing_in(MusicStation.SHED)) if m != null else 0
+	var live := MusicStation.shown().find(m.playing_in(MusicStation.SHED)) if m != null else 0
 	if live >= 0 and not _skipping:
 		_band = live
 	if _lift >= 0.0:
@@ -423,7 +425,7 @@ func _bake_one(look: Array) -> Array[ImageTexture]:
 					# A band of grooves a song with a smooth gap between each.
 					var across := (GROOVE_OUT - q) / band_wide()
 					var into := across - floorf(across)
-					var last := MusicStation.songs().size() - 0.5
+					var last := MusicStation.shown().size() - 0.5
 					if across > 0.5 and (into < 0.18 or into > 0.82) and across < last:
 						c = GAP_TONE
 					else:
@@ -530,7 +532,7 @@ func _angle_for(reach: float) -> float:
 
 ## How wide a song's band is, and how far its middle is off the record's.
 static func band_wide() -> float:
-	return (GROOVE_OUT - GROOVE_IN) / float(MusicStation.songs().size())
+	return (GROOVE_OUT - GROOVE_IN) / float(MusicStation.shown().size())
 
 
 static func band_middle(index: int) -> float:
@@ -584,8 +586,8 @@ func _draw_rows(m: MusicStation) -> void:
 			Vector2(0, head.y), AMBER_HI, HORIZONTAL_ALIGNMENT_CENTER,
 			Rect2(mid.get_center().x - 40, 0, 80, 1))
 	var synced := m != null and m.synced
-	for i in MusicStation.songs().size():
-		var slug: StringName = MusicStation.songs()[i]
+	for i in MusicStation.shown().size():
+		var slug: StringName = MusicStation.shown()[i]
 		var y := ROWS_AT.y + i * ROW_GAP
 		_px(ROWS_AT.x, y, ROW.x, ROW.y, LID if i % 2 else LID_LO)
 		var open := m == null or m.can_pick(slug)
@@ -593,6 +595,15 @@ func _draw_rows(m: MusicStation) -> void:
 		Style.write(self, title, _fit_size(title, (TICK_X[0] - ROWS_AT.x - 6) * UNIT,
 			[Style.TEXT_SMALL, Style.TEXT_TINY]),
 			_board.position + Vector2(ROWS_AT.x + 3, y + 9) * UNIT, CREAM if open else DIM)
+		# A song the demo does not play says so across both tick columns (2026-10-13).
+		if MusicStation.demo_locked(slug):
+			var words := Text.DEMO_LOCKED
+			var span := Rect2(TICK_X[0] - 3, 0, ROWS_AT.x + ROW.x - TICK_X[0] + 1, 1)
+			Style.write(self, words, _fit_size(words, span.size.x * UNIT,
+				[Style.TEXT_SMALL, Style.TEXT_TINY]),
+				_board.position + Vector2(0, (y + 9) * UNIT), DIM, HORIZONTAL_ALIGNMENT_CENTER,
+				_box(span))
+			continue
 		for c in 2:
 			var tx: float = TICK_X[c]
 			if not open:
@@ -658,7 +669,7 @@ func pad_focus() -> Array:
 				continue
 			if parts[1] == "shed" and m != null and m.synced:
 				continue
-		out.append({"box": targets[key], "key": key, "first": key == StringName("tick:lake:" + String(MusicStation.songs()[0]))})
+		out.append({"box": targets[key], "key": key, "first": key == StringName("tick:lake:" + String(MusicStation.shown()[0]))})
 	if _close != null:
 		out.append({"box": _close.get_rect(), "key": &"close"})
 	return out

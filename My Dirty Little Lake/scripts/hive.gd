@@ -139,6 +139,14 @@ var lit := false:
 		if value != lit:
 			lit = value
 			queue_redraw()
+## The demo's hive, until its "Not in the demo" card has been asked for: the key chip stands
+## over the empty hive while the angler is in reach, and nothing stands there otherwise. The
+## lake sets it (`Lake._hive_tease`).
+var tease := false:
+	set(value):
+		if value != tease:
+			tease = value
+			queue_redraw()
 ## Set through `set_stage` or straight: either way the picture follows and `changed` fires.
 var stage: Stage = Stage.EMPTY:
 	set(value):
@@ -387,7 +395,7 @@ func actionable() -> bool:
 ## is in reach (2026-10-04, Richard), or nothing.
 func mark() -> StringName:
 	if not actionable():
-		return &""
+		return &"chip" if tease and lit else &""
 	return &"chip" if lit else &"orb"
 
 

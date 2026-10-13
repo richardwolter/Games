@@ -6854,7 +6854,8 @@ Record Player.
 - **Full game only, by decision**: under `Demo.on()` the station offers and plays Nuven's
   songs alone (`MusicStation.songs()`, `playlist()`), the record menu stays five rows, the
   label stays red NUVEN and the credits say Nuven alone; the demo preset excludes the two
-  songs and the blue label.
+  songs and the blue label. **Superseded 2026-10-13** (see The Demo's Four Songs): the demo
+  carries Movimento Tranquilo, its blue label and Loobas' credit.
 - `test_lake`'s `_check_loobas` guards the order, the builds and grids, the old-save top-up
   and the mark, the credit, the label, the demo's lists and label, the menu's size and every
   title fitting. Probe: `tools/shot_record_menu.tscn`.
@@ -7231,8 +7232,8 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
 - **Not on Demo** (second pass the same day, Richard): Reel, Loading (`boat_volley`, PT
   "Carga"; not Capacity, PT "Carrega", which the first cut took out by mistake), Fetch and
   Keenness are not sold (cap 0, `Demo.locked`): the row stands drawn back with "Not on Demo"
-  (`DEMO_LOCKED`) in place of its figure and no tag. Pigeons and $ Bonus one level each; the
-  hose stops at level 2 (`WashRoom.hose_most`).
+  (`DEMO_LOCKED`) in place of its figure and no tag. Pigeons and $ Bonus one level each
+  (none since 2026-10-13, below); the hose stops at level 2 (`WashRoom.hose_most`).
 - **The boats keep up** (third pass, Richard: "o ritmo dos barcos fica muito lento"): Capacity
   4 levels (16 to 40 a hold) and Fleet 2 (three hulls). In the sim the ferry carries 3-4
   pieces a second against the net's 2-3, Waiting peaks near 200 at minute 12 and drains;
@@ -7273,6 +7274,26 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   commit. **No SetLive, by decision**: Richard sets the build live on default in Steamworks.
   First build uploaded, installed through Steam and played through by Richard, and submitted
   for Valve's review on 2026-10-10.
+- **The Demo's Four Songs, the piers and the hive** (2026-10-13, `/grill-me` with Richard):
+  - **Four songs play** (`Demo.SONGS`, Richard's pick): Movimento Tranquilo, House by the
+    Lake, Hello World, This is Nice. `MusicStation.songs()` is what plays, `shown()` all
+    seven, which the record menu lists (seven rows, seven bands): the other three
+    (`demo_locked`: Tudo Que Eu Fiz, Sanctuary, Memory Lane) dim their title and write
+    `DEMO_LOCKED` across both tick columns, no ticks, no hover, no pad stop. Lake default
+    Movimento, House by the Lake, Hello World; the shed's This is Nice.
+  - **No end song in the demo**: `set_ending` is refused, so the playlist carries on under
+    the thanks and the credits (the menu's Credits board too). Habibs is not shipped.
+  - Movimento plays on the blue LOOBAS record, and the credits name Loobas under Nuven. The
+    demo preset leaves out `tudo_que_eu_fiz*`, `goin*` and `habibs*` and ships the label.
+  - **Pigeons and $ Bonus are not sold** (cap 0, `Demo.locked`): the "At the piers" rows read
+    `DEMO_LOCKED`. A netted pigeon still pays its base. Prices not re-run, by decision.
+  - **The hive says it once** (`Lake._hive_tease`, `Hive.tease`): the empty hive wears the key
+    chip while the angler is in reach, until the first E there, which owes a hint card
+    (`hive_demo`, the bee's theme a shade duller, words `DEMO_LOCKED`) beside the hive, gone on
+    a click or after 8 s. Saved in `cues_seen`; afterwards no chip and E falls through.
+  - One wording everywhere: `DEMO_LOCKED`, "Not in the demo", no new key.
+  - `test_lake`'s `_check_loobas` guards the four, the three locked, the fit, no end song and
+    the seven rows; `_check_demo` the two shop rows and `_check_demo_hive` the chip and card.
 - **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 

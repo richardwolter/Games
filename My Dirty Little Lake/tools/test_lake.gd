@@ -2364,6 +2364,12 @@ func _check_demo() -> void:
 		and String(locked_row.get("cost", "x")).is_empty(), "a track the demo does not sell reads Not on Demo",
 		str(locked_row))
 	_check(WashRoom.hose_most() == 2, "the demo's hose stops at level 2", "")
+	var at_piers := []
+	for row: Dictionary in _main.call(&"_shop_rows"):
+		if (row["key"] == &"bird_worth" or row["key"] == &"recycle_bonus") and bool(row.get("locked", false)):
+			at_piers.append(row["key"])
+	_check(at_piers.size() == 2, "Pigeons and $ Bonus are not in the demo", str(at_piers))
+	_check_demo_hive()
 	for what: StringName in Lake.TRACKS:
 		_main.set(String(what) + "_level", int(Demo.CAPS.get(what, 0)))
 	_check(bool(_main.call(&"demo_bought_out")), "every track at its demo cap is bought out", "")
@@ -2402,6 +2408,38 @@ func _check_demo() -> void:
 	_check_demo_fill()
 	Demo.forced = false
 	_check(int(_main.call(&"_level_cap", &"net_strength")) == 4, "the full game's cap back", "")
+
+
+## The demo's hive (2026-10-13): the key chip over the empty hive until the first E, which
+## owes the "Not in the demo" card once; then nothing.
+func _check_demo_hive() -> void:
+	var hive: Hive = _main.get(&"_hive")
+	if hive == null:
+		_check(false, "the demo's hive needs a hive", "")
+		return
+	var cues: Dictionary = _main.get(&"_cues_seen")
+	var hints: Array[StringName] = _main.get(&"_hints")
+	var stage_was := hive.stage
+	var seen_was := cues.has(&"hive_demo")
+	hive.stage = Hive.Stage.EMPTY
+	cues.erase(&"hive_demo")
+	_check(bool(_main.call(&"_hive_tease")), "the demo's empty hive has its card to give", "")
+	hive.tease = true
+	hive.lit = true
+	_check(hive.mark() == &"chip", "the chip stands over it in reach", str(hive.mark()))
+	_main.call(&"_open_hive_room")
+	_check(&"hive_demo" in hints and not bool(_main.get(&"_hive_open")),
+		"E at it owes the Not in the demo card, and opens nothing", str(hints))
+	_check(not bool(_main.call(&"_hive_tease")), "once asked for, the chip is gone", "")
+	hive.tease = false
+	_check(hive.mark() == &"", "and the hive is scenery", str(hive.mark()))
+	_check(Text.of(String(Lake.HINT_TEXT[&"hive_demo"])) == Text.DEMO_LOCKED
+		and CueCard.THEMES.has(&"hive_demo"), "the card says Not in the demo, in the bee's theme", "")
+	hints.erase(&"hive_demo")
+	if seen_was:
+		cues[&"hive_demo"] = true
+	hive.lit = false
+	hive.stage = stage_was
 
 
 func _check_achievements() -> void:
@@ -6902,13 +6940,28 @@ func _check_loobas(music: MusicStation) -> void:
 		and RecordMenu.label_for(&"goin")[0] == RecordMenu.LABEL_ART
 		and ResourceLoader.exists(RecordMenu.LOOBAS_ART),
 		"Loobas' songs play on the LOOBAS record, Nuven's on the NUVEN one", "")
+	# The demo plays four songs, Richard's pick (2026-10-13), and lists the rest as locked.
 	Demo.forced = true
-	_check(MusicStation.songs().size() == 5 and not MusicStation.songs().has(&"tudo_que_eu_fiz")
-		and MusicStation.playlist() == [&"beatgucci", &"save_me", &"goin"]
-		and not CreditsBoard.LINES.has("Loobas") and RecordMenu.label_for(&"tudo_que_eu_fiz")[0] == RecordMenu.LABEL_ART,
-		"the demo offers none of them, credits Nuven alone and keeps the red NUVEN label",
-		str(MusicStation.playlist()))
-	_check(is_zero_approx(RecordMenu.extra()), "and its record menu stays five rows tall", "")
+	_check(MusicStation.songs() == [&"movimento_tranquilo", &"beatgucci", &"save_me", &"indie_boi"]
+		and MusicStation.playlist() == [&"movimento_tranquilo", &"beatgucci", &"save_me"]
+		and CreditsBoard.LINES.has("Loobas")
+		and RecordMenu.label_for(&"movimento_tranquilo")[0] == RecordMenu.LOOBAS_ART,
+		"the demo plays its four songs, Movimento on the LOOBAS record, Loobas credited",
+		str(MusicStation.songs()))
+	var locked_songs := MusicStation.SONGS.filter(func(s): return MusicStation.demo_locked(s))
+	_check(locked_songs == [&"tudo_que_eu_fiz", &"goin", &"habibs"]
+		and not music.can_pick(&"goin") and not music.toggle(MusicStation.LAKE, &"goin")
+		and MusicStation.shown() == MusicStation.SONGS,
+		"the other three are listed, locked and cannot be ticked", str(locked_songs))
+	var room_for := (RecordMenu.ROWS_AT.x + RecordMenu.ROW.x - RecordMenu.TICK_X[0] + 1) * RecordMenu.UNIT
+	_check(Style.measure(Text.DEMO_LOCKED, Style.TEXT_TINY).x <= room_for,
+		"Not in the demo fits across the tick columns", str(Style.measure(Text.DEMO_LOCKED, Style.TEXT_TINY).x))
+	var ending_was := music.ending
+	music.set_ending(true)
+	_check(not music.ending, "the demo has no end song: the playlist carries on", "")
+	music.ending = ending_was
+	_check(is_equal_approx(RecordMenu.extra(), 2 * RecordMenu.ROW_GAP),
+		"its record menu lists all seven rows", "")
 	Demo.forced = false
 	_check(is_equal_approx(RecordMenu.extra(), 2 * RecordMenu.ROW_GAP)
 		and RecordMenu.sync_box().position.y >= RecordMenu.ROWS_AT.y + 7 * RecordMenu.ROW_GAP,

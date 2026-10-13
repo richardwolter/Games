@@ -35,8 +35,8 @@ static var TITLE: String:
 ## The pack attributions stay literal: each is the pack's own required wording, verbatim by
 ## licence. Only the headings and the Godot line are keyed.
 ##
-## Loobas under Nuven, by name only (2026-10-12, `/grill-me` with Richard), and only where
-## Loobas' songs are: the demo carries none of them.
+## Loobas under Nuven, by name only (2026-10-12, `/grill-me` with Richard). The demo carries
+## one of his songs since 2026-10-13, so he is credited there too.
 static var LINES: Array:
 	get: return [
 		Text.CREDITS_HEAD_DESIGN,
@@ -44,7 +44,7 @@ static var LINES: Array:
 		"",
 		Text.CREDITS_HEAD_MUSIC,
 		"Nuven",
-	] + ([] if Demo.on() else ["Loobas"]) + [
+		"Loobas",
 		"",
 		Text.CREDITS_HEAD_ART,
 		"Benvictus",

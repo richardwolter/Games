@@ -68,6 +68,9 @@ const THEMES := {
 		"ink": Color(0.10, 0.26, 0.04), "icon": &"sprout", "entrance": &"sprout"},
 	&"swarm": {"band": Color(0.90, 0.68, 0.16), "mark": Color(1.0, 0.80, 0.30),
 		"ink": Color(0.30, 0.16, 0.0), "icon": &"bee", "entrance": &"buzz", "stripes": true},
+	# The demo's hive saying it is not in the demo: the swarm's own bee, its tab a shade duller.
+	&"hive_demo": {"band": Color(0.80, 0.62, 0.20), "mark": Color(1.0, 0.80, 0.30),
+		"ink": Color(0.30, 0.16, 0.0), "icon": &"bee", "entrance": &"buzz", "stripes": true},
 	&"honey": {"band": Color(0.86, 0.50, 0.10), "mark": Color(1.0, 0.72, 0.36),
 		"ink": Color(0.36, 0.14, 0.0), "icon": &"jar", "entrance": &"drip"},
 	&"lucky": {"band": Color(0.84, 0.62, 0.16), "mark": Color(1.0, 0.84, 0.28),
