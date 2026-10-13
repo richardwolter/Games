@@ -12994,7 +12994,23 @@ func _check_oct11_fixes() -> void:
 		if ground.layer == Ground.Layer.OUTSIDE:
 			bank = ground
 	if bank != null:
-		_check(bank.driftwood.size() >= 10, "the bank's beach has its driftwood", str(bank.driftwood.size()))
+		_check(bank.driftwood.size() >= 5 and bank.driftwood.size() <= Ground.DRIFTWOOD_MOST,
+			"the bank's beach has a few pieces of driftwood", str(bank.driftwood.size()))
+		var near_twin := 0
+		var names: Array = bank.get(&"_drift_names")
+		for i in bank.driftwood.size():
+			var best := -1
+			for j in bank.driftwood.size():
+				if j != i and (best < 0 or bank.driftwood[j].get_center().distance_to(bank.driftwood[i].get_center())
+						< bank.driftwood[best].get_center().distance_to(bank.driftwood[i].get_center())):
+					best = j
+			if best >= 0 and bank.driftwood[best].get_center().distance_to(bank.driftwood[i].get_center()) < Ground.DRIFTWOOD_APART:
+				near_twin += 1
+		_check(near_twin == 0, "and they lie far apart", str(near_twin))
+		var kinds_laid := {}
+		for n: String in names:
+			kinds_laid[n] = true
+		_check(kinds_laid.size() >= 3, "and they are not all the one picture", str(kinds_laid.keys()))
 		# Round the bank, not along one stretch of it.
 		var sides := {}
 		for box: Rect2 in bank.driftwood:

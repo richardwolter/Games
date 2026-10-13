@@ -4632,6 +4632,49 @@ Every mechanic a player meets mid-run is named the first time it happens.
   frog ring, the driftwood rules, the money green, the bell and the door;
   `_stage_settings_shape` the two faces.
 
+### Six General Fixes (2026-10-13, `/grill-me` with Richard)
+- **The tornado is out of control** (`Tornado._gusting`, `GUST_GAP`, `STALL_*`, `SURGE*`,
+  `REVERSE_ODDS`, `SWERVE_*`): every 0.35-1 s while it roams it rolls a gust. It may stop
+  dead and then surge, drop its goal and dart off another way, or swerve up to 1.5 rad off
+  its line. `SPEED_DART` 150 to 230, `JITTER_TURN` 1.0, `JITTER_PX` 11, churns are shorter
+  and quicker (`CHURN` 1-2.4 s at 70). The foot a net must touch is unchanged, and so are the
+  hits (3/4/4/5) and the lifetime, by decision: harder to hit, judged in play.
+  **It throws in bursts, further** (`FLING_BURST` 2-4 every `FLING_EVERY` 0.8-1.2 s,
+  `FLING_REACH` 4-10 tiles, keeping `FLING_KEEP` 0.3 of its carry). This supersedes
+  `FLING_FROM` and the 2.5-4.5 tiles. The carry cap is unchanged. Known: a tier-3 piece can
+  land on top of a cleaned bay out of a weak net's Strength, as before.
+- **No animal walks onto a pier or its sign** (`Dropoff.walls`, `Lake._wildlife_buildings`):
+  the jetty's and the platform's drawn boxes, run down `deck_up`, and the sign from its plank
+  to its post's foot are building boxes now. A forced step (fleeing, a capybara's swim) may
+  cut through trees but never into a building (`Wildlife._in_building`). `SIDESTEPS` gained
+  ±90 degrees. Songbird spots keep off the piers (`DogPaths.on_pier`, 1 tile), so
+  `DogPaths.setup` runs before the nature is sown.
+- **An animal in front of a dog or the angler is drawn over them** (`Wildlife.FRONT_LAYER`
+  10, `_paint_front`, `walker_bodies` from `Lake._cover_walkers`, `_shadeless`): the plants'
+  trick. Land animals, frogs and turtles on land, and songbirds on the ground are drawn again
+  without their shadows, when their feet are lower than a walker's on the front band and
+  their drawings overlap.
+- **Driftwood: 7 pieces, mixed, far apart** (`Ground.DRIFTWOOD_MOST`, `DRIFTWOOD_PIECES`,
+  `DRIFTWOOD_APART` 450): every candidate is collected and laid in hash order. Each one is a
+  different picture from the nearest one already down, and is flipped on a hash
+  (`_floor_art`'s `flip`). This supersedes the 15 copies of one log at 150 px.
+- **A loaded run's nature is already there** (`Lake._nature_settles`; `refresh(..., settled)`
+  on `Flora`, `Fish` and `Wildlife._settle_all`): `load_game` builds the filth map at once
+  instead of on the worker a few frames later. Plants are fully grown, schools faded in, and
+  frogs, turtles, land animals, broods and songbirds are placed where they live, with the
+  arrival gaps lifted. Only what is earned after the load arrives as before.
+- **Flowers grow past the lake's grid** (`Flora._sow`): the basin is widest along the grid's
+  x, so on the top-left and bottom-right ends the 92-tile grid stopped about six tiles past
+  the water, on the sand. Plants are now placed over the forest's reach on every side.
+- **A thin black ring on the animals whose art has none** (`Wildlife._ring`, `KINDS`'
+  `"ink"`): the bunnies, the wolf and the peacock get a 1 world px ring drawn at runtime, so
+  it stays even at their fractional sizes. Every other animal above water is already ringed
+  in its art (measured off `critters.png`). Fish, crayfish, anything seen under the water,
+  bees and dragonflies get none, by decision.
+- **The songs' real titles** (`RecordMenu.TITLES`, `docs/CREDITS.md`, Richard): beatgucci
+  "House by the Lake", Save ME "Hello World", Goin "Sanctuary", Indie Boi "This is Nice",
+  Habibs "Memory Lane". The slugs and file names keep the working names.
+
 ### The Ferry's Water (2026-10-11, `/grill-me` with Richard)
 - **The bow breaks water on its own waterline, tight** (`Boat._throw_spray`, `_bow_point`,
   `WaterSplash.bow_spray`, `BOW_SPRAY` 0.2 s, `BOW_SPRAY_SPAN` 14-22 px): a small crown and

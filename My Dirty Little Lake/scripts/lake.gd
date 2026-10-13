@@ -1423,6 +1423,9 @@ func _ready() -> void:
 	# deck, hidden behind a moored hull and walked in front of by the angler. Above the net
 	# and the finds' beams too — "over everything" was the whole of the instruction, and a
 	# bird that vanishes behind the thing being cast at it is the bug, not the fix.
+	# The piers and the logs are known before the nature is sown: the songbirds' spots keep
+	# off the piers through DogPaths.on_pier (2026-10-13).
+	DogPaths.setup(_dropoffs, _grounds)
 	_grow_nature()
 	_start_weather()
 	_mark("nature")
@@ -6201,7 +6204,7 @@ const WALKER_COVER_ANGLER := Vector2(13.0, 42.0)
 
 
 func _cover_walkers() -> void:
-	if _flora == null and _grounds.is_empty():
+	if _flora == null and _grounds.is_empty() and _wildlife == null:
 		return
 	var view := _visible_world_rect().grow(40.0)
 	var bodies: Array = []
@@ -6214,6 +6217,10 @@ func _cover_walkers() -> void:
 		_flora.cover(bodies, true)
 	for g in _grounds:
 		g.cover(bodies, true)
+	# And an animal in front of one is drawn again over it (2026-10-13, Richard: a dog
+	# clipping through the peacock): the animals are on z 6 under the walkers' 9.
+	if _wildlife != null:
+		_wildlife.walker_bodies = bodies
 
 
 ## Walkers on one layer are drawn by their feet, the shed's rule (2026-09-28, Richard: the
@@ -6507,6 +6514,10 @@ func _land_filth() -> void:
 ## Built whole rather than patched where a cast landed: it is a distance map, and taking a
 ## piece out moves the nearest-piece distance of everything round it. One sweep of a grid
 ## the size of a postage stamp is cheaper than the bookkeeping.
+## True only while `load_game` builds the map: the nature it earns is put in place, settled.
+var _nature_settles := false
+
+
 func _build_filth_map() -> void:
 	if _filth_task >= 0:
 		# A remap still out on the thread would land after this one and undo it.
@@ -6626,11 +6637,11 @@ func _apply_filth(done: Dictionary) -> void:
 		_bed_growth = maxf(_bed_growth, clampf(_clean_share / BED_GROWN_AT, 0.0, 1.0))
 		_water_material.set_shader_parameter(&"bed_growth", _bed_growth)
 	if _flora != null:
-		_flora.refresh(_clean_share)
+		_flora.refresh(_clean_share, _nature_settles)
 	if _fish != null:
-		_fish.refresh(_clean_share, _clean_tiles)
+		_fish.refresh(_clean_share, _clean_tiles, _nature_settles)
 	if _wildlife != null:
-		_wildlife.refresh(_clean_share, _clean_tiles, 1.0 - pollution)
+		_wildlife.refresh(_clean_share, _clean_tiles, 1.0 - pollution, _nature_settles)
 
 
 ## How full of rubbish the water round each tile is, 0 to 1: the pieces afloat within
@@ -7115,6 +7126,7 @@ func _wildlife_buildings() -> Array:
 		var roof := stop.roof()
 		if not roof.is_empty():
 			out.append(roof["rect"])
+		out.append_array(stop.walls())
 	return out
 
 
@@ -7618,11 +7630,17 @@ func load_game() -> bool:
 	if _room != null:
 		_room.house_seen = clampi(int(save.get("house_seen", house_stage)), 1, house_stage)
 	_settle_house()
-	_filth_stale = true
 	_camera.position = Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	_load_extra(save)
 	# What the save already proves is earned on the way in (Richard: retroactive).
 	_audit_achievements()
+	# The map at once, not on the worker a few frames later, and the nature it earns already
+	# there (2026-10-13, Richard: "nature should not pop up out of nowhere when loading the
+	# scene on main menu"): plants grown, animals, fish and birds at their spots. Only what is
+	# earned after this grows in, walks out of the woods or flies in.
+	_nature_settles = true
+	_build_filth_map()
+	_nature_settles = false
 	return true
 
 

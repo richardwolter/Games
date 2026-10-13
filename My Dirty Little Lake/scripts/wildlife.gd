@@ -306,6 +306,17 @@ var _bed_shade: Layer
 var _bed: Layer
 var _ground: Layer
 var _air: Layer
+## The animals standing in front of a dog or the angler, drawn again over them (2026-10-13,
+## Richard: "animals behind other animals should have the sprite covered by the animal in
+## front ... I saw a dog clipping through the peacock"). The animals are on z 6 and the
+## walkers on 9, so a dog was always drawn over the peacock; the plants' trick (Flora.cover)
+## puts the one in front back over it, on `FRONT_LAYER`, shadows left out (`_shadeless`).
+## `walker_bodies` are the walkers on the front band, [box, feet y] (`_body`), set by the
+## lake every frame.
+const FRONT_LAYER := 10
+var walker_bodies: Array = []
+var _front: Layer
+var _shadeless := false
 
 
 ## A canvas of its own at its own z, painted by a callable on the owner.
@@ -341,6 +352,7 @@ func _ready() -> void:
 	_bed.material = through
 	_ground = _layer(&"Ground", 6, _paint_ground)
 	_air = _layer(&"Air", 20, _paint_air)
+	_front = _layer(&"Front", FRONT_LAYER, _paint_front)
 	if grid != null:
 		_find_shore()
 
@@ -435,11 +447,18 @@ func flies() -> Array:
 
 
 ## The lake's clean water changed: `clean` is every water tile index the map calls clean.
-func refresh(clean_share: float, clean: PackedInt32Array, cleared_share: float = 0.0) -> void:
+## `settled` (a run just loaded, 2026-10-13, Richard: "nature should not pop up out of
+## nowhere when loading the scene on main menu"): everything the lake earns is put in at once,
+## already where it lives: frogs and turtles on their sand, the land animals at home, broods
+## on the water, songbirds on the ground, all faded in. What is earned after this arrives as
+## it always did.
+func refresh(clean_share: float, clean: PackedInt32Array, cleared_share: float = 0.0, settled: bool = false) -> void:
 	stage = clean_share
 	cleared = cleared_share
 	_clean = clean
 	_reckon_in = 0.0
+	if settled:
+		_settle_all()
 
 
 ## Forget every animal. For the harness, which refills the lake.
@@ -554,6 +573,7 @@ func _process(delta: float) -> void:
 		_bed_shade.queue_redraw()
 	_ground.queue_redraw()
 	_air.queue_redraw()
+	_front.queue_redraw()
 
 
 ## Everything standing on the ground layer, as [drawn box, feet's y], for the plants and the
@@ -863,6 +883,74 @@ func _reckon() -> void:
 			_bird_in = _rng.randf_range(BIRD_GAP.x, BIRD_GAP.y)
 	if none_yet and _alive() > 0:
 		first_arrived.emit(_first_spot())
+
+
+## See `refresh`'s `settled`. The broods and the songbirds have their arrival gaps lifted for
+## it, so they all come at once.
+func _settle_all() -> void:
+	if held or grid == null or not ready_to_live():
+		return
+	var before := {}
+	for list: Array in [_frogs, _turtles, _critters_on_land, _broods, _birds, _flies, _crays]:
+		for a: Dictionary in list:
+			before[a] = true
+	# Each pass adds up to what the gaps let through; a handful of passes fills both lists.
+	for pass_n in maxi(BROODS_MOST, SONGBIRDS_MOST) + 1:
+		_brood_in = 0.0
+		_bird_in = 0.0
+		_reckon()
+	_brood_in = _rng.randf_range(BROOD_GAP.x, BROOD_GAP.y)
+	_bird_in = _rng.randf_range(BIRD_GAP.x, BIRD_GAP.y)
+	for f: Dictionary in _frogs:
+		if before.has(f):
+			continue
+		f["at"] = f["land_at"]
+		f["fade"] = 1.0
+		_frog_sit(f)
+	for t: Dictionary in _turtles:
+		if before.has(t):
+			continue
+		t["at"] = (t["spot"] as Dictionary)["land"]
+		t["fade"] = 1.0
+		_turtle_rest(t)
+	for c: Dictionary in _critters_on_land:
+		if before.has(c) or c.has("lead"):
+			continue
+		c["at"] = c["to"]
+		c["arriving"] = false
+		c["fade"] = 1.0
+		c["path"] = []
+		_rest(c)
+	for c: Dictionary in _critters_on_land:
+		if before.has(c) or not c.has("lead"):
+			continue
+		c["at"] = ((c["lead"] as Dictionary)["at"] as Vector2) + Vector2(CAPY_GAP, 0.0)
+		c["arriving"] = false
+		c["fade"] = 1.0
+		_rest(c)
+	for b: Dictionary in _broods:
+		if before.has(b):
+			continue
+		b["at"] = b["to"]
+		b["alt"] = 0.0
+		b["state"] = Brood.SWIM
+		b["t"] = 1.0
+		for kid: Dictionary in b["kids"]:
+			kid["at"] = (b["at"] as Vector2) + Vector2(_rng.randf_range(-14.0, 14.0), _rng.randf_range(-6.0, 6.0))
+	for bird: Dictionary in _birds:
+		if before.has(bird):
+			continue
+		bird["at"] = bird["to"]
+		bird["alt"] = 0.0
+		bird["fade"] = 1.0
+		bird["state"] = Bird.GROUND
+		_bird_idle(bird)
+	for list: Array in [_flies, _crays]:
+		for a: Dictionary in list:
+			if not before.has(a):
+				a["fade"] = 1.0
+	_reckon_in = RECKON_EVERY
+	queue_redraw()
 
 
 ## How often the animals within earshot are counted for the sound's crowd
@@ -1373,12 +1461,12 @@ enum Land { SIT, MOVE, FLEE, RISE, DISPLAY }
 ## drawn 1.5x smaller than their art (2026-10-06, Richard), drawn smaller rather than rebaked
 ## (his pick off tools/last_shrink_sheet.png), with their boxes come in to match.
 const KINDS := {
-	&"bunny": {"scale": 0.5 / 1.5, "walk": 26.0, "run": 80.0, "shy": 2.2, "half": 7.0, "tall": 12.0},
+	&"bunny": {"ink": true, "scale": 0.5 / 1.5, "walk": 26.0, "run": 80.0, "shy": 2.2, "half": 7.0, "tall": 12.0},
 	&"fox": {"scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 18.0, "tall": 24.0},
-	&"wolf": {"scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 20.0, "tall": 26.0},
+	&"wolf": {"ink": true, "scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 20.0, "tall": 26.0},
 	&"snake": {"scale": 0.5 / 1.5, "walk": 8.0, "run": 16.0, "shy": 1.4, "half": 9.5, "tall": 11.5},
 	&"capy": {"scale": 0.5, "walk": 14.0, "run": 30.0, "shy": 0.0, "half": 13.0, "tall": 22.0},
-	&"peacock": {"scale": 0.5, "walk": 12.0, "run": 12.0, "shy": 0.0, "half": 17.0, "tall": 32.0},
+	&"peacock": {"ink": true, "scale": 0.5, "walk": 12.0, "run": 12.0, "shy": 0.0, "half": 17.0, "tall": 32.0},
 }
 const BUNNY_COATS: Array[String] = ["brown", "black", "white"]
 const SNAKE_COATS: Array[String] = ["blue", "corn"]
@@ -1478,7 +1566,7 @@ const PEACOCK_HOLD := 2.5
 const PEACOCK_STRUT_FPS := 3.0
 ## A step that would put the animal into a tree, a rock or a building is turned this far
 ## either way (radians, in order); blocked every way, a walk gives up after `STUCK_TIME`.
-const SIDESTEPS: Array[float] = [0.6, -0.6, 1.2, -1.2]
+const SIDESTEPS: Array[float] = [0.6, -0.6, 1.2, -1.2, 1.57, -1.57]
 const STUCK_TIME := 0.6
 
 ## The grounds the trees and rocks stand on, and the buildings' drawn boxes (world), handed
@@ -1766,7 +1854,23 @@ func _step_to(c: Dictionary, to: Vector2, go: float, forced: bool = false) -> Ve
 		var side := at + dir.rotated(turn) * go
 		if not _blocked(c, side) and (not keep or _walkable(c, side)):
 			return side
-	return next if forced else at
+	# Forced or not, nothing walks into a building, a pier or a pier's sign (2026-10-13):
+	# a fleeing animal or a capybara's swim may cut through the trees, never those.
+	if forced and (not _in_building(c, next) or _in_building(c, at)):
+		return next
+	return at
+
+
+## Does this animal's drawing, standing on `at`, overlap a building's, a pier's or a sign's box.
+func _in_building(c: Dictionary, at: Vector2) -> bool:
+	var k: Dictionary = KINDS[c["kind"]]
+	var half := float(k["half"])
+	var tall := float(k["tall"])
+	var box := Rect2(at.x - half, at.y - tall, half * 2.0, tall)
+	for r: Rect2 in _building_boxes:
+		if r.intersects(box):
+			return true
+	return false
 
 
 func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
@@ -2349,14 +2453,17 @@ func _draw_land(on: CanvasItem, c: Dictionary) -> void:
 		var shown := Rect2(r.position, Vector2(r.size.x, r.size.y - cut))
 		var water := at + Vector2(0.0, roundf(sin(float(c["clock"]) * CAPY_BOB_RATE) * CAPY_BOB))
 		var sun := _sun() * FLOAT_SHADE
-		Flock.stamp(on, _critters, shown, Vector2.ZERO, facing, Shade.tint_on(day, Shade.On.WATER, fade),
-			Shade.lying(water, sun.x, sun.y), Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
+		if not _shadeless:
+			Flock.stamp(on, _critters, shown, Vector2.ZERO, facing, Shade.tint_on(day, Shade.On.WATER, fade),
+				Shade.lying(water, sun.x, sun.y), Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
 		Flock.stamp(on, _critters, shown, water, facing, Color(1.0, 1.0, 1.0, fade),
 			Transform2D.IDENTITY, Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
 		_collar(on, water, r.size.x * scale_by * SCALE * 0.8, float(c["clock"]), fade)
 		return
 	# The sun's shadow, the dog's own: the picture laid on the land from the feet.
 	_lay(on, name, at, facing, Shade.On.LAND, fade, scale_by)
+	if bool(KINDS[c["kind"]].get("ink", false)):
+		_ring(on, name, at, facing, fade, scale_by)
 	_stamp(on, name, at, facing, Color(1.0, 1.0, 1.0, fade), scale_by)
 
 
@@ -2426,14 +2533,15 @@ func _find_bird_spots() -> void:
 
 
 ## Ground a songbird may stand or walk on: the island's sand and lawn, or the bank's sand, dry
-## and off the hut, the pump, the hive and the crate.
+## and off the hut, the pump, the hive, the crate and the piers.
 func _bird_ground(at: Vector2, side: String) -> bool:
 	if _wet(at):
 		return false
 	if _on_wood(at):
 		return false
 	if side == "bank":
-		return _on_sand(at, "bank")
+		# Never on a pier's deck or platform, nor by its sign (2026-10-13).
+		return _on_sand(at, "bank") and not DogPaths.on_pier(Iso.world_to_tile(at), 1.0)
 	var tile := Iso.world_to_tile(at)
 	if Iso.past_shelf(tile) > -0.15:
 		return false
@@ -2991,6 +3099,21 @@ func _stamp(on: CanvasItem, name: String, at: Vector2, facing: float, tint: Colo
 	Flock.stamp(on, _critters, frame, at, facing, tint, Transform2D.IDENTITY, Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
 
 
+## A black ring one world px round a picture (2026-10-13, `/grill-me` with Richard: "rabbits
+## should also have a small outline to match other sprites style"): the picture drawn four
+## times in black, a world px off each way, under itself. Runtime rather than baked, so it is
+## one world px whatever the picture is drawn at (the bunnies are at a third). Only the kinds
+## whose art carries no ring of its own (`KINDS`' "ink": the bunnies, the wolf, the peacock);
+## every other animal above water is ringed in its art.
+const RING_STEPS: Array[Vector2] = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]
+
+
+func _ring(on: CanvasItem, name: String, at: Vector2, facing: float, fade: float, scale_by: float) -> void:
+	var ink := Color(0.0, 0.0, 0.0, fade)
+	for step: Vector2 in RING_STEPS:
+		_stamp(on, name, at + step, facing, ink, scale_by)
+
+
 ## The sun's lean and stretch as `Shade.lying` takes them: the day's, or the lake's own
 ## (`Shade.sun_of`); with neither, the fallback `Shade.drop` uses, so a laid shadow and a
 ## dropped one agree.
@@ -3011,7 +3134,7 @@ func _surface_at(at: Vector2) -> int:
 func _lay(on: CanvasItem, name: String, at: Vector2, facing: float, surface: int, fade: float,
 		scale_by: float = 1.0, reach: float = 1.0) -> void:
 	var frame := _region(name)
-	if frame.size.x <= 0.0:
+	if frame.size.x <= 0.0 or _shadeless:
 		return
 	var sun := _sun() * reach
 	Flock.stamp(on, _critters, frame, Vector2.ZERO, facing, Shade.tint_on(day, surface, fade),
@@ -3227,6 +3350,54 @@ func _paint_ground(on: CanvasItem) -> void:
 				_draw_bird_shadow(on, item[2])
 
 
+## The animals in front of a walker and overlapping it, drawn again over it, back to front,
+## with no shadows (they are on the ground layer already). See `FRONT_LAYER`.
+func _paint_front(on: CanvasItem) -> void:
+	if walker_bodies.is_empty():
+		return
+	var items: Array = []
+	var ahead := func(box: Rect2, feet: float) -> bool:
+		for body: Array in walker_bodies:
+			if feet > float(body[1]) and box.intersects(body[0]):
+				return true
+		return false
+	for f: Dictionary in _frogs:
+		if int(f["state"]) != Frog.SWIM:
+			var b: Array = _body(f["at"], 10.0 * FROG_DRAWN, 18.0 * FROG_DRAWN)
+			if ahead.call(b[0], b[1]):
+				items.append([b[1], 0, f])
+	for t: Dictionary in _turtles:
+		if int(t["state"]) != Turtle.UNDER:
+			var b: Array = _body(t["at"], 14.0 * TURTLE_DRAWN, 21.0 * TURTLE_DRAWN)
+			if ahead.call(b[0], b[1]):
+				items.append([b[1], 1, t])
+	for c: Dictionary in _critters_on_land:
+		var k: Dictionary = KINDS[c["kind"]]
+		var b: Array = _body(c["at"], float(k["half"]), float(k["tall"]))
+		if ahead.call(b[0], b[1]):
+			items.append([b[1], 4, c])
+	for s: Dictionary in _birds:
+		if float(s["alt"]) <= 0.5:
+			var b: Array = _body(s["at"], 8.0, 14.0)
+			if ahead.call(b[0], b[1]):
+				items.append([b[1], 5, s])
+	if items.is_empty():
+		return
+	items.sort_custom(func(a: Array, c: Array) -> bool: return float(a[0]) < float(c[0]))
+	_shadeless = true
+	for item: Array in items:
+		match int(item[1]):
+			0:
+				_draw_frog(on, item[2])
+			1:
+				_draw_turtle(on, item[2])
+			4:
+				_draw_land(on, item[2])
+			5:
+				_draw_bird_ground(on, item[2])
+	_shadeless = false
+
+
 func _paint_air(on: CanvasItem) -> void:
 	for b: Dictionary in _broods:
 		if float(b["alt"]) > 0.5:
@@ -3266,10 +3437,11 @@ func _draw_frog(on: CanvasItem, f: Dictionary) -> void:
 	var ground := at + Shade.drop(day, lift)
 	var surface := Shade.On.WATER if bool(f["on_pad"]) or _wet(ground) else Shade.On.LAND
 	var sun := _sun()
-	on.draw_set_transform_matrix(Shade.lying(ground.round(), sun.x, sun.y))
-	on.draw_texture_rect_region(sheet, Rect2(-FROG_FOOT * FROG_ART, Vector2(FROG_CELL, FROG_CELL) * FROG_ART), src,
-		Shade.tint_on(day, surface, float(f["fade"])))
-	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if not _shadeless:
+		on.draw_set_transform_matrix(Shade.lying(ground.round(), sun.x, sun.y))
+		on.draw_texture_rect_region(sheet, Rect2(-FROG_FOOT * FROG_ART, Vector2(FROG_CELL, FROG_CELL) * FROG_ART), src,
+			Shade.tint_on(day, surface, float(f["fade"])))
+		on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var box := Rect2((at - FROG_FOOT * FROG_ART - Vector2(0.0, lift)).round(), Vector2(FROG_CELL, FROG_CELL) * FROG_ART)
 	on.draw_texture_rect_region(sheet, box, src, Color(1.0, 1.0, 1.0, float(f["fade"])))
 
@@ -3289,8 +3461,9 @@ func _draw_turtle(on: CanvasItem, t: Dictionary) -> void:
 		var shown := Rect2(r.position, Vector2(r.size.x, r.size.y - cut))
 		var water := at + Vector2(0.0, roundf(sin(float(t["clock"]) * TURTLE_BOB_RATE) * TURTLE_BOB))
 		var sun := _sun() * FLOAT_SHADE
-		Flock.stamp(on, _critters, shown, Vector2.ZERO, facing, Shade.tint_on(day, Shade.On.WATER, fade),
-			Shade.lying(water, sun.x, sun.y), Vector2.ZERO, TURTLE_ART * SCALE / Flock.SCALE)
+		if not _shadeless:
+			Flock.stamp(on, _critters, shown, Vector2.ZERO, facing, Shade.tint_on(day, Shade.On.WATER, fade),
+				Shade.lying(water, sun.x, sun.y), Vector2.ZERO, TURTLE_ART * SCALE / Flock.SCALE)
 		Flock.stamp(on, _critters, shown, water, facing, Color(1.0, 1.0, 1.0, fade),
 			Transform2D.IDENTITY, Vector2.ZERO, TURTLE_ART * SCALE / Flock.SCALE)
 		_collar(on, water, r.size.x * TURTLE_ART * SCALE * 0.8, float(t["clock"]), fade)

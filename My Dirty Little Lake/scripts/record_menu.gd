@@ -46,13 +46,14 @@ const VINYL := Color8(14, 14, 14)
 const VINYL_HI := Color8(48, 48, 48)
 const SCRIM := Color(0.0, 0.0, 0.0, 0.45)
 
-## How the songs are written. Names, not words: not translated.
+## How the songs are written. Names, not words: not translated. The slugs are the files'
+## working names; the titles are the songs' own (2026-10-13, Richard).
 const TITLES := {
-	&"beatgucci": "beatgucci",
-	&"save_me": "Save ME",
-	&"goin": "Goin",
-	&"indie_boi": "Indie Boi",
-	&"habibs": "Habibs",
+	&"beatgucci": "House by the Lake",
+	&"save_me": "Hello World",
+	&"goin": "Sanctuary",
+	&"indie_boi": "This is Nice",
+	&"habibs": "Memory Lane",
 	&"movimento_tranquilo": "Movimento Tranquilo",
 	&"tudo_que_eu_fiz": "Tudo Que Eu Fiz",
 }

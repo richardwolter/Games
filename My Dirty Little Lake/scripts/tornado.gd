@@ -97,17 +97,30 @@ const HUNT_REACH := 2.5
 const HUNT_NEAR := 360.0
 ## A goal is somewhere else: at least this far off, px.
 const HUNT_LEAST := 70.0
-const SPEED_DART := 150.0
-const SPEED_CHURN := 34.0
-const CHURN := Vector2(2.5, 5.0)
+const SPEED_DART := 230.0
+const SPEED_CHURN := 70.0
+const CHURN := Vector2(1.0, 2.4)
 ## A dart eases up to speed over this long and slows inside `ARRIVE_SLOW` px of its goal.
 const DART_RISE := 0.35
 const ARRIVE_SLOW := 70.0
 const ARRIVE := 16.0
 ## Chaos: the heading wanders up to `JITTER_TURN` radians off the line on short noise, and
 ## the foot shakes `JITTER_PX` world px round where it is going.
-const JITTER_TURN := 0.75
-const JITTER_PX := 6.0
+const JITTER_TURN := 1.0
+const JITTER_PX := 11.0
+## Out of control (2026-10-13, `/grill-me` with Richard: "more hectic and out of control,
+## harder to aim"): every `GUST_GAP` seconds it rolls a gust. `STALL_ODDS` of them stop it
+## dead for `STALL` seconds and then it surges `SURGE` times as fast for `SURGE_TIME`;
+## `REVERSE_ODDS` drop the goal and dart off another way, as if just hit; the rest swerve,
+## easing the heading up to `SWERVE_MOST` radians off the line at `SWERVE_EASE`.
+const GUST_GAP := Vector2(0.35, 1.0)
+const STALL_ODDS := 0.22
+const STALL := Vector2(0.15, 0.4)
+const SURGE := 1.5
+const SURGE_TIME := 0.5
+const REVERSE_ODDS := 0.2
+const SWERVE_MOST := 1.5
+const SWERVE_EASE := 7.0
 ## After a hit the new goal is off the way it was going: its direction's dot with the old
 ## heading under `FLEE_DOT`, and `FLEE_CLEAR` px from the old goal.
 const FLEE_DOT := 0.3
@@ -126,9 +139,15 @@ const RELIFT_AFTER := 3.0
 ## How much it carries at size 1; `carry_most()` scales it with the size.
 const CARRY_MOST := 14
 const LIFT_TIME := 0.9
-const FLING_EVERY := 1.2
-const FLING_FULL := 0.55
-const FLING_FROM := 6
+## Flings come in bursts (2026-10-13, `/grill-me` with Richard: "throw more stuff around and
+## further"): every `FLING_EVERY` seconds (`FLING_FULL` when nearly full) it throws
+## `FLING_BURST` pieces `FLING_REACH` tiles out, keeping at least `FLING_KEEP` of what it can
+## carry in the whirl. Was one piece every 1.2 s, 2.5-4.5 tiles, above six carried.
+const FLING_EVERY := Vector2(0.8, 1.2)
+const FLING_FULL := 0.5
+const FLING_BURST := Vector2i(2, 4)
+const FLING_REACH := Vector2(4.0, 10.0)
+const FLING_KEEP := 0.3
 const LIFT_TIER_MOST := 3
 
 # --- Water -----------------------------------------------------------------------------
@@ -189,6 +208,11 @@ var _goal_at := Vector2.ZERO
 var _fleeing := false
 var _churn := 0.0
 var _dart_t := 0.0
+var _gust_in := 0.0
+var _stall := 0.0
+var _surge := 0.0
+var _swerve := 0.0
+var _swerve_to := 0.0
 var _heading := Vector2.ZERO
 var _path := Vector2.ZERO
 
@@ -222,7 +246,7 @@ var _flung: Array[Dictionary] = []
 var _birds: Array[Dictionary] = []
 var _lifted_at := {}
 var _lift_in := 0.0
-var _fling_in := FLING_EVERY
+var _fling_in := FLING_EVERY.y
 var _remap_in := 0.0
 var _remap_dirty := false
 var _scare_in := 0.0
@@ -378,6 +402,11 @@ func start(angle: float = NAN) -> void:
 	_fleeing = false
 	_churn = 0.0
 	_dart_t = 0.0
+	_gust_in = 0.0
+	_stall = 0.0
+	_surge = 0.0
+	_swerve = 0.0
+	_swerve_to = 0.0
 	_heading = Vector2.ZERO
 	if is_nan(angle):
 		if angler != null:
@@ -589,18 +618,49 @@ func _hunt(delta: float, cap: float) -> void:
 		speed *= clampf(left / ARRIVE_SLOW, 0.3, 1.0)
 		if left < ARRIVE:
 			_churn = _rng.randf_range(CHURN.x, CHURN.y)
+	speed *= _gusting(delta, cap)
 	speed = minf(speed, cap)
 	if left < 0.001 or speed <= 0.0:
 		return
 	var turn := JITTER_TURN * (
 		sin(_t * 2.9 + _seed) * 0.6 + sin(_t * 6.3 + _seed * 2.0) * 0.4
-	)
+	) + _swerve
 	var w := line.normalized().rotated(turn) * minf(speed * delta, left)
 	var det := tang.x * norm.y - tang.y * norm.x
 	if absf(det) < 0.0001:
 		return
 	_theta += (w.x * norm.y - w.y * norm.x) / det
 	_grow = clampf(_grow + (tang.x * w.y - tang.y * w.x) / det, lo, hi)
+
+
+## The gusts that throw the hunt about (see `GUST_GAP`): returns what the pace is multiplied
+## by this frame, and eases `_swerve`. Only while it roams: the touchdown and the collapse
+## (`cap` held down) keep their slow walk.
+func _gusting(delta: float, cap: float) -> float:
+	_swerve = lerpf(_swerve, _swerve_to, 1.0 - exp(-SWERVE_EASE * delta))
+	if cap < SPEED_DART:
+		_stall = 0.0
+		_swerve_to = 0.0
+		return 1.0
+	if _stall > 0.0:
+		_stall -= delta
+		if _stall <= 0.0:
+			_surge = SURGE_TIME
+		return 0.05
+	_gust_in -= delta
+	if _gust_in <= 0.0:
+		_gust_in = _rng.randf_range(GUST_GAP.x, GUST_GAP.y)
+		var roll := _rng.randf()
+		if roll < STALL_ODDS:
+			_stall = _rng.randf_range(STALL.x, STALL.y)
+		elif roll < STALL_ODDS + REVERSE_ODDS:
+			_pick_goal(true)
+		else:
+			_swerve_to = _rng.randf_range(-SWERVE_MOST, SWERVE_MOST)
+	if _surge > 0.0:
+		_surge -= delta
+		return SURGE
+	return 1.0
 
 
 ## The fullest water within `HUNT_ARC` of here in the band. Fleeing (just hit), it may not go
@@ -921,18 +981,24 @@ func _fling_now(delta: float) -> void:
 	_fling_in -= delta
 	if _fling_in > 0.0:
 		return
-	if _debris.size() <= FLING_FROM:
+	if _debris.size() <= maxi(2, int(ceil(float(carry_most()) * FLING_KEEP))):
 		_fling_in = 0.2
 		return
-	_fling_in = FLING_EVERY
-	var pick := -1
-	for i in _debris.size():
-		if _debris[i]["state"] == "orbit":
-			pick = i
+	_fling_in = _rng.randf_range(FLING_EVERY.x, FLING_EVERY.y)
+	var full := _debris.size() >= carry_most() - 1
+	var keep := maxi(2, int(ceil(float(carry_most()) * FLING_KEEP)))
+	var burst := _rng.randi_range(FLING_BURST.x, FLING_BURST.y)
+	while burst > 0 and _debris.size() > keep:
+		var pick := -1
+		for i in _debris.size():
+			if _debris[i]["state"] == "orbit":
+				pick = i
+				break
+		if pick < 0:
 			break
-	if pick >= 0:
-		_throw(pick, _rng.randf_range(2.5, 4.5), 0.75)
-	if _debris.size() >= carry_most() - 1:
+		_throw(pick, _rng.randf_range(FLING_REACH.x, FLING_REACH.y), 0.75)
+		burst -= 1
+	if full:
 		_fling_in = FLING_FULL
 
 

@@ -170,6 +170,9 @@ license/agreement in place with the artist (confirmed 2026-09-06).
   `_radio` files are the same songs filtered): "beatgucci (Zé)" (`beatgucci`), "Save ME"
   (`save_me`), "Goin (edit2)" (`goin`, byte for byte the file that was `music_goin.mp3`),
   "INDIE BOI" (`indie_boi_radio`), "Habibs 2" (`habibs`).
+  Their titles in the game (2026-10-13, Richard): `beatgucci` "House by the Lake", `save_me`
+  "Hello World", `goin` "Sanctuary", `indie_boi` "This is Nice", `habibs` "Memory Lane".
+  The file names and code slugs keep the working names.
 - **Loobas** (a friend of Richard's, 2026-10-12): "Movimento Tranquilo"
   (`movimento_tranquilo`) and "Tudo Que Eu Fiz" (`tudo_que_eu_fiz`), delivered as WAV, built
   the same way. Credited "Loobas" on the credits board under Nuven, name only, by Richard's

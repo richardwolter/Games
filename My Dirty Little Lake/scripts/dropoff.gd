@@ -461,6 +461,38 @@ func roof() -> Dictionary:
 	return {"image": _box_image, "rect": Rect2(position + box.position, box.size)}
 
 
+## What the animals keep off, in world px (2026-10-13, Richard: "animals moving over the pier
+## or pier sign, make sure none of them does it"): the drawn jetty and the platform, each its
+## deck-top outline's box run down `deck_up` to the deck's foot, and the sign from its plank
+## down to its post's foot. Read by `Wildlife._blocked` beside the buildings' boxes.
+func walls() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var book := _book()
+	if book.is_empty():
+		return out
+	var up := float(book.get("deck_up", 0)) * ART_SCALE
+	for key in ["jetty", "platform"]:
+		if not book.has(key):
+			continue
+		var box := Rect2()
+		var first := true
+		for p: Variant in book[key]:
+			var at := _world(p, book)
+			if first:
+				box = Rect2(at, Vector2.ZERO)
+				first = false
+			else:
+				box = box.expand(at)
+		if not first:
+			out.append(Rect2(box.position, box.size + Vector2(0.0, up)).grow(2.0))
+	if book.has("sign") and book.has("sign_foot"):
+		var frame := _frame(book)
+		var plank := _rect(book["sign"])
+		var board := Rect2(frame.position + plank.position * ART_SCALE, plank.size * ART_SCALE)
+		out.append(board.expand(_world(book["sign_foot"], book)).grow(2.0))
+	return out
+
+
 ## Where the box is drawn, in world px.
 func _box_rect(book: Dictionary) -> Rect2:
 	var box := _rect(book["box"])

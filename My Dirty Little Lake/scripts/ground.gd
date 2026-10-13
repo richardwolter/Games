@@ -224,7 +224,15 @@ const FLOOR_PIECES := ["log0", "log1", "log_moss0", "log_moss1", "stick0", "stic
 ## them all on one stretch of the south bank. Flora, the beach tufts and the
 ## animals' spots keep off it through `on_driftwood`. 15 logs round the bank, from 2 in
 ## the first cut and 4 in the second.
+## Fewer and mixed (2026-10-13, `/grill-me` with Richard: "too repetitive, make it less and
+## more spread out"): every candidate spot is collected, shuffled off its own hash and laid
+## until `DRIFTWOOD_MOST`, `DRIFTWOOD_APART` 450 px apart, each one a picture off
+## `DRIFTWOOD_PIECES` that differs from the nearest one laid, flipped on a hash. Was 15 of the
+## one driftwood picture, 150 px apart.
 const DRIFTWOOD_SHARE := 0.04
+const DRIFTWOOD_MOST := 7
+const DRIFTWOOD_PIECES := ["driftwood", "driftwood", "log0", "log1", "log_moss0", "log_moss1",
+	"stick0", "stick1"]
 const DRIFTWOOD_BAND := Vector2(1.0, 4.2)
 const DRIFTWOOD_CLEAR := 6.0
 ## How far out of the water every corner of a log's drawing has to be, tiles: on the dry
@@ -237,7 +245,7 @@ const DRIFTWOOD_DRY := 0.4
 const LITTER_CLEAR := 26.0
 ## How far apart two logs' middles are kept, world px: so they spread round the bank rather
 ## than lining up along the one stretch of beach wide enough to take them.
-const DRIFTWOOD_APART := 150.0
+const DRIFTWOOD_APART := 450.0
 const ROCKS := "res://assets/Forest Isometric Pack Free/Rocks/Slice %d.png"
 const ROCK_COUNT := 5
 const LEAVES := "res://assets/Forest Isometric Pack Free/Leaves/Slice %d.png"
@@ -349,6 +357,8 @@ var _strips: Dictionary = {}
 var _one_x: Dictionary = {}
 ## Every piece of driftwood's drawn box, world px (`_lay_driftwood`).
 var driftwood: Array[Rect2] = []
+## Which picture each one is, in `driftwood`'s order.
+var _drift_names: Array[String] = []
 
 
 ## The polygon the shader draws the ground on, and its material.
@@ -557,6 +567,7 @@ func _sow() -> void:
 	if layer != Layer.OUTSIDE:
 		return
 	driftwood.clear()
+	_drift_names.clear()
 	var span := _span()
 	# What each tile's middle is, asked once for the four passes below rather than once a
 	# pass: the ring is tens of thousands of tiles, and the shore-shape maths is most of
@@ -612,6 +623,7 @@ func _sow() -> void:
 			_litter(Vector2i(tx, ty), at)
 
 	# The wood's floor, then a piece of driftwood now and then on the bank's beach.
+	var drift_spots: Array = []
 	for tx in range(span.position.x, span.end.x + 1):
 		for ty in range(span.position.y, span.end.y + 1):
 			var at := Vector2(float(tx) + 0.5, float(ty) + 0.5)
@@ -627,7 +639,12 @@ func _sow() -> void:
 					_litter_art(Vector2i(tx, ty), at, _floor_art(piece))
 			elif k == Kind.SAND and out >= DRIFTWOOD_BAND.x and out <= DRIFTWOOD_BAND.y:
 				if _hash(at.x * 3.1 - 5.0, at.y * 6.7 + 1.0) < DRIFTWOOD_SHARE:
-					_lay_driftwood(Vector2i(tx, ty), at)
+					drift_spots.append([_hash(at.y * 4.3 + 11.0, at.x * 2.1 - 3.0), Vector2i(tx, ty), at])
+	drift_spots.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	for spot: Array in drift_spots:
+		if driftwood.size() >= DRIFTWOOD_MOST:
+			break
+		_lay_driftwood(spot[1], spot[2])
 
 	# The tufts on the beach, just past the lawn's line. Each is rolled a spot inside its
 	# tile rather than standing on the middle, so the scatter does not line up with the
@@ -657,10 +674,24 @@ func _sow() -> void:
 ## One piece of driftwood at `at`, if its whole drawing is on sand above the rubbish's band
 ## and clear of every log already down. See DRIFTWOOD_BAND.
 func _lay_driftwood(cell: Vector2i, at: Vector2) -> void:
-	var art := _floor_art("driftwood")
+	var foot := Iso.tile_to_world(at.x, at.y)
+	# Not the picture of the nearest one already down.
+	var near := ""
+	var near_d := INF
+	for i in driftwood.size():
+		var d := driftwood[i].get_center().distance_to(foot)
+		if d < near_d:
+			near_d = d
+			near = _drift_names[i]
+	var pick := int(_hash(at.x * 7.7 + 1.0, at.y * 1.3 + 5.0) * float(DRIFTWOOD_PIECES.size())) % DRIFTWOOD_PIECES.size()
+	var name: String = DRIFTWOOD_PIECES[pick]
+	for k in DRIFTWOOD_PIECES.size():
+		name = DRIFTWOOD_PIECES[(pick + k) % DRIFTWOOD_PIECES.size()]
+		if name != near:
+			break
+	var art := _floor_art(name, _hash(at.y * 9.1 - 2.0, at.x * 3.7) < 0.5)
 	if art == null:
 		return
-	var foot := Iso.tile_to_world(at.x, at.y)
 	var size := Vector2(art.get_width(), art.get_height()) * _scale_of(art)
 	var box := Rect2(foot - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
 	var wide := box.grow(DRIFTWOOD_CLEAR)
@@ -673,6 +704,7 @@ func _lay_driftwood(cell: Vector2i, at: Vector2) -> void:
 		if other.get_center().distance_to(box.get_center()) < DRIFTWOOD_APART:
 			return
 	driftwood.append(box)
+	_drift_names.append(name)
 	_litter_art(cell, at, art)
 
 
@@ -757,8 +789,26 @@ func _tree_art(name: String) -> Texture2D:
 	return art
 
 
-## One of the floor's pieces off its sheet, drawn at one world px a painted px.
-func _floor_art(name: String) -> Texture2D:
+## One of the floor's pieces off its sheet, drawn at one world px a painted px; `flip`,
+## mirrored left to right (a picture of its own, so the batch needs no flag).
+func _floor_art(name: String, flip: bool = false) -> Texture2D:
+	if flip:
+		var key := name + "@flip"
+		if _tree_art_cache.has(key):
+			return _tree_art_cache[key]
+		var plain := _floor_art(name)
+		if plain == null:
+			return null
+		var img := plain.get_image()
+		if img == null:
+			return plain
+		if img.is_compressed():
+			img.decompress()
+		img.flip_x()
+		var turned := ImageTexture.create_from_image(img)
+		_one_x[turned] = true
+		_tree_art_cache[key] = turned
+		return turned
 	if _tree_art_cache.has(name):
 		return _tree_art_cache[name]
 	var table := _trees_table()

@@ -138,10 +138,19 @@ func schools() -> Array:
 
 
 ## The lake's clean water changed: `clean` is every water tile index the map calls clean.
-func refresh(clean_share: float, clean: PackedInt32Array) -> void:
+## `settled` (a run just loaded, 2026-10-13): the schools the stage buys are put in at once,
+## already faded in.
+func refresh(clean_share: float, clean: PackedInt32Array, settled: bool = false) -> void:
 	stage = clean_share
 	_clean_tiles = clean
 	_reckon_in = 0.0
+	if settled:
+		_reckon()
+		_reckon_in = RECKON_EVERY
+		for s: Dictionary in _schools:
+			s["fade"] = 1.0
+		_spots = _fish_spots()
+		queue_redraw()
 
 
 ## Something hit the water at `at` (world): every school within reach turns and runs.

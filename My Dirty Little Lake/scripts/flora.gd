@@ -324,7 +324,9 @@ func reset() -> void:
 
 
 ## The lake's clean share changed, or the map did: see what is due now.
-func refresh(clean_share: float) -> void:
+## `settled` (a run just loaded, 2026-10-13): what is due is there already, fully grown, with
+## no grow-in.
+func refresh(clean_share: float, settled: bool = false) -> void:
 	stage = clean_share
 	if grid == null or grid.filth.is_empty():
 		return
@@ -336,9 +338,12 @@ func refresh(clean_share: float) -> void:
 			continue
 		if grid.water_state(_water_index[k]) != 0:
 			continue
+		_alive += 1
+		if settled:
+			_age[k] = _delay[k] + GROW_TIME
+			continue
 		_age[k] = 0.0
 		_growing += 1
-		_alive += 1
 	if _growing > 0:
 		set_process(true)
 	_dirty = true
@@ -541,8 +546,15 @@ func _follow_sun() -> void:
 ## the shore band, and the ring of water just off each shore for the pads.
 func _sow() -> void:
 	var entries: Array = []
-	for tx in Iso.COLS:
-		for ty in Iso.ROWS:
+	# Over every tile the grounds draw, not only the lake's grid (2026-10-13, Richard: the top
+	# left and bottom right of the bank grew no flowers): the basin is widest along the grid's
+	# x, so on those two ends the grid stops about six tiles past the water, on the sand.
+	# Only as far as anything grows: the forest's floor, `FOREST_DEEP` past the woods' edge.
+	var reach := Iso.RADIUS + Vector2.ONE * (Ground.WOOD_FROM + FOREST_DEEP + 3.0)
+	var span := Rect2i(0, 0, Iso.COLS, Iso.ROWS).merge(
+		Rect2i(Vector2i((Iso.CENTRE - reach).floor()), Vector2i((reach * 2.0).ceil())))
+	for tx in range(span.position.x, span.end.x):
+		for ty in range(span.position.y, span.end.y):
 			var kinds := _kinds_at(tx, ty)
 			for spot in kinds.size():
 				var kind: String = kinds[spot]
