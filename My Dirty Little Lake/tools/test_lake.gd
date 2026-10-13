@@ -9061,19 +9061,22 @@ func _check_land_animals(wild: Wildlife) -> void:
 	wild._land_step(bun, 0.016, PackedVector2Array([(bun["at"] as Vector2) + Vector2(8.0, 0.0)]))
 	_check(int(bun["state"]) == Wildlife.Land.FLEE, "a bunny walked up to runs off", "")
 	var from: Vector2 = bun["at"]
-	# Gone only once off the screen, never faded where it is seen (2026-10-06).
-	var faded_seen := 0
-	var fade_was := float(bun["fade"])
-	for i in 3600:
-		if bun.get("gone", false):
-			break
+	# A hop a short way off, then it stays (2026-10-13): never gone, never running on the
+	# spot — a frame with its legs going (MOVE or FLEE) and under a tenth of a px gained.
+	var in_place := 0
+	var longest := 0
+	for i in 1200:
+		var was: Vector2 = bun["at"]
 		wild._land_step(bun, 1.0 / 60.0, PackedVector2Array())
-		if float(bun["fade"]) < fade_was and wild._in_view(bun["at"]):
-			faded_seen += 1
-		fade_was = float(bun["fade"])
-	_check(bun.get("gone", false) and not wild._in_view(bun["at"]), "and is gone into the trees, off the screen",
-		"%.0f px, in view %s" % [from.distance_to(bun["at"]), wild._in_view(bun["at"])])
-	_check(faded_seen == 0, "and never fades where it can be seen", "%d frames" % faded_seen)
+		var going := int(bun["state"]) == Wildlife.Land.MOVE or int(bun["state"]) == Wildlife.Land.FLEE
+		if going and was.distance_to(bun["at"]) < 0.1:
+			in_place += 1
+			longest = maxi(longest, in_place)
+		else:
+			in_place = 0
+	_check(not bun.get("gone", false) and from.distance_to(bun["at"]) > 10.0,
+		"and hops a short way off and stays", "%.0f px, gone %s" % [from.distance_to(bun["at"]), bun.get("gone", false)])
+	_check(longest < 45, "and never runs on the spot for long", "%d frames" % longest)
 	if not snake.is_empty():
 		var sat: Vector2 = snake["at"]
 		wild._land_step(snake, 0.016, PackedVector2Array([sat + Vector2(8.0, 0.0)]))

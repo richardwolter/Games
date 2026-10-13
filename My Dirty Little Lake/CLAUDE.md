@@ -4671,6 +4671,16 @@ Every mechanic a player meets mid-run is named the first time it happens.
   it stays even at their fractional sizes. Every other animal above water is already ringed
   in its art (measured off `critters.png`). Fish, crayfish, anything seen under the water,
   bees and dragonflies get none, by decision.
+- **Bunnies keep their heads** (same day, Richard: "getting stuck running in place too much.
+  Make them less afraid and more intelligent moving"): `shy` 2.2 to 1.3 tiles. A fright is a
+  hop of `BUNNY_HOP` (1.6-3.2) tiles away to a spot with a clear way there (`_bunny_hop`):
+  straight away first, then bent up to 90 degrees either side. A bank bunny no longer bolts
+  into the trees and vanishes. Every bunny walk is rolled up to `WAY_TRIES` times until the
+  straight line there is walkable and clear (`_clear_way`). **Every land animal** now
+  rests instead of running on the spot (`PROGRESS_PX` / `PROGRESS_TIME`: no ground gained in
+  0.8 s), `STUCK_TIME` went 0.6 to 0.25, and an animal still among the trees on its way out
+  walks straight through them (it is unseen there). Supersedes "a bunny runs into the trees,
+  fading" and the bank bunny's run off screen.
 - **The songs' real titles** (`RecordMenu.TITLES`, `docs/CREDITS.md`, Richard): beatgucci
   "House by the Lake", Save ME "Hello World", Goin "Sanctuary", Indie Boi "This is Nice",
   Habibs "Memory Lane". The slugs and file names keep the working names.

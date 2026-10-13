@@ -1461,7 +1461,7 @@ enum Land { SIT, MOVE, FLEE, RISE, DISPLAY }
 ## drawn 1.5x smaller than their art (2026-10-06, Richard), drawn smaller rather than rebaked
 ## (his pick off tools/last_shrink_sheet.png), with their boxes come in to match.
 const KINDS := {
-	&"bunny": {"ink": true, "scale": 0.5 / 1.5, "walk": 26.0, "run": 80.0, "shy": 2.2, "half": 7.0, "tall": 12.0},
+	&"bunny": {"ink": true, "scale": 0.5 / 1.5, "walk": 26.0, "run": 80.0, "shy": 1.3, "half": 7.0, "tall": 12.0},
 	&"fox": {"scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 18.0, "tall": 24.0},
 	&"wolf": {"ink": true, "scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 20.0, "tall": 26.0},
 	&"snake": {"scale": 0.5 / 1.5, "walk": 8.0, "run": 16.0, "shy": 1.4, "half": 9.5, "tall": 11.5},
@@ -1487,6 +1487,17 @@ const FLEE_SPEED := Vector2(70.0, 90.0)
 const LAND_SIT := Vector2(2.0, 7.0)
 const LAND_WANDER := Vector2(18.0, 60.0)
 const FLEE_REACH := 140.0
+## The bunnies keep their heads (2026-10-13, Richard: "getting stuck running in place too
+## much. Make them less afraid and more intelligent moving"). Shy at 1.3 tiles, not 2.2; a
+## fright is a hop `BUNNY_HOP` tiles away to a spot it can see a clear way to
+## (`_bunny_hop`), not a bolt for the trees; and every walk goes only where the line there
+## is clear (`_clear_way`), rolled `WAY_TRIES` times.
+const BUNNY_HOP := Vector2(1.6, 3.2)
+const WAY_TRIES := 8
+## Every land animal: a walk that has not come `PROGRESS_PX` nearer its goal in
+## `PROGRESS_TIME` seconds stops and rests rather than running on the spot.
+const PROGRESS_PX := 3.0
+const PROGRESS_TIME := 0.8
 const LAND_PRINT_EVERY := 10.0
 ## The bunnies' home on the bank (Richard, 2026-09-25: "more concentrated on grass and near
 ## forest"): the lawn towards the treeline, `LAND_HOME` tiles out of the water, and now and
@@ -1567,7 +1578,7 @@ const PEACOCK_STRUT_FPS := 3.0
 ## A step that would put the animal into a tree, a rock or a building is turned this far
 ## either way (radians, in order); blocked every way, a walk gives up after `STUCK_TIME`.
 const SIDESTEPS: Array[float] = [0.6, -0.6, 1.2, -1.2, 1.57, -1.57]
-const STUCK_TIME := 0.6
+const STUCK_TIME := 0.25
 
 ## The grounds the trees and rocks stand on, and the buildings' drawn boxes (world), handed
 ## in by the lake. See `_blocked`.
@@ -1931,6 +1942,14 @@ func _land_choose(c: Dictionary) -> void:
 			_set_off(c, up)
 			return
 	c["up_inland"] = false
+	if kind == &"bunny":
+		for attempt in WAY_TRIES:
+			var to_try := _bunny_wander(c)
+			if to_try != at and _walkable(c, to_try) and not _taken_by_still(to_try) 					and not _blocked(c, to_try) and _clear_way(c, at, to_try):
+				_set_off(c, to_try)
+				return
+		c["timer"] = 1.0
+		return
 	match kind:
 		&"bunny":
 			if c["zone"] == "isle":
@@ -1966,8 +1985,31 @@ func _land_choose(c: Dictionary) -> void:
 		c["timer"] = 1.0
 
 
+## A bunny's next spot: grazing along the grass, a look at the water, back home; or about
+## the island's lawn. Rolled afresh each call (`_land_choose` tries several).
+func _bunny_wander(c: Dictionary) -> Vector2:
+	var at: Vector2 = c["at"]
+	var spot: Dictionary = c["spot"]
+	var n: Vector2 = spot["normal"]
+	var along := Vector2(-n.y, n.x) * (1.0 if _rng.randf() < 0.5 else -1.0)
+	var home: Vector2 = c["home"]
+	if c["zone"] == "isle":
+		if _isle_lawn.is_empty():
+			return at
+		var to: Vector2 = _isle_lawn[_rng.randi_range(0, _isle_lawn.size() - 1)]
+		return at + (to - at).limit_length(_rng.randf_range(LAND_WANDER.x, LAND_WANDER.y))
+	if _rng.randf() < LAND_BEACH_ODDS and not c.get("on_beach", false):
+		c["on_beach"] = true
+		return (spot["land"] as Vector2) + along * _rng.randf_range(0.0, 20.0)
+	if c.get("on_beach", false):
+		c["on_beach"] = false
+		return home + along * _rng.randf_range(0.0, 20.0)
+	return at + along * _rng.randf_range(LAND_WANDER.x, LAND_WANDER.y) + (home - at) * 0.4
+
+
 ## Off to `to`: a capybara sitting or lying gets up first.
 func _set_off(c: Dictionary, to: Vector2) -> void:
+	_mark_progress(c)
 	c["to"] = to
 	if c["kind"] == &"capy" and c["pose"] != "idle":
 		c["state"] = Land.RISE
@@ -1990,7 +2032,7 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 	var go := speed * delta
 	if flee:
 		# Runs on at full strength; it is gone only once off the screen (`VIEW_MARGIN`).
-		if c["zone"] == "bank" and kind != &"snake" and not _in_view(at):
+		if c["zone"] == "bank" and kind != &"snake" and kind != &"bunny" and not _in_view(at):
 			c["gone"] = true
 			return
 	else:
@@ -2006,7 +2048,11 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 		c["at"] = to
 		_arrived(c, flee)
 	else:
-		var next := _step_to(c, to, go, (flee and c["zone"] == "bank") or bool(c.get("trip", false)))
+		# Still among the trees on its way out it walks straight through them: it is unseen
+		# there (`arriving` holds its fade at 0), and a sidestep round every trunk was a walk
+		# that never came out.
+		var forced: bool = (flee and c["zone"] == "bank" and kind != &"bunny") or bool(c.get("trip", false)) 			or bool(c.get("arriving", false))
+		var next := _step_to(c, to, go, forced)
 		if next == at:
 			c["stuck"] = float(c["stuck"]) + delta
 			if float(c["stuck"]) > STUCK_TIME:
@@ -2015,6 +2061,25 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 				_rest(c)
 			return
 		c["stuck"] = 0.0
+		# Moving, but not getting there: sidestepping back and forth at a corner is legs
+		# running on the spot. Give up and rest (`PROGRESS_TIME`).
+		var left := next.distance_to(to)
+		# A new goal (the next waypoint, a flee stretch) starts the count again.
+		if c.get("prog_to", Vector2.INF) != to:
+			c["prog_to"] = to
+			c["prog_d"] = INF
+			c["prog_t"] = 0.0
+		if left < float(c.get("prog_d", INF)) - PROGRESS_PX:
+			c["prog_d"] = left
+			c["prog_t"] = 0.0
+		else:
+			c["prog_t"] = float(c.get("prog_t", 0.0)) + delta
+			if float(c["prog_t"]) > PROGRESS_TIME and not (flee and c["zone"] == "bank" and kind != &"bunny"):
+				c["prog_t"] = 0.0
+				c["path"] = []
+				c.erase("hop")
+				_rest(c)
+				return
 		_turn_with(c, next - at, delta)
 		c["at"] = next
 		c["walked"] = float(c["walked"]) + at.distance_to(next)
@@ -2082,7 +2147,8 @@ static func _view_of(v: Vector2) -> String:
 
 
 func _arrived(c: Dictionary, flee: bool) -> void:
-	if flee and c["zone"] == "bank" and c["kind"] != &"snake":
+	c.erase("hop")
+	if flee and c["zone"] == "bank" and c["kind"] != &"snake" and c["kind"] != &"bunny":
 		# Still on the screen: on the same way, another stretch, until it is off it.
 		if _in_view(c["at"]):
 			var away: Vector2 = c.get("flee_dir", Vector2.UP)
@@ -2145,6 +2211,16 @@ func _land_fright(c: Dictionary, from: Vector2) -> void:
 		c["speed"] = float(KINDS[kind]["run"])
 		c["state"] = Land.FLEE
 		return
+	if kind == &"bunny":
+		var hop := _bunny_hop(c, from)
+		if hop == at:
+			return
+		c["to"] = hop
+		c["speed"] = float(KINDS[kind]["run"])
+		c["state"] = Land.FLEE
+		c["hop"] = true
+		_mark_progress(c)
+		return
 	if c["zone"] == "isle":
 		var best := at
 		for p: Vector2 in _isle_lawn:
@@ -2153,12 +2229,49 @@ func _land_fright(c: Dictionary, from: Vector2) -> void:
 		c["to"] = best
 		c["speed"] = float(KINDS[kind]["run"])
 		c["state"] = Land.FLEE
+		_mark_progress(c)
 		return
 	var inland := -((c["spot"] as Dictionary)["normal"] as Vector2)
 	c["flee_dir"] = (inland * 1.3 + away).normalized()
 	c["to"] = at + (c["flee_dir"] as Vector2) * FLEE_REACH
 	c["state"] = Land.FLEE
 	c["speed"] = _rng.randf_range(FLEE_SPEED.x, FLEE_SPEED.y)
+	_mark_progress(c)
+
+
+## Where a frightened bunny hops to: `BUNNY_HOP` tiles away from `from`, the straight way
+## first and then bent either side, to a spot on its own ground with a clear way there and
+## no nearer the fright. None: it stays where it is.
+func _bunny_hop(c: Dictionary, from: Vector2) -> Vector2:
+	var at: Vector2 = c["at"]
+	var away := (at - from).normalized() if at.distance_to(from) > 0.1 else Vector2.RIGHT
+	var reach := _rng.randf_range(BUNNY_HOP.x, BUNNY_HOP.y)
+	for turn: float in [0.0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.6, -1.6]:
+		for share: float in [1.0, 0.7, 0.45]:
+			var dir := away.rotated(turn)
+			var p := at + Vector2(dir.x, dir.y) * Iso.tile_circle_extent(reach * share)
+			if p.distance_to(from) <= at.distance_to(from):
+				continue
+			if _walkable(c, p) and not _blocked(c, p) and _clear_way(c, at, p):
+				return p
+	return at
+
+
+## Is the straight line from `a` to `b` one this animal can walk: every few px on its own
+## ground and clear of the trees, the rocks and the buildings.
+func _clear_way(c: Dictionary, a: Vector2, b: Vector2) -> bool:
+	var steps := maxi(int(a.distance_to(b) / 6.0), 1)
+	for i in range(1, steps + 1):
+		var p := a.lerp(b, float(i) / float(steps))
+		if not _walkable(c, p) or _blocked(c, p):
+			return false
+	return true
+
+
+## A walk starts: how near its goal it is, and since when.
+func _mark_progress(c: Dictionary) -> void:
+	c["prog_d"] = INF
+	c["prog_t"] = 0.0
 
 
 # ---- fox and wolf: patrolling the beaches ------------------------------------------------
