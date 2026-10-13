@@ -10,13 +10,18 @@ Every letter is turned on its own with RotSprite (scaled up 8x with Scale2x, tur
 down at every art pixel's middle), shifted by the fraction of a pixel that came out cleanest
 (PHASES). A letter that still breaks is drawn by hand (DRAWN).
 
-Writes assets/record_label.png: four cells of SIDE x SIDE, the disc's middle at each cell's middle,
+Two words (2026-10-12): LOOBAS on the blue label the full game's record wears since Loobas' two
+songs joined the album, and NUVEN on the red one the demo keeps. `--word LOOBAS` (the default) or
+`--word NUVEN` picks which is baked; each has its own phases, hand fixes, colours and file.
+
+Writes assets/record_label_<word>.png (NUVEN: assets/record_label.png): four cells of SIDE x SIDE, the disc's middle at each cell's middle,
 white where the word is, clear elsewhere. The menu colours it and drops its shadow straight down
 the screen. Writes tools/last_record_label.png, a close-up of the four steps on the label with a
 coordinate grid, for judging and drawing fixes. Reimport after a re-run.
 
     PYTHONPATH=".../psd-extract/.venv/Lib/site-packages" python tools/build_record_label.py
     ... python tools/build_record_label.py --search   # print the cleanest phases
+    ... python tools/build_record_label.py --word NUVEN
 """
 import itertools
 import math
@@ -40,6 +45,13 @@ FONT = {
     "U": ["#..#", "#..#", "#..#", "#..#", ".##."],
     "V": ["#...#", "#...#", ".#.#.", ".#.#.", "..#.."],
     "E": ["####", "#...", "###.", "#...", "####"],
+    # LOOBAS is a letter longer than NUVEN, so its letters are three wide but for the O's,
+    # which a three-wide O cannot round: 25 pixels across, as NUVEN is.
+    "L": ["#..", "#..", "#..", "#..", "###"],
+    "O": [".##.", "#..#", "#..#", "#..#", ".##."],
+    "B": ["##.", "#.#", "##.", "#.#", "##."],
+    "A": [".#.", "#.#", "###", "#.#", "#.#"],
+    "S": [".##", "#..", ".#.", "..#", "##."],
 }
 WORD = "NUVEN"
 
@@ -72,6 +84,39 @@ DRAWN = {
 
 # For the close-up only: the menu's own label colours.
 RED, RED_LO, RED_HI = (178, 48, 44), (112, 26, 26), (214, 92, 70)
+OUT_FILE = "assets/record_label.png"
+
+# The other word, swapped in by `use`. Its phases are `--search`'s picks for it; nothing yet
+# needed drawing by hand. The blue is the clean water's ramp (`water_clean_mid`, `_deep`,
+# `_shallow` in palette.tres), as RecordMenu.LABELS has it.
+WORDS = {
+    "NUVEN": None,
+    "LOOBAS": {
+        "word": "LOOBAS",
+        "phases": {
+            0: [(0.0, 0.0)] * 6,
+            1: [(-0.5, -0.5), (0.125, 0.375), (0.125, -0.5), (0.125, -0.375), (0.375, -0.5),
+                (-0.25, -0.5)],
+            2: [(-0.5, -0.375), (-0.5, -0.5), (-0.5, -0.5), (-0.5, 0.0), (-0.5, -0.5),
+                (-0.375, -0.5)],
+            3: [(-0.5, -0.5), (-0.125, -0.375), (-0.375, 0.0), (-0.25, -0.5), (-0.125, -0.375),
+                (-0.375, -0.5)],
+        },
+        "drawn": {},
+        "colours": ((65, 107, 146), (44, 77, 110), (127, 167, 198)),
+        "out": "assets/record_label_loobas.png",
+    },
+}
+
+
+def use(name):
+    global WORD, PHASES, DRAWN, RED, RED_LO, RED_HI, OUT_FILE
+    cfg = WORDS[name]
+    if cfg is None:
+        return
+    WORD, PHASES, DRAWN = cfg["word"], cfg["phases"], cfg["drawn"]
+    RED, RED_LO, RED_HI = cfg["colours"]
+    OUT_FILE = cfg["out"]
 CREAM, OUT = (240, 232, 210), (8, 8, 8)
 
 
@@ -226,7 +271,7 @@ def main():
         for (x, y) in c:
             if abs(x) <= LABEL_R and abs(y) <= LABEL_R:
                 sp[k * SIDE + x + MID, y + MID] = (255, 255, 255, 255)
-    strip.save("assets/record_label.png")
+    strip.save(OUT_FILE)
 
     # Close-up with a coordinate grid, for drawing fixes.
     z = 26
@@ -256,6 +301,7 @@ def main():
 
 
 if __name__ == "__main__":
+    use(sys.argv[sys.argv.index("--word") + 1] if "--word" in sys.argv else "LOOBAS")
     if "--search" in sys.argv:
         search()
     else:

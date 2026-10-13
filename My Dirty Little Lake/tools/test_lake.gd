@@ -6329,7 +6329,12 @@ func _stage_music() -> void:
 	music.follow_players = false
 	add_child(music)
 	var fade := MusicStation.FADE
-	_check(music.now_playing() == &"beatgucci", "the station opens on beatgucci",
+	_check(music.now_playing() == &"movimento_tranquilo", "the station opens on Movimento Tranquilo",
+		"%s" % music.now_playing())
+	# The rest walks Nuven's three as they always ran: a list of just those, marked as a save
+	# that already knows Loobas' songs so they are not added back.
+	music.take_picks({"lake": ["beatgucci", "save_me", "goin"], "loobas": true})
+	_check(music.now_playing() == &"beatgucci", "a list without it moves on to beatgucci",
 		"%s" % music.now_playing())
 	var cut := float(music.call(&"_length", 0))
 	_check(absf(cut - 132.0) < 0.2, "beatgucci stops at 2:12", "%.2f s" % cut)
@@ -6400,6 +6405,7 @@ func _stage_music() -> void:
 		and is_equal_approx(float(g["beatgucci"]), 1.0) and music.song_time() > at,
 		"closing it fades back to the playlist where it has got to", "%s" % g)
 	_check_record_lists(music)
+	_check_loobas(music)
 	music.queue_free()
 
 	var station := MusicStation.main()
@@ -6835,6 +6841,57 @@ func _check_record_lists(music: MusicStation) -> void:
 	music.take_picks({})
 
 
+## Loobas' two songs (2026-10-12, `/grill-me` with Richard): in `SONGS` and on the lake by
+## default in the order Richard gave, levelled and with beat grids; a save's picks from before
+## them gain them on the lake once; the demo offers none of them and keeps the red NUVEN
+## label; the credits name Loobas in the full game only; every title fits its row.
+func _check_loobas(music: MusicStation) -> void:
+	_check(MusicStation.SONGS == [&"movimento_tranquilo", &"beatgucci", &"save_me",
+			&"tudo_que_eu_fiz", &"goin", &"indie_boi", &"habibs"]
+		and MusicStation.PLAYLIST == [&"movimento_tranquilo", &"beatgucci", &"save_me",
+			&"tudo_que_eu_fiz", &"goin"],
+		"Loobas' songs stand where Richard put them, on the lake by default", str(MusicStation.PLAYLIST))
+	var table = JSON.parse_string(FileAccess.get_file_as_string(MusicStation.BEATS))
+	var ready := true
+	for slug in MusicStation.LOOBAS:
+		ready = ready and MusicStation.GAIN_DB.has(slug) and table is Dictionary 			and (table as Dictionary).has(String(slug)) 			and ResourceLoader.exists(MusicStation.DIR + String(slug) + ".ogg") 			and ResourceLoader.exists(MusicStation.DIR + String(slug) + "_radio.ogg")
+	_check(ready, "each is built twice, levelled and has a beat grid", "")
+	var kept := music.picks()
+	music.take_picks({"lake": ["beatgucci", "goin"], "shed": ["indie_boi"], "synced": false})
+	_check(music.list_of(MusicStation.LAKE) == [&"movimento_tranquilo", &"beatgucci",
+			&"tudo_que_eu_fiz", &"goin"],
+		"a save's picks from before them gain them on the lake", str(music.list_of(MusicStation.LAKE)))
+	_check(bool(music.picks().get("loobas", false)), "and the next save carries the mark", "")
+	music.take_picks({"lake": ["beatgucci", "goin"], "shed": ["indie_boi"], "loobas": true})
+	_check(not music.ticked(MusicStation.LAKE, &"movimento_tranquilo"),
+		"so unticking them afterwards sticks", str(music.list_of(MusicStation.LAKE)))
+	music.take_picks(kept)
+	_check(CreditsBoard.LINES.has("Loobas")
+		and CreditsBoard.LINES.find("Loobas") == CreditsBoard.LINES.find("Nuven") + 1,
+		"the credits name Loobas under Nuven", "")
+	_check(RecordMenu.label()[0] == RecordMenu.LOOBAS_ART and ResourceLoader.exists(RecordMenu.LOOBAS_ART),
+		"the full game's record wears the LOOBAS label", "")
+	Demo.forced = true
+	_check(MusicStation.songs().size() == 5 and not MusicStation.songs().has(&"tudo_que_eu_fiz")
+		and MusicStation.playlist() == [&"beatgucci", &"save_me", &"goin"]
+		and not CreditsBoard.LINES.has("Loobas") and RecordMenu.label()[0] == RecordMenu.LABEL_ART,
+		"the demo offers none of them, credits Nuven alone and keeps the red NUVEN label",
+		str(MusicStation.playlist()))
+	_check(is_zero_approx(RecordMenu.extra()), "and its record menu stays five rows tall", "")
+	Demo.forced = false
+	_check(is_equal_approx(RecordMenu.extra(), 2 * RecordMenu.ROW_GAP)
+		and RecordMenu.sync_box().position.y >= RecordMenu.ROWS_AT.y + 7 * RecordMenu.ROW_GAP,
+		"seven songs make the record menu two rows taller, the switch under them", "")
+	var cut := []
+	for slug in MusicStation.SONGS:
+		var title := String(RecordMenu.TITLES.get(slug, ""))
+		var room := (RecordMenu.TICK_X[0] - RecordMenu.ROWS_AT.x - 6) * RecordMenu.UNIT
+		var px := RecordMenu._fit_size(title, room, [Style.TEXT_SMALL, Style.TEXT_TINY])
+		if title.is_empty() or Style.measure(title, px).x > room:
+			cut.append(slug)
+	_check(cut.is_empty(), "every title fits its row", str(cut))
+
+
 ## The record player in the shed: E at it lifts the lid and puts the menu up; the room is
 ## deaf behind it; the menu's controls work the station; closing shuts the lid.
 func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
@@ -6857,9 +6914,9 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		_check(menu.press(&"sync") and station.synced != synced, "the switch syncs the two", "")
 		_check(not menu.press(&"tick:shed:goin"), "synced, the shed's ticks are not the player's", "")
 		menu.press(&"sync")
-		# The label is red and says NUVEN in cream (2026-10-10). The word turns with the record and
-		# stays whole at every step: the baked word is 56 pixels, a few under the spindle ring.
-		# Four steps on it is the first turned a right angle, exactly.
+		# The label is blue and says LOOBAS in cream in the full game (2026-10-12; red NUVEN
+		# before, and still in the demo). The word turns with the record and stays whole at
+		# every step. Four steps on it is the first turned a right angle, exactly.
 		var disc: Array = menu.get(&"_disc")
 		var counts: Array[int] = []
 		var red := 0
@@ -6875,7 +6932,7 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 					for x in img.get_width():
 						if img.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK):
 							n += 1
-						if f == 0 and img.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL):
+						if f == 0 and img.get_pixel(x, y).is_equal_approx(RecordMenu.label()[1]):
 							red += 1
 				counts.append(n)
 			for y in first.get_height():
@@ -6885,7 +6942,8 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 					if ink != there:
 						square = false
 		var whole: bool = not counts.is_empty() and counts.min() >= 48 and counts.max() <= 60
-		_check(whole and red > 200 and square, "the red label reads NUVEN and turns whole",
+		_check(whole and red > 200 and square and RecordMenu.label()[0] == RecordMenu.LOOBAS_ART,
+			"the blue label reads LOOBAS and turns whole",
 			"ink %s, red %d, right angle exact %s" % [counts, red, square])
 		var ticked := station.ticked(MusicStation.SHED, &"goin")
 		menu.press(&"tick:shed:goin")
@@ -6904,10 +6962,10 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		var inward := true
 		for i in MusicStation.SONGS.size():
 			reaches.append(RecordMenu.band_middle(i))
-			if i > 0 and reaches[i] >= reaches[i - 1] - 2.0:
+			if i > 0 and reaches[i] >= reaches[i - 1] - RecordMenu.band_wide() * 0.9:
 				inward = false
 		_check(inward and reaches[0] > RecordMenu.GROOVE_OUT - RecordMenu.band_wide(),
-			"every song has its own band, beatgucci at the rim and in down the list", str(reaches))
+			"every song has its own band, the first at the rim and in down the list", str(reaches))
 		var angles := {}
 		for r in reaches:
 			angles[snappedf(float(menu.call(&"_angle_for", r)), 0.01)] = true

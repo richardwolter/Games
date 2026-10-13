@@ -6,7 +6,8 @@
 ## start the song over. The scenes only say where the player is — indoors, a board open, the
 ## ending — and push the volume; every player lives here.
 ##
-## - **The lake's list** runs beatgucci, Save ME, Goin and round again by default. The next
+## - **The lake's list** runs Movimento Tranquilo, beatgucci, Save ME, Tudo Que Eu Fiz, Goin
+##   and round again by default (2026-10-12: Loobas' two songs joined Nuven's three). The next
 ##   song comes up underneath over `FADE` seconds; the one playing holds its level and only
 ##   fades over its own last `FADE_OUT`.
 ##   beatgucci stops at 2:12 by decision; that cut is in the file (`tools/build_music.py`),
@@ -36,11 +37,17 @@ extends Node
 const DIR := "res://assets/music/"
 
 ## The lake's songs by default, in the order they play, looping back to the first.
-const PLAYLIST: Array[StringName] = [&"beatgucci", &"save_me", &"goin"]
+const PLAYLIST: Array[StringName] = [
+	&"movimento_tranquilo", &"beatgucci", &"save_me", &"tudo_que_eu_fiz", &"goin"]
 const SHED_SONG := &"indie_boi"
 const ENDING_SONG := &"habibs"
 ## Every song the record player offers, in the order a list plays them.
-const SONGS: Array[StringName] = [&"beatgucci", &"save_me", &"goin", &"indie_boi", &"habibs"]
+const SONGS: Array[StringName] = [&"movimento_tranquilo", &"beatgucci", &"save_me",
+	&"tudo_que_eu_fiz", &"goin", &"indie_boi", &"habibs"]
+## Loobas' songs (2026-10-12, `/grill-me` with Richard), a friend of his: the full game's
+## only, by decision. The demo plays and offers Nuven's alone (`songs()`, `playlist()`), and
+## its export leaves these files out.
+const LOOBAS: Array[StringName] = [&"movimento_tranquilo", &"tudo_que_eu_fiz"]
 ## The two places a list plays in.
 const LAKE := &"lake"
 const SHED := &"shed"
@@ -72,6 +79,8 @@ const GAIN_DB := {
 	&"goin": 0.0,
 	&"indie_boi": 1.6,
 	&"habibs": -2.4,
+	&"movimento_tranquilo": 1.6,
+	&"tudo_que_eu_fiz": 6.7,
 }
 
 ## Under this a player is not heard at all: a song that is not the one playing, or the one
@@ -226,9 +235,9 @@ class Track:
 		list = new_list
 		song = 0
 		if not was.is_empty():
-			var from := SONGS.find(was)
+			var from := MusicStation.songs().find(was)
 			for i in list.size():
-				if SONGS.find(list[i]) > from:
+				if MusicStation.songs().find(list[i]) > from:
 					song = i
 					break
 		at = 0.0
@@ -256,7 +265,7 @@ class Track:
 	## [slug, seconds into it] of the song heard loudest.
 	func heard() -> Array:
 		if list.is_empty():
-			return [PLAYLIST[0], at]
+			return [MusicStation.playlist()[0], at]
 		if next >= 0 and handover() > 0.5:
 			return [list[next], at - (length_of(song) - FADE)]
 		return [list[song], at]
@@ -268,6 +277,27 @@ class Track:
 		return false
 
 
+## Every song this build offers: `SONGS`, less Loobas' in the demo.
+static func songs() -> Array[StringName]:
+	if not Demo.on():
+		return SONGS
+	var out: Array[StringName] = []
+	for slug in SONGS:
+		if not LOOBAS.has(slug):
+			out.append(slug)
+	return out
+
+
+## The lake's list by default in this build: `PLAYLIST`, less Loobas' in the demo.
+static func playlist() -> Array[StringName]:
+	var out: Array[StringName] = []
+	var offered := songs()
+	for slug in PLAYLIST:
+		if offered.has(slug):
+			out.append(slug)
+	return out
+
+
 static func main() -> MusicStation:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
@@ -276,7 +306,7 @@ static func main() -> MusicStation:
 
 
 func _init() -> void:
-	_lake.list = PLAYLIST.duplicate()
+	_lake.list = MusicStation.playlist().duplicate()
 	_shed.list = [SHED_SONG]
 
 
@@ -286,7 +316,7 @@ func _ready() -> void:
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(BEATS))
 		if parsed is Dictionary:
 			_beats = parsed
-	for slug in SONGS:
+	for slug in MusicStation.songs():
 		_lake.players[slug] = [_player(slug, "", "lake_"), _player(slug, "_radio", "lake_")]
 		_shed.players[slug] = [null, _player(slug, "_radio", "shed_")]
 	_ending = _player(ENDING_SONG, "", "end_")
@@ -341,7 +371,7 @@ func gains() -> Dictionary:
 	# Synced, the shed's share goes to the lake's own song through the radio.
 	var shed_own := shed_gain * (1.0 - _sync_at)
 	var shed_lake := shed_gain * _sync_at
-	for slug in SONGS:
+	for slug in MusicStation.songs():
 		var song := _lake.gain_of(slug)
 		out[String(slug)] = lake * song * (1.0 - _radio_at)
 		out[String(slug) + "_radio"] = (lake * _radio_at + shed_lake) * song
@@ -400,7 +430,7 @@ func ticked(place: StringName, slug: StringName) -> bool:
 
 
 func can_pick(slug: StringName) -> bool:
-	return SONGS.has(slug) and (slug != ENDING_SONG or habibs_open)
+	return MusicStation.songs().has(slug) and (slug != ENDING_SONG or habibs_open)
 
 
 ## Tick or untick a song on a place's list. Refused for a locked song, and for the last song
@@ -431,12 +461,22 @@ func picks() -> Dictionary:
 		"lake": _lake.list.map(func(s): return String(s)),
 		"shed": _shed.list.map(func(s): return String(s)),
 		"synced": synced,
+		"loobas": true,
 	}
 
 
 ## Take a save's picks; anything missing or unknown falls back to the old fixed lists.
+##
+## A save whose picks were written before Loobas' songs existed (no `loobas` mark) has them
+## ticked on the lake once, on the way in (Richard: "add to lake list"); the mark goes out
+## with the next save, so unticking them afterwards sticks.
 func take_picks(saved: Dictionary) -> void:
-	_lake.take(_read_list(saved.get("lake"), PLAYLIST))
+	var lake := _read_list(saved.get("lake"), [])
+	if lake.is_empty():
+		lake = MusicStation.playlist()
+	elif not saved.has("loobas"):
+		lake = _read_list(lake + LOOBAS, [])
+	_lake.take(lake)
 	_shed.take(_read_list(saved.get("shed"), [SHED_SONG]))
 	synced = bool(saved.get("synced", false))
 	_sync_at = 1.0 if synced else 0.0
@@ -448,7 +488,7 @@ func _read_list(raw, fallback: Array) -> Array[StringName]:
 	if raw is Array:
 		for s in raw:
 			var slug := StringName(str(s))
-			if SONGS.has(slug) and not out.has(slug):
+			if MusicStation.songs().has(slug) and not out.has(slug):
 				out.append(slug)
 	if out.is_empty():
 		out = fallback.duplicate()
@@ -457,7 +497,7 @@ func _read_list(raw, fallback: Array) -> Array[StringName]:
 
 func _ordered(list: Array) -> Array[StringName]:
 	var out: Array[StringName] = []
-	for slug in SONGS:
+	for slug in MusicStation.songs():
 		if list.has(slug):
 			out.append(slug)
 	return out
@@ -510,7 +550,7 @@ func _push() -> void:
 	if _lake.players.is_empty():
 		return
 	var given := gains()
-	for slug in SONGS:
+	for slug in MusicStation.songs():
 		var pair: Array = _lake.players[slug]
 		_apply(pair[0], given[String(slug)], slug)
 		_apply(pair[1], given[String(slug) + "_radio"], slug)

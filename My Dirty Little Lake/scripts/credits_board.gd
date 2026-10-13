@@ -34,6 +34,9 @@ static var TITLE: String:
 
 ## The pack attributions stay literal: each is the pack's own required wording, verbatim by
 ## licence. Only the headings and the Godot line are keyed.
+##
+## Loobas under Nuven, by name only (2026-10-12, `/grill-me` with Richard), and only where
+## Loobas' songs are: the demo carries none of them.
 static var LINES: Array:
 	get: return [
 		Text.CREDITS_HEAD_DESIGN,
@@ -41,6 +44,7 @@ static var LINES: Array:
 		"",
 		Text.CREDITS_HEAD_MUSIC,
 		"Nuven",
+	] + ([] if Demo.on() else ["Loobas"]) + [
 		"",
 		Text.CREDITS_HEAD_ART,
 		"Benvictus",
@@ -91,7 +95,9 @@ const RIBBON_TALL := 36.0
 const RIBBON_OVERHANG := 10.0
 const CHIPS := 3
 const CLOSE_SIZE := 44.0
-const LINE_GAP := 8.0
+## 7, down from 8 (2026-10-12): the Loobas line took the board to 694 of the 680 a 720-high
+## window leaves.
+const LINE_GAP := 7.0
 const WRAP_GAP := 2.0
 const BLANK := 12.0
 

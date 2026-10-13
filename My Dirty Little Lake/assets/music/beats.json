@@ -14,5 +14,13 @@
  "habibs": {
   "bpm": 144.0,
   "offset": 0.3819
+ },
+ "movimento_tranquilo": {
+  "bpm": 108.0,
+  "offset": 0.3472
+ },
+ "tudo_que_eu_fiz": {
+  "bpm": 85.0,
+  "offset": 0.6176
  }
 }

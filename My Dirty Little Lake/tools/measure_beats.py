@@ -20,7 +20,7 @@ import subprocess
 
 import numpy as np
 
-SONGS = ["beatgucci", "save_me", "goin", "habibs"]
+SONGS = ["beatgucci", "save_me", "goin", "habibs", "movimento_tranquilo", "tudo_que_eu_fiz"]
 DIR = os.path.join("assets", "music")
 OUT = os.path.join(DIR, "beats.json")
 RATE = 11025

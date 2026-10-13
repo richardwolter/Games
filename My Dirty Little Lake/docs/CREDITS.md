@@ -162,7 +162,7 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
 
 ## Music and Sound
 
-**Every piece of music and every recorded sound in the game is by Nuven** (Spotify:
+**Every recorded sound and every song but two is by Nuven** (Spotify:
 open.spotify.com/artist/3Cdtqtl7PvG7793m9pkg34; Richard, 2026-09-15). ✅ Personal
 license/agreement in place with the artist (confirmed 2026-09-06).
 
@@ -170,6 +170,11 @@ license/agreement in place with the artist (confirmed 2026-09-06).
   `_radio` files are the same songs filtered): "beatgucci (Zé)" (`beatgucci`), "Save ME"
   (`save_me`), "Goin (edit2)" (`goin`, byte for byte the file that was `music_goin.mp3`),
   "INDIE BOI" (`indie_boi_radio`), "Habibs 2" (`habibs`).
+- **Loobas** (a friend of Richard's, 2026-10-12): "Movimento Tranquilo"
+  (`movimento_tranquilo`) and "Tudo Que Eu Fiz" (`tudo_que_eu_fiz`), delivered as WAV, built
+  the same way. Credited "Loobas" on the credits board under Nuven, name only, by Richard's
+  call. Full game only: the demo carries neither song and no credit line.
+  ⚠️ Licence: confirm the same personal agreement as Nuven's is in place.
 - **Sound effects**, `assets/sfx/`, cut from the recordings in `art_source/SFX` by
   `tools/build_sfx.py`. The few sounds still built in code (`scripts/sfx.gd`) are
   arithmetic, not recordings.

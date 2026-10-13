@@ -20,8 +20,11 @@ signal closed
 
 ## Design pixels to one art pixel of the board.
 const UNIT := 3.0
-## The board in art pixels.
-const ART := Vector2(200, 140)
+## The board in art pixels, for five songs. Each song past five makes it a row taller
+## (`art()`): Loobas' two took it to seven (2026-10-12). It went 20 wider for "Movimento
+## Tranquilo", which wants 172 design pixels at the rows' size (`tools/probe_record_titles.gd`).
+const ART := Vector2(220, 140)
+const ROWS_BASE := 5
 
 # The pack turntable's own colours (2026-10-01): the record player in the shed is the
 # 0_mem0ry one now, black and greys with a silver deck, so the board it opens is drawn in
@@ -50,6 +53,8 @@ const TITLES := {
 	&"goin": "Goin",
 	&"indie_boi": "Indie Boi",
 	&"habibs": "Habibs",
+	&"movimento_tranquilo": "Movimento Tranquilo",
+	&"tudo_que_eu_fiz": "Tudo Que Eu Fiz",
 }
 
 ## The record: its middle and radius in art pixels, and how fast it turns — 33 and a third,
@@ -62,12 +67,21 @@ const TITLES := {
 ## turn (RotSprite letter by letter, the worst letters drawn by hand) into `LABEL_ART`; every
 ## other step is one of those turned by whole right angles, exact on the grid. A name, not
 ## translated.
+##
+## **LOOBAS on blue in the full game** (2026-10-12, `/grill-me` with Richard: "change the label
+## to Loobas and change color to blue"), whatever plays, since Loobas' songs joined the album.
+## The blue is the clean water's ramp (`water_clean_mid`, `_deep`, `_shallow`). The demo,
+## which has none of Loobas' songs, keeps the red NUVEN label (`label()`).
 const LABEL_ART := "res://assets/record_label.png"
 const LABEL_R := 16
 const LABEL := Color8(178, 48, 44)
 const LABEL_LO := Color8(112, 26, 26)
 const LABEL_HI := Color8(214, 92, 70)
 const LABEL_INK := Color8(240, 232, 210)
+const LOOBAS_ART := "res://assets/record_label_loobas.png"
+const LOOBAS := Color8(65, 107, 146)
+const LOOBAS_LO := Color8(44, 77, 110)
+const LOOBAS_HI := Color8(127, 167, 198)
 
 const DISC_AT := Vector2(52, 56)
 const DISC_R := 31
@@ -76,8 +90,8 @@ const SPIN_FRAMES := 16
 const SPIN_FPS := 8.0
 
 ## The tonearm: its pivot, and its line as points off the pivot. The record is an album:
-## one band of grooves a song, `SONGS`' order from the rim in (beatgucci outermost, Habibs
-## by the label), each band `GROOVE_OUT` to `GROOVE_IN` split in five with a smooth gap
+## one band of grooves a song, `SONGS`' order from the rim in (Movimento Tranquilo outermost, Habibs
+## by the label), each band `GROOVE_OUT` to `GROOVE_IN` split one band a song with a smooth gap
 ## between. The needle stands still in the middle of its song's band. On a change of song it
 ## comes up off the record over `ARM_LIFT` seconds (the head rises `ARM_RISE` art pixels over
 ## its own shadow), crosses straight to the new song's band over `ARM_MOVE`, and sets down
@@ -96,11 +110,12 @@ const ARM_DROP := 0.25
 const ARM_RISE := 3.0
 
 ## The rows, the two tick columns and the switch, in art pixels.
+## `SYNC_BOX` is where five songs put it; `sync_box()` moves it down a row a song past five.
 const ROWS_AT := Vector2(96, 26)
-const ROW := Vector2(88, 13)
+const ROW := Vector2(108, 13)
 const ROW_GAP := 15.0
-const TICK_X := [143.0, 170.0]
-const SYNC_BOX := Rect2(116, 104, 48, 16)
+const TICK_X := [163.0, 190.0]
+const SYNC_BOX := Rect2(126, 104, 48, 16)
 const NOW_BOX := Rect2(16, 98, 72, 24)
 const SKIP_BOX := Rect2(74, 102, 11, 11)
 
@@ -173,8 +188,28 @@ func close() -> void:
 	closed.emit()
 
 
+## How many art pixels taller than `ART` the board is for the songs this build offers.
+static func extra() -> float:
+	return maxf(0.0, MusicStation.songs().size() - ROWS_BASE) * ROW_GAP
+
+
+static func art() -> Vector2:
+	return ART + Vector2(0, extra())
+
+
+static func sync_box() -> Rect2:
+	return Rect2(SYNC_BOX.position + Vector2(0, extra()), SYNC_BOX.size)
+
+
+## [art file, face, rim, lit ring round the hole] for the label this build wears.
+static func label() -> Array:
+	if Demo.on():
+		return [LABEL_ART, LABEL, LABEL_LO, LABEL_HI]
+	return [LOOBAS_ART, LOOBAS, LOOBAS_LO, LOOBAS_HI]
+
+
 func _lay_out() -> void:
-	var span := ART * UNIT
+	var span := art() * UNIT
 	_board = Rect2(((size - span) * 0.5).floor(), span)
 	if _close != null:
 		var side := 44.0
@@ -207,12 +242,12 @@ func _panel(r: Rect2, face: Color, lit: Color) -> void:
 ## Every place something answers a click, by key: `tick:<place>:<slug>`, `sync`, `skip`.
 func _targets() -> Dictionary:
 	var out := {}
-	for i in MusicStation.SONGS.size():
-		var slug: StringName = MusicStation.SONGS[i]
+	for i in MusicStation.songs().size():
+		var slug: StringName = MusicStation.songs()[i]
 		var y := ROWS_AT.y + i * ROW_GAP + 3.0
 		out[StringName("tick:lake:" + String(slug))] = _box(Rect2(TICK_X[0] - 3, y - 3, 13, 13))
 		out[StringName("tick:shed:" + String(slug))] = _box(Rect2(TICK_X[1] - 3, y - 3, 13, 13))
-	out[&"sync"] = _box(SYNC_BOX)
+	out[&"sync"] = _box(sync_box())
 	out[&"skip"] = _box(SKIP_BOX)
 	return out
 
@@ -259,7 +294,7 @@ func press(key: StringName) -> bool:
 		# needle has set down on its band (Richard, 2026-09-28).
 		if _lift >= 0.0 or _skipping:
 			return false
-		var next := MusicStation.SONGS.find(m.next_in(MusicStation.SHED))
+		var next := MusicStation.songs().find(m.next_in(MusicStation.SHED))
 		m.hold(MusicStation.SHED)
 		_skipping = true
 		_from = _band
@@ -300,7 +335,7 @@ func _process(delta: float) -> void:
 		_from = _band
 		_cross = 0.0
 	_seen = changes
-	var live := MusicStation.SONGS.find(m.playing_in(MusicStation.SHED)) if m != null else 0
+	var live := MusicStation.songs().find(m.playing_in(MusicStation.SHED)) if m != null else 0
 	if live >= 0 and not _skipping:
 		_band = live
 	if _lift >= 0.0:
@@ -345,6 +380,10 @@ func needle_up() -> bool:
 func _bake_disc() -> void:
 	_disc.clear()
 	var word := _label_word()
+	var look := label()
+	var face: Color = look[1]
+	var rim: Color = look[2]
+	var ring: Color = look[3]
 	var hole := DISC_R * 0.12
 	var side := DISC_R * 2 + 1
 	for f in SPIN_FRAMES:
@@ -358,22 +397,22 @@ func _bake_disc() -> void:
 				if q > DISC_R - 0.8:
 					c = OUT
 				elif q >= GROOVE_IN and q <= GROOVE_OUT:
-					# Five bands of grooves with a smooth gap between each.
+					# A band of grooves a song with a smooth gap between each.
 					var across := (GROOVE_OUT - q) / band_wide()
 					var into := across - floorf(across)
-					if across > 0.5 and (into < 0.18 or into > 0.82) and across < 4.5:
+					if across > 0.5 and (into < 0.18 or into > 0.82) 							and across < MusicStation.songs().size() - 0.5:
 						c = GAP_TONE
 					else:
 						c = VINYL_HI if int(q) % 2 == 0 else GROOVE_TONE
 				if q <= LABEL_R:
-					c = LABEL_LO if q > LABEL_R - 1.0 else LABEL
+					c = rim if q > LABEL_R - 1.0 else face
 					if q <= hole + 1.6:
-						c = LABEL_HI
+						c = ring
 					if word != null and q > hole:
 						if label_ink(word, f, x, y):
 							c = LABEL_INK
 						elif label_ink(word, f, x, y - 1):
-							c = LABEL_LO
+							c = rim
 					if q <= hole:
 						c = OUT
 				img.set_pixel(x + DISC_R, y + DISC_R, c)
@@ -382,9 +421,10 @@ func _bake_disc() -> void:
 
 ## The baked word, four steps of the turn side by side, or null with no art (a bare label).
 static func _label_word() -> Image:
-	if not ResourceLoader.exists(LABEL_ART):
+	var path: String = label()[0]
+	if not ResourceLoader.exists(path):
 		return null
-	var tex := load(LABEL_ART) as Texture2D
+	var tex := load(path) as Texture2D
 	return tex.get_image() if tex != null else null
 
 
@@ -408,12 +448,13 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), SCRIM)
 	var m := _station()
 	# The case and the lid's lining.
-	_px(4, 6, 192, 128, WALNUT)
-	_edge(4, 6, 192, 128, OUT)
-	_px(5, 7, 190, 2, WALNUT_HI)
-	_px(10, 12, 180, 116, LID_LO)
-	_edge(10, 12, 180, 116, OUT)
-	_px(11, 13, 178, 1, LID)
+	var grow := extra()
+	_px(4, 6, 212, 128 + grow, WALNUT)
+	_edge(4, 6, 212, 128 + grow, OUT)
+	_px(5, 7, 210, 2, WALNUT_HI)
+	_px(10, 12, 200, 116 + grow, LID_LO)
+	_edge(10, 12, 200, 116 + grow, OUT)
+	_px(11, 13, 198, 1, LID)
 	_draw_platter()
 	_draw_now(m)
 	_draw_rows(m)
@@ -464,7 +505,7 @@ func _angle_for(reach: float) -> float:
 
 ## How wide a song's band is, and how far its middle is off the record's.
 static func band_wide() -> float:
-	return (GROOVE_OUT - GROOVE_IN) / float(MusicStation.SONGS.size())
+	return (GROOVE_OUT - GROOVE_IN) / float(MusicStation.songs().size())
 
 
 static func band_middle(index: int) -> float:
@@ -493,7 +534,11 @@ func _draw_now(m: MusicStation) -> void:
 	Style.write(self, Text.RECORD_NOW, Style.TEXT_TINY,
 		box.position + Vector2(4 * UNIT, 8 * UNIT), AMBER_HI)
 	var slug := m.playing_in(MusicStation.SHED) if m != null else &""
-	Style.write(self, String(TITLES.get(slug, "")), Style.TEXT_BODY,
+	# The title drops a size rather than run under the skip: "Movimento Tranquilo" is 211
+	# design pixels at the body size against the 159 left of the skip.
+	var title := String(TITLES.get(slug, ""))
+	Style.write(self, title, _fit_size(title, (SKIP_BOX.position.x - NOW_BOX.position.x - 5) * UNIT,
+		[Style.TEXT_BODY, Style.TEXT_SMALL, Style.TEXT_TINY]),
 		box.position + Vector2(4 * UNIT, 20 * UNIT), CREAM)
 	var skip := SKIP_BOX
 	var face := AMBER_HI if _hover == &"skip" else AMBER
@@ -514,12 +559,14 @@ func _draw_rows(m: MusicStation) -> void:
 			Vector2(0, head.y), AMBER_HI, HORIZONTAL_ALIGNMENT_CENTER,
 			Rect2(mid.get_center().x - 40, 0, 80, 1))
 	var synced := m != null and m.synced
-	for i in MusicStation.SONGS.size():
-		var slug: StringName = MusicStation.SONGS[i]
+	for i in MusicStation.songs().size():
+		var slug: StringName = MusicStation.songs()[i]
 		var y := ROWS_AT.y + i * ROW_GAP
 		_px(ROWS_AT.x, y, ROW.x, ROW.y, LID if i % 2 else LID_LO)
 		var open := m == null or m.can_pick(slug)
-		Style.write(self, String(TITLES[slug]), Style.TEXT_SMALL,
+		var title := String(TITLES[slug])
+		Style.write(self, title, _fit_size(title, (TICK_X[0] - ROWS_AT.x - 6) * UNIT,
+			[Style.TEXT_SMALL, Style.TEXT_TINY]),
 			_board.position + Vector2(ROWS_AT.x + 3, y + 9) * UNIT, CREAM if open else DIM)
 		for c in 2:
 			var tx: float = TICK_X[c]
@@ -536,6 +583,14 @@ func _draw_rows(m: MusicStation) -> void:
 			if _hover == key and not ghost:
 				face = WALNUT
 			_tick(tx, y + 3, on, face, GHOST if ghost else AMBER_HI)
+
+
+## The first size on the ladder at which the line fits `room` design pixels, else the last.
+static func _fit_size(text: String, room: float, ladder: Array) -> int:
+	for px in ladder:
+		if Style.measure(text, px).x <= room:
+			return px
+	return ladder.back()
 
 
 func _tick(x: float, y: float, on: bool, face: Color, mark: Color) -> void:
@@ -555,7 +610,7 @@ func _lock(x: float, y: float, c: Color) -> void:
 
 func _draw_sync(m: MusicStation) -> void:
 	var on := m != null and m.synced
-	var r := SYNC_BOX
+	var r := sync_box()
 	_panel(r, WALNUT_HI if _hover == &"sync" else WALNUT, WALNUT_HI)
 	var box := _box(r)
 	Style.write(self, Text.RECORD_SYNC, Style.TEXT_SMALL, Vector2(0, box.position.y + 11 * UNIT),
@@ -578,7 +633,7 @@ func pad_focus() -> Array:
 				continue
 			if parts[1] == "shed" and m != null and m.synced:
 				continue
-		out.append({"box": targets[key], "key": key, "first": key == &"tick:lake:beatgucci"})
+		out.append({"box": targets[key], "key": key, "first": key == StringName("tick:lake:" + String(MusicStation.songs()[0]))})
 	if _close != null:
 		out.append({"box": _close.get_rect(), "key": &"close"})
 	return out

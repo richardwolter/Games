@@ -32,6 +32,9 @@ PLAN = {
     "goin": ("Goin (edit2)#2.2.mp3", None, True, True),
     "indie_boi": ("INDIE BOI #sketch.mp3", None, True, True),
     "habibs": ("Habibs 3 #4.2.mp3", None, True, True),
+    # Loobas, a friend of Richard's (2026-10-12), not Nuven. WAVs as delivered.
+    "movimento_tranquilo": ("Movimento Tranquilo.wav", None, True, True),
+    "tudo_que_eu_fiz": ("Tudo Que Eu Fiz.wav", None, True, True),
 }
 
 # Trailing silence under this is taken off the end.

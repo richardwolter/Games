@@ -6747,8 +6747,41 @@ menu's own player (both gone, with `%Music` in both scenes and `assets/music_goi
 - **Tests**: `test_lake`'s `_stage_music` drives its own station by hand: the order, the 2:12
   cut, the equal-power handover, shed and radio over a running playlist, the end song in and
   out, and the lake telling the autoload.
-- **Credits**: every song and recorded sound is by Nuven (Richard, 2026-09-15), in
-  `docs/CREDITS.md` and on the credits board.
+- **Credits**: every recorded sound and every song but Loobas' two is by Nuven (Richard,
+  2026-09-15; see Loobas' Songs), in `docs/CREDITS.md` and on the credits board.
+
+### Loobas' Songs (2026-10-12, `/grill-me` with Richard)
+Two songs by Loobas, a friend of Richard's: "Movimento Tranquilo" and "Tudo Que Eu Fiz".
+**Supersedes "every song is by Nuven"** in The Music, and the label's colour and word in The
+Record Player.
+- **Built like the rest**: WAVs in `art_source/Music/`, `build_music.py` (`movimento_tranquilo`,
+  `tudo_que_eu_fiz`, outdoors and radio), `GAIN_DB` 1.6 / 6.7 to Goin's level, beat grids
+  108 / 85 BPM (`tools/last_beat_<slug>.wav` for the ear check, not yet done).
+- **`SONGS`**: Movimento Tranquilo, beatgucci, Save ME, Tudo Que Eu Fiz, Goin, Indie Boi,
+  Habibs, Richard's order. **The lake's default list is the first five**; the shed's is still
+  Indie Boi. The record's rows and the album's bands follow `SONGS`.
+- **Old saves gain them**: picks saved without the `loobas` mark get both ticked on the lake
+  once on load (`MusicStation.take_picks`); every save now carries the mark, so unticking
+  them sticks. No `SAVE_VERSION` bump.
+- **The record menu is two rows taller and 20 art px wider** (`RecordMenu.art()`, `extra()`,
+  `sync_box()`, `ROWS_BASE` 5): "Movimento Tranquilo" is 172 design px at the rows' size.
+  Titles drop a size rather than run on (`_fit_size`); `tools/probe_record_titles.gd`
+  measures them.
+- **The label is blue and reads LOOBAS, whatever plays** (Richard's call, over a label per
+  song): `water_clean_mid`/`_deep`/`_shallow`, `assets/record_label_loobas.png`
+  (`build_record_label.py --word LOOBAS`, the default now; `--word NUVEN` rebuilds the old).
+  LOOBAS is three-wide letters but the O's, 25 px across as NUVEN is. **Open**: steps 1-3 of
+  the turn break up (`tools/last_record_label.png`); NUVEN needed hand-drawn letters for the
+  same (`DRAWN`), and LOOBAS has none yet.
+- **Credits**: "Loobas" under Nuven, name only, no Spotify mark. `CreditsBoard.LINE_GAP` 8 to
+  7 to keep the board inside 720 (670 of 680). `docs/CREDITS.md` flags the licence to confirm.
+- **Full game only, by decision**: under `Demo.on()` the station offers and plays Nuven's
+  songs alone (`MusicStation.songs()`, `playlist()`), the record menu stays five rows, the
+  label stays red NUVEN and the credits say Nuven alone; the demo preset excludes the two
+  songs and the blue label.
+- `test_lake`'s `_check_loobas` guards the order, the builds and grids, the old-save top-up
+  and the mark, the credit, the label, the demo's lists and label, the menu's size and every
+  title fitting. Probe: `tools/shot_record_menu.tscn`.
 
 ### The Record Player (2026-09-28, `/grill-me` with Richard)
 E on the record player in the shed lifts its lid and puts up a menu (`scripts/record_menu.gd`,
