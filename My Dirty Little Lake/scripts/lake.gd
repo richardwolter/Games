@@ -3703,6 +3703,9 @@ func _show_farewell() -> void:
 		_farewell.lines = [Text.DEMO_LINE_1, Text.DEMO_LINE_2]
 		_farewell.wishlist = true
 		_farewell.lake_door = true
+	else:
+		# The ending filmed (2026-10-12): the full game's only.
+		_farewell.reel_of = self
 	# The cleaned lake is the end of the game, so the credits roll under the words
 	# (2026-09-16).
 	_farewell.roll_credits()

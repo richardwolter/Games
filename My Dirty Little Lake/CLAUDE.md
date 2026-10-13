@@ -2335,6 +2335,22 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   **The rows are laid out here, not borrowed**: the board is a plate of wood with a face to
   wrap against and this is open water with the whole window. The words are read from
   `CreditsBoard`, so a credit added there is added here.
+- **The ending is filmed** (2026-10-12, `/grill-me` with Richard; `scripts/ending_reel.gd`,
+  `EndingReel`, `shaders/ending_bubble.gdshader`): one round bubble beside the words and the
+  roll, showing the player's own lake **live** (a `SubViewport` sharing the lake's `World2D`,
+  a camera of its own; the HUD and the farewell are CanvasLayers and not in it). It cuts every
+  `SHOT_BEATS` (16, four bars) on Habibs' beat clock, irising shut over the last
+  `IRIS_BEATS` and open over the first, and **hops to the other side on every cut**. Shots
+  come off `SHOTS` in order (frog, ducks, fish, bees, capybaras, peacock, turtle, songbird,
+  dogs, the house, bunny, the wide shot), a subject the lake does not have skipped, the camera
+  following it; the wide shot is always there. A stepped pixel circle, a foam-white rim, a
+  vignette. **Full game only** (`Farewell.reel_of`, set by `Lake._show_farewell` outside the
+  demo; not the menu's Credits board). It comes in once the words are up and **runs until the
+  ending is dismissed**, past the roll. While it is up the roll narrows to `REEL_ROLL_WIDE`
+  (0.5) and the lake behind darkens a further `REEL_DARK`. Nothing saved. **Open**: the frame
+  cost of the second view on a cleaned lake is not benched; animals off the main view may
+  despawn (the shot then holds where it was). All numbers first guesses; `shot_ending` logs
+  the shot and rect, `test_lake`'s `_check_reel` guards the cut, the side and the fall-through.
 - **A click skips the roll** (`skip_roll`, `ROLL_SKIP`): it runs off at nine times the pace
   and leaves the words and the plaque. A second click dismisses as before. **The doors are
   not drawn while the roll is running** — the credits pass over exactly the band they stand

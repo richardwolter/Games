@@ -5794,6 +5794,7 @@ func _stage_ending() -> void:
 		and not CreditsBoard.LINES.is_empty(),
 		"off the credits board's own words", "%d" % CreditsBoard.LINES.size())
 	_check_credits()
+	_check_reel(ending)
 	_check(_main.call(&"_last_pieces_line") == "",
 		"and the note about leftovers is gone", "")
 	_advance()
@@ -6002,6 +6003,30 @@ func _check_one_sun(day: DayCycle) -> void:
 	var shader := FileAccess.get_file_as_string("res://shaders/shadow.gdshader")
 	_check(shader.contains("sun_stretch") and not shader.contains("sun_reach"),
 		"the rubbish's crescents lean and stretch with the sun", "")
+
+
+## The ending filmed (2026-10-12): a bubble on the full game's ending, alternating sides on
+## every cut, falling through the shot list to a subject the lake has, the wide shot always.
+func _check_reel(ending: Farewell) -> void:
+	var reel: EndingReel = ending.reel if ending != null else null
+	_check(reel != null, "the full game's ending films the lake in a bubble", "")
+	if reel == null:
+		return
+	_check(reel.get_node(^"Film").world_2d == _main.get_viewport().world_2d,
+		"and the film is the lake's own world, live", "")
+	var side := reel.side
+	var taken := reel.shots_taken
+	reel.call(&"_cut", false)
+	_check(reel.side != side and reel.shots_taken == taken + 1,
+		"a cut takes the next shot and hops the bubble to the other side", "")
+	_check(reel.call(&"_find", &"wide") != null and EndingReel.SHOTS.has(reel.shot),
+		"and the shot list always has the wide shot to fall to", String(reel.shot))
+	var r := reel.bubble_rect()
+	var band: Vector2 = ending.call(&"_message_band")
+	_check(r.size.x > 0.0 and r.end.x <= reel.size.x and r.position.x >= 0.0,
+		"the bubble stands inside the window", str(r))
+	_check(EndingReel.SHOT_BEATS % 4 == 0, "a shot holds whole bars", "")
+	_check(band.y > band.x, "beside the words", "")
 
 
 func _stage_ending_on_load() -> void:

@@ -126,6 +126,15 @@ var wishlist: bool = false
 ## The home door reads "Back to lake" and only closes the words (the demo's ending).
 var lake_door: bool = false
 var _wish_rect := Rect2()
+## The ending filmed (2026-10-12): the lake the reel films, set by the full game's ending
+## before the screen is added. Null, no reel (the demo).
+var reel_of: Node = null
+var reel: EndingReel
+## The roll's width and the extra dark behind it while the reel is up: the column narrows to
+## leave the bubble its side of the window, and the lake goes darker so the bubble is the
+## lit thing.
+const REEL_ROLL_WIDE := 0.5
+const REEL_DARK := 0.35
 var _wish_hot: bool = false
 
 ## The credit roll: whether it is running, how far up it has climbed in pixels, whether a
@@ -151,6 +160,11 @@ func _ready() -> void:
 	# parent is not a Control is not laid out by anyone. It has to keep up with the window
 	# itself.
 	_make_icon()
+	if reel_of != null:
+		reel = EndingReel.new()
+		reel.name = &"Reel"
+		reel.lake = reel_of
+		add_child(reel)
 	_fill()
 	get_viewport().size_changed.connect(_fill)
 	if _rolling:
@@ -270,7 +284,7 @@ func _place_icon() -> void:
 func _lay_out_roll() -> void:
 	_roll_rows = []
 	_roll_tall = 0.0
-	var wide := size.x * ROLL_WIDE
+	var wide := size.x * (REEL_ROLL_WIDE if reel_of != null else ROLL_WIDE)
 	for text: String in CreditsBoard.LINES:
 		if text.is_empty():
 			_roll_rows.append({"text": "", "px": 0, "head": false, "icon": 0.0, "step": ROLL_BLANK})
@@ -463,6 +477,8 @@ func _draw() -> void:
 	# it. In fast, then a long settle.
 	var fade := 1.0 - pow(1.0 - _shown, 3.0)
 	Style.dim(self, Rect2(Vector2.ZERO, size), WASH, fade)
+	if reel != null:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, REEL_DARK * fade))
 	# Under the message, which is drawn over it: the roll passes behind the words rather
 	# than pushing them about.
 	_draw_roll(fade)

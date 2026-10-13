@@ -59,6 +59,7 @@ func _physics_process(_delta: float) -> void:
 		330:
 			_note("words up: %s" % str(_main.get_node_or_null(^"Farewell") != null))
 			_save(&"words")
+			_note_reel()
 		# The first credits reaching the message's band, where the two cross and the roll
 		# dims under the words.
 		760:
@@ -75,6 +76,7 @@ func _physics_process(_delta: float) -> void:
 		900:
 			_note("rolling: %s" % str(_ending() != null and _ending().rolling()))
 			_save(&"roll")
+			_note_reel()
 			if _ending() != null:
 				_ending().skip_roll()
 		# The skip runs at ROLL_SKIP times the pace, so three seconds is plenty of room for
@@ -132,3 +134,13 @@ func _save_frame() -> void:
 
 func _save(which: StringName) -> void:
 	get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(SHOTS[which]))
+
+
+## The ending's bubble (2026-10-12): which shot, where, and how many cuts so far.
+func _note_reel() -> void:
+	var f := _ending()
+	if f == null or f.reel == null:
+		_note("reel: none")
+		return
+	_note("reel: shot %s side %d rect %s shots %d" % [f.reel.shot, f.reel.side,
+		str(f.reel.bubble_rect()), f.reel.shots_taken])
