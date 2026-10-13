@@ -6767,12 +6767,18 @@ Record Player.
   `sync_box()`, `ROWS_BASE` 5): "Movimento Tranquilo" is 172 design px at the rows' size.
   Titles drop a size rather than run on (`_fit_size`); `tools/probe_record_titles.gd`
   measures them.
-- **The label is blue and reads LOOBAS, whatever plays** (Richard's call, over a label per
-  song): `water_clean_mid`/`_deep`/`_shallow`, `assets/record_label_loobas.png`
+- **The record is the song's artist's** (same evening, Richard: "it should change the record
+  between loobas and nuven when switching songs"; supersedes "LOOBAS whatever plays"): a
+  Loobas song turns on a blue LOOBAS label, any other on the red NUVEN one
+  (`RecordMenu.label_for`, both baked at `_ready`), swapped while the needle is up, half way
+  across (`_shown_band`). Blue is `water_clean_mid`/`_deep`/`_shallow`,
+  `assets/record_label_loobas.png`
   (`build_record_label.py --word LOOBAS`, the default now; `--word NUVEN` rebuilds the old).
   LOOBAS is three-wide letters but the O's, 25 px across as NUVEN is. **Open**: steps 1-3 of
   the turn break up (`tools/last_record_label.png`); NUVEN needed hand-drawn letters for the
   same (`DRAWN`), and LOOBAS has none yet.
+- **The Music bus's top is +3 dB** (`Prefs.BUS_TOP`, was 0, same evening, Richard: "increase
+  the volume of music overall a bit"): every song louder at the same slider.
 - **Credits**: "Loobas" under Nuven, name only, no Spotify mark. `CreditsBoard.LINE_GAP` 8 to
   7 to keep the board inside 720 (670 of 680). `docs/CREDITS.md` flags the licence to confirm.
 - **Full game only, by decision**: under `Demo.on()` the station offers and plays Nuven's

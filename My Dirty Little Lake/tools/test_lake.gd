@@ -6869,12 +6869,14 @@ func _check_loobas(music: MusicStation) -> void:
 	_check(CreditsBoard.LINES.has("Loobas")
 		and CreditsBoard.LINES.find("Loobas") == CreditsBoard.LINES.find("Nuven") + 1,
 		"the credits name Loobas under Nuven", "")
-	_check(RecordMenu.label()[0] == RecordMenu.LOOBAS_ART and ResourceLoader.exists(RecordMenu.LOOBAS_ART),
-		"the full game's record wears the LOOBAS label", "")
+	_check(RecordMenu.label_for(&"tudo_que_eu_fiz")[0] == RecordMenu.LOOBAS_ART
+		and RecordMenu.label_for(&"goin")[0] == RecordMenu.LABEL_ART
+		and ResourceLoader.exists(RecordMenu.LOOBAS_ART),
+		"Loobas' songs play on the LOOBAS record, Nuven's on the NUVEN one", "")
 	Demo.forced = true
 	_check(MusicStation.songs().size() == 5 and not MusicStation.songs().has(&"tudo_que_eu_fiz")
 		and MusicStation.playlist() == [&"beatgucci", &"save_me", &"goin"]
-		and not CreditsBoard.LINES.has("Loobas") and RecordMenu.label()[0] == RecordMenu.LABEL_ART,
+		and not CreditsBoard.LINES.has("Loobas") and RecordMenu.label_for(&"tudo_que_eu_fiz")[0] == RecordMenu.LABEL_ART,
 		"the demo offers none of them, credits Nuven alone and keeps the red NUVEN label",
 		str(MusicStation.playlist()))
 	_check(is_zero_approx(RecordMenu.extra()), "and its record menu stays five rows tall", "")
@@ -6914,37 +6916,63 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		_check(menu.press(&"sync") and station.synced != synced, "the switch syncs the two", "")
 		_check(not menu.press(&"tick:shed:goin"), "synced, the shed's ticks are not the player's", "")
 		menu.press(&"sync")
-		# The label is blue and says LOOBAS in cream in the full game (2026-10-12; red NUVEN
-		# before, and still in the demo). The word turns with the record and stays whole at
-		# every step. Four steps on it is the first turned a right angle, exactly.
-		var disc: Array = menu.get(&"_disc")
-		var counts: Array[int] = []
-		var red := 0
-		var square := true
-		if disc.size() == RecordMenu.SPIN_FRAMES:
-			var c := RecordMenu.DISC_R
-			var first: Image = disc[0].get_image()
-			var turned: Image = disc[4].get_image()
-			for f in RecordMenu.SPIN_FRAMES:
-				var img: Image = disc[f].get_image()
-				var n := 0
-				for y in img.get_height():
-					for x in img.get_width():
-						if img.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK):
-							n += 1
-						if f == 0 and img.get_pixel(x, y).is_equal_approx(RecordMenu.label()[1]):
-							red += 1
-				counts.append(n)
-			for y in first.get_height():
-				for x in first.get_width():
-					var ink := first.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK)
-					var there := turned.get_pixel(2 * c - y, x).is_equal_approx(RecordMenu.LABEL_INK)
-					if ink != there:
-						square = false
-		var whole: bool = not counts.is_empty() and counts.min() >= 48 and counts.max() <= 60
-		_check(whole and red > 200 and square and RecordMenu.label()[0] == RecordMenu.LOOBAS_ART,
-			"the blue label reads LOOBAS and turns whole",
-			"ink %s, red %d, right angle exact %s" % [counts, red, square])
+		# Two records (2026-10-12): red NUVEN for Nuven's songs, blue LOOBAS for Loobas'. Each
+		# word turns with its record and stays whole at every step. Four steps on it is the
+		# first turned a right angle, exactly.
+		var discs: Dictionary = menu.get(&"_discs")
+		for slug: StringName in [&"goin", &"movimento_tranquilo"]:
+			var look := RecordMenu.label_for(slug)
+			var disc: Array = discs.get(look[0], [])
+			var counts: Array[int] = []
+			var face := 0
+			var square := true
+			if disc.size() == RecordMenu.SPIN_FRAMES:
+				var c := RecordMenu.DISC_R
+				var first: Image = disc[0].get_image()
+				var turned: Image = disc[4].get_image()
+				for f in RecordMenu.SPIN_FRAMES:
+					var img: Image = disc[f].get_image()
+					var n := 0
+					for y in img.get_height():
+						for x in img.get_width():
+							if img.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK):
+								n += 1
+							if f == 0 and img.get_pixel(x, y).is_equal_approx(look[1]):
+								face += 1
+					counts.append(n)
+				for y in first.get_height():
+					for x in first.get_width():
+						var ink := first.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK)
+						var there := turned.get_pixel(2 * c - y, x).is_equal_approx(RecordMenu.LABEL_INK)
+						if ink != there:
+							square = false
+			var whole: bool = not counts.is_empty() and counts.min() >= 48 and counts.max() <= 60
+			_check(whole and face > 200 and square,
+				"%s plays on the %s record, its word turning whole" % [slug, look[0].get_file()],
+				"ink %s, face %d, right angle exact %s" % [counts, face, square])
+		# The record follows the shed's song: swapped while the needle is up between the two.
+		var shed_kept := station.list_of(MusicStation.SHED)
+		station.take_picks({"lake": station.list_of(MusicStation.LAKE), "loobas": true,
+			"shed": ["tudo_que_eu_fiz", "goin"], "synced": false})
+		# The change of list moves the needle too: let it set down first.
+		menu._process(2.0)
+		menu._process(0.1)
+		var before := menu.shown_label()
+		menu.press(&"skip")
+		menu._process(0.25)
+		var mid := menu.shown_label()
+		menu._process(2.0)
+		menu._process(0.1)
+		_check(before == RecordMenu.LOOBAS_ART and mid == RecordMenu.LOOBAS_ART
+			and station.playing_in(MusicStation.SHED) == &"goin"
+			and menu.shown_label() == RecordMenu.LABEL_ART,
+			"skipping from Loobas to Nuven changes the record while the needle is up",
+			"%s / %s / %s, shed %s, list %s, band %d" % [before.get_file(), mid.get_file(),
+				menu.shown_label().get_file(), station.playing_in(MusicStation.SHED),
+				station.list_of(MusicStation.SHED), menu.band()])
+		station.take_picks({"lake": station.list_of(MusicStation.LAKE), "loobas": true,
+			"shed": shed_kept.map(func(x): return String(x)), "synced": false})
+		menu._process(3.0)
 		var ticked := station.ticked(MusicStation.SHED, &"goin")
 		menu.press(&"tick:shed:goin")
 		_check(station.ticked(MusicStation.SHED, &"goin") != ticked, "a tick in the shed's column", "")

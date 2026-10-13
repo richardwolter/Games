@@ -68,10 +68,12 @@ const TITLES := {
 ## other step is one of those turned by whole right angles, exact on the grid. A name, not
 ## translated.
 ##
-## **LOOBAS on blue in the full game** (2026-10-12, `/grill-me` with Richard: "change the label
-## to Loobas and change color to blue"), whatever plays, since Loobas' songs joined the album.
-## The blue is the clean water's ramp (`water_clean_mid`, `_deep`, `_shallow`). The demo,
-## which has none of Loobas' songs, keeps the red NUVEN label (`label()`).
+## **The record is the song's artist's** (2026-10-12, Richard: "it should change the record
+## between loobas and nuven when switching songs"): a Loobas song plays on a blue LOOBAS label
+## (the clean water's ramp, `water_clean_mid`, `_deep`, `_shallow`), any other on the red
+## NUVEN one (`label_for`). The record is swapped while the needle is up and over the middle
+## of its crossing (`_shown_band`), never under the needle. The demo has no Loobas songs, so
+## its record is always NUVEN.
 const LABEL_ART := "res://assets/record_label.png"
 const LABEL_R := 16
 const LABEL := Color8(178, 48, 44)
@@ -127,7 +129,8 @@ var _close: CloseButton
 var _hover := &""
 ## Seconds the record has turned.
 var _spin := 0.0
-var _disc: Array[ImageTexture] = []
+## label art file -> its record, one picture a step of the turn.
+var _discs: Dictionary = {}
 ## The arm's swing, 0 on the record to 1 lifted clear, and the clock of a lift under way.
 var _arm := 0.0
 ## The band the needle stands in, an index into `SONGS`: held while the needle is up, and
@@ -201,11 +204,24 @@ static func sync_box() -> Rect2:
 	return Rect2(SYNC_BOX.position + Vector2(0, extra()), SYNC_BOX.size)
 
 
-## [art file, face, rim, lit ring round the hole] for the label this build wears.
-static func label() -> Array:
-	if Demo.on():
-		return [LABEL_ART, LABEL, LABEL_LO, LABEL_HI]
-	return [LOOBAS_ART, LOOBAS, LOOBAS_LO, LOOBAS_HI]
+## [art file, face, rim, lit ring round the hole] for the label a song plays on.
+static func label_for(slug: StringName) -> Array:
+	if MusicStation.LOOBAS.has(slug) and not Demo.on():
+		return [LOOBAS_ART, LOOBAS, LOOBAS_LO, LOOBAS_HI]
+	return [LABEL_ART, LABEL, LABEL_LO, LABEL_HI]
+
+
+## The band whose record is on the platter: the one the needle left until it is half way
+## across to the next, then the next.
+func _shown_band() -> int:
+	return _band if _cross >= 0.5 else _from
+
+
+## The art file of the label on the platter now, for the harness.
+func shown_label() -> String:
+	var songs := MusicStation.songs()
+	var i := _shown_band()
+	return label_for(songs[i] if i >= 0 and i < songs.size() else &"")[0]
 
 
 func _lay_out() -> void:
@@ -378,9 +394,15 @@ func needle_up() -> bool:
 ## The record, one picture a step of its turn: grooves, the red label and the name turning on it.
 ## Whole art pixels, baked once.
 func _bake_disc() -> void:
-	_disc.clear()
-	var word := _label_word()
-	var look := label()
+	_discs.clear()
+	for look in [label_for(&""), label_for(MusicStation.LOOBAS[0])]:
+		if not _discs.has(look[0]):
+			_discs[look[0]] = _bake_one(look)
+
+
+func _bake_one(look: Array) -> Array[ImageTexture]:
+	var out: Array[ImageTexture] = []
+	var word := _label_word(look[0])
 	var face: Color = look[1]
 	var rim: Color = look[2]
 	var ring: Color = look[3]
@@ -400,7 +422,8 @@ func _bake_disc() -> void:
 					# A band of grooves a song with a smooth gap between each.
 					var across := (GROOVE_OUT - q) / band_wide()
 					var into := across - floorf(across)
-					if across > 0.5 and (into < 0.18 or into > 0.82) 							and across < MusicStation.songs().size() - 0.5:
+					var last := MusicStation.songs().size() - 0.5
+					if across > 0.5 and (into < 0.18 or into > 0.82) and across < last:
 						c = GAP_TONE
 					else:
 						c = VINYL_HI if int(q) % 2 == 0 else GROOVE_TONE
@@ -416,12 +439,12 @@ func _bake_disc() -> void:
 					if q <= hole:
 						c = OUT
 				img.set_pixel(x + DISC_R, y + DISC_R, c)
-		_disc.append(ImageTexture.create_from_image(img))
+		out.append(ImageTexture.create_from_image(img))
+	return out
 
 
 ## The baked word, four steps of the turn side by side, or null with no art (a bare label).
-static func _label_word() -> Image:
-	var path: String = label()[0]
+static func _label_word(path: String) -> Image:
 	if not ResourceLoader.exists(path):
 		return null
 	var tex := load(path) as Texture2D
@@ -464,11 +487,12 @@ func _draw() -> void:
 func _draw_platter() -> void:
 	_px(16, 20, 72, 72, WALNUT_LO)
 	_edge(16, 20, 72, 72, OUT)
-	if not _disc.is_empty():
+	var disc: Array = _discs.get(shown_label(), [])
+	if not disc.is_empty():
 		# Stepped: the turn advances SPIN_FPS times a second, not every frame.
 		var turn := floorf(_spin * SPIN_FPS) / SPIN_FPS * SPIN_RPS
 		var f := int(floorf(turn * SPIN_FRAMES)) % SPIN_FRAMES
-		var tex := _disc[f]
+		var tex: ImageTexture = disc[f]
 		draw_texture_rect(
 			tex,
 			_box(Rect2(DISC_AT - Vector2(DISC_R, DISC_R), Vector2(DISC_R * 2 + 1, DISC_R * 2 + 1))),
