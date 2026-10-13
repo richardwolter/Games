@@ -4901,6 +4901,42 @@ func _check_shed_cues(room: ShedRoom) -> void:
 	_check(is_equal_approx(room.turn_hint_alpha(), 1.0), "turning does not cut the chip short", "%.2f" % room.turn_hint_alpha())
 	room.call(&"_tick_turn_hint", ShedRoom.TURN_HINT_HOLD + ShedRoom.TURN_HINT_FADE)
 	_check(room.turn_hint_alpha() == 0.0, "and it fades out", "%.2f" % room.turn_hint_alpha())
+	# The pad's pick-up chip (2026-10-13): no ring round the piece in reach, a Y chip that
+	# shows once the player has stood still and goes the moment they walk.
+	room.carrying = &""
+	room.place(&"decor_loveseat", Vector2i(ShedRoom.CELL * 14, ShedRoom.CELL * 16), 0)
+	var seat_span: Vector2i = room.span_of(&"decor_loveseat", 0)
+	room.set(&"_you_at", Vector2(14.0 + float(seat_span.x) * 0.5 / ShedRoom.CELL,
+		16.0 + float(seat_span.y) / ShedRoom.CELL))
+	room.set(&"_you_pet", -1.0)
+	var mode_was := Pad.mode
+	Pad.set_mode(Pad.Mode.PAD)
+	room.set(&"_you_walk", Vector2.ZERO)
+	room.set(&"_pick_still", 0.0)
+	room.set(&"_pick_shown", 0.0)
+	room.call(&"_tick_pick_chip", ShedRoom.PICK_STILL * 0.5)
+	_check(room.pick_chip_alpha() == 0.0, "no pick-up chip before the player has stood still", "%.2f" % room.pick_chip_alpha())
+	room.call(&"_tick_pick_chip", ShedRoom.PICK_STILL)
+	room.call(&"_tick_pick_chip", ShedRoom.PICK_IN)
+	_check(is_equal_approx(room.pick_chip_alpha(), 1.0), "standing still by a piece shows the pick-up chip",
+		"%.2f" % room.pick_chip_alpha())
+	_check(room.pad_mark() == Rect2(), "and nothing rings the piece", str(room.pad_mark()))
+	room.set(&"_you_walk", Vector2(0.1, 0.0))
+	room.call(&"_tick_pick_chip", ShedRoom.PICK_OUT)
+	_check(room.pick_chip_alpha() == 0.0, "walking takes the chip away", "%.2f" % room.pick_chip_alpha())
+	room.set(&"_you_walk", Vector2.ZERO)
+	Pad.set_mode(mode_was)
+	decor.clear()
+	# Nothing but `Pad` warps the pointer (a direct warp dropped the game into mouse mode and
+	# the turn chip showed the keyboard's R), and the focus mark is cream corners, not gold.
+	var warpers := []
+	for script_name: String in DirAccess.get_files_at("res://scripts"):
+		if script_name.ends_with(".gd") and script_name != "pad.gd" 				and FileAccess.get_file_as_string("res://scripts/" + script_name).contains("warp_mouse("):
+			warpers.append(script_name)
+	_check(warpers.is_empty(), "only Pad warps the pointer", str(warpers))
+	var ring_source := FileAccess.get_file_as_string("res://scripts/focus_ring.gd")
+	_check(ring_source.contains("const CREAM") and not ring_source.contains("_draw_glow"),
+		"the pad's focus mark is cream corner brackets, the gold halo gone", "")
 	var single := &""
 	for name: String in sheets.facings.keys():
 		if sheets.has(StringName(name)) and not sheets.turnable(StringName(name)):
@@ -6570,9 +6606,9 @@ func _check_audio_pass(sound: Sfx) -> void:
 	_check(dog != null and dog.has_method(&"carrying"),
 		"a dog says what is in its mouth, so the ending can wait for it", "")
 
-	# A ferry landing its hold at a pier is silent: that volley is a whole hold going into a
-	# box across the lake, several times a minute, and the coins are what say it landed. The
-	# angler's own throws into the island crate keep the thud.
+	# Only a piece going from the crate into a hull thuds (2026-10-13): a ferry landing its
+	# hold at a pier is silent (the coins say it landed), and so are the angler's throws into
+	# the crate and a dog's delivery to it.
 	var haul: Haul = _main.get(&"_haul")
 	var yard_here: Dropoff = (_main.get(&"_dropoffs") as Array)[0]
 	# `play_pop` steps the crate thud's pitch every time it fires, so the step table is what
@@ -6584,8 +6620,16 @@ func _check_audio_pass(sound: Sfx) -> void:
 		"a ferry landing at a pier knocks no box", "")
 	haul.set(&"_pop_at", -1000.0)
 	haul.call(&"_pop", null)
+	_check(not bool((sound.get(&"_pitch_step") as Dictionary).has(&"pop")),
+		"the angler's throw into the crate knocks nothing either", "")
+	var hulls: Array = _main.get(&"_boats")
+	haul.set(&"_pop_at", -1000.0)
+	haul.call(&"_pop", hulls[0] if not hulls.is_empty() else null)
 	_check(bool((sound.get(&"_pitch_step") as Dictionary).has(&"pop")),
-		"but the angler's own throw into the crate still does", "")
+		"but a piece loaded from the crate into a hull does", "")
+	_check(Sfx.CRATE_PITCH < 1.0, "the crate's thud is pitched down", "%.2f" % Sfx.CRATE_PITCH)
+	_check(not FileAccess.get_file_as_string("res://scripts/lake.gd").contains("_sfx.play_pop()"),
+		"a dog's delivery to the crate is silent", "")
 
 	# The flights are one triangle array (2026-09-29): a shadow disc, a waterline diamond and
 	# a picture a piece, all off the atlas. tools/probe_same_frame.tscn is what proves it draws
@@ -9281,18 +9325,19 @@ func _check_beat(wild: Wildlife) -> void:
 			f["test_was"] = state
 	_check(landings > 0 and off_beat == 0, "frogs' hops land on the beat",
 		"%d landings, %d off the beat" % [landings, off_beat])
-	# A resting turtle's head bobs on the beat: one idle cycle a beat, the head up at its start.
+	# A resting turtle's head bobs on the beat: one nod a beat, the head up at its start.
 	var t0 := {"clock": 0.0, "nod_seed": 0.0, "state": Wildlife.Turtle.BASK, "pose": "idle"}
-	var want := "turtle_idle%d" % mini(int(fposmod(wild.beat(), 1.0) * 8.0), 7)
+	var nods := Wildlife.TURTLE_NODS
+	var want := "turtle_nod%d" % mini(int(fposmod(wild.beat(), 1.0) * nods), nods - 1)
 	_check(wild._turtle_frame(t0) == want, "a resting turtle bobs its head on the beat", want)
 	t0["nod_seed"] = 0.5
-	var half := "turtle_idle%d" % mini(int(fposmod(wild.beat() + 0.5, 1.0) * 8.0), 7)
+	var half := "turtle_nod%d" % mini(int(fposmod(wild.beat() + 0.5, 1.0) * nods), nods - 1)
 	_check(wild._turtle_frame(t0) == half, "and half of them half a beat behind", half)
 	# The pack turtle's frames, and the hide played into the shell and out again.
 	var sheet_table: Dictionary = wild.get(&"_table")
 	var turtle_missing := 0
-	for anim: String in ["idle", "sit", "sleep", "hide", "walk"]:
-		var n: int = {"idle": 8, "sit": 7, "sleep": 12, "hide": 13, "walk": 8}[anim]
+	for anim: String in ["idle", "sit", "sleep", "hide", "walk", "nod"]:
+		var n: int = {"idle": 8, "sit": 7, "sleep": 12, "hide": 13, "walk": 8, "nod": Wildlife.TURTLE_NODS}[anim]
 		for k in n:
 			turtle_missing += 0 if sheet_table.has("turtle_%s%d" % [anim, k]) else 1
 	_check(turtle_missing == 0 and not sheet_table.has("turtle_tuck") and not sheet_table.has("turtle_swim0"),

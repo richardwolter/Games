@@ -341,6 +341,18 @@ func _process(delta: float) -> void:
 		_cursor = Vector2.INF
 
 
+## Put the hidden pointer at `at` (viewport pixels) for a board: keeps `WARP_QUIET_MS`, so
+## the motion the warp makes is not taken for the mouse being picked up, and moves the
+## stick's own cursor with it, so the next `move_cursor` carries on from here. A board must
+## warp through this, never `warp_mouse` itself (2026-10-13: the shed's pick-up warped
+## directly, the game dropped to mouse mode, and the turn chip showed the keyboard's R).
+func warp_to(at: Vector2) -> void:
+	_warped_at = Time.get_ticks_msec()
+	if _cursor != Vector2.INF:
+		_cursor = at
+	get_viewport().warp_mouse(at)
+
+
 ## Move the pointer by a stick: the left stick carrying a piece in the shed
 ## (`ShedRoom._carry_with_pad`) and aiming the wash room's nozzle (`WashRoom._pad_aim`).
 func move_cursor(stick: Vector2, delta: float) -> void:

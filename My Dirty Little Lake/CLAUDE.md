@@ -4685,6 +4685,36 @@ Every mechanic a player meets mid-run is named the first time it happens.
   "House by the Lake", Save ME "Hello World", Goin "Sanctuary", Indie Boi "This is Nice",
   Habibs "Memory Lane". The slugs and file names keep the working names.
 
+### Pad and Sound Fixes (2026-10-13, `/grill-me` with Richard)
+- **The pad's focus mark is four cream corner brackets** (`FocusRing`, picked C off
+  `tools/last_focus_sheet.png`, three looks on real boards by `tools/shot_focus.tscn`): short
+  cream corners `OUT` (3) clear of the box, `THICK` 2, arms `ARM_SHARE` of the shorter side
+  (5 to 12), each ringed in one dark pixel, a whole pixel out and back with the breath,
+  gliding between picks. **Supersedes the gold halo** (glow, edge, glints, corner stars).
+  "No mark" (the control's hover alone) was mocked and showed nothing on the menu's doors
+  and the shop's rows. Every pad-focused board and the hive steps' marks wear it.
+- **The house rings nothing** (`ShedRoom.pad_mark` empty): the piece Y would pick up wears
+  the pick-up button's glyph as a key chip over its top (`_draw_pick_chip`), once the player
+  has stood still `PICK_STILL` (0.4 s), in over `PICK_IN`, gone over `PICK_OUT` the moment
+  they walk or push the stick. Pad only, empty hands, shelf and record menu down. Where the
+  interact chip is over the same piece, the two stand `PICK_BESIDE` apart, interact left.
+- **Only `Pad` warps the pointer** (`Pad.warp_to`, which keeps `WARP_QUIET_MS` and the
+  stick's cursor): `ShedRoom`'s pick-up and shelf take and `WashRoom.pick` warped directly,
+  the motion read as the mouse, the game dropped to mouse mode and the turn chip showed the
+  keyboard's R. `test_lake` fails on any `warp_mouse(` in `scripts/` outside `pad.gd`.
+- **Pad defaults reviewed and kept**: within convention (RT cast, A interact, B back,
+  Start settings, View camera lock, R3 recentre, bumpers zoom, X house, Y shop).
+- **Turtles nod** (`build_wildlife.py` `TURTLE_NOD`, `_nod`, `turtle_nod0..3`,
+  `Wildlife.TURTLE_NODS`): the head alone up an art pixel, back, down, back, one cycle a
+  beat. The pack's idle sank the whole turtle one art pixel, about one screen pixel at 0.77
+  world px an art px, and read as standing still (`tools/probe_turtle_bob.tscn` showed the
+  clock and the frames running). Bask timing unchanged, by decision. Film:
+  `tools/last_turtle_nod.gif`.
+- **Only crate-to-hull loading thuds** (`Haul._pop`: a `Boat` tag only): the angler's throws
+  into the crate and a dog's delivery are silent, pier landings stay silent. **Pitched
+  `Sfx.CRATE_PITCH` 0.85** under the roll.
+- Out of scope, by decision: remapping, D-pad zoom, turtle timing, other sounds.
+
 ### The Ferry's Water (2026-10-11, `/grill-me` with Richard)
 - **The bow breaks water on its own waterline, tight** (`Boat._throw_spray`, `_bow_point`,
   `WaterSplash.bow_spray`, `BOW_SPRAY` 0.2 s, `BOW_SPRAY_SPAN` 14-22 px): a small crown and
@@ -5161,7 +5191,7 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   turtle, its `turtle_sit`/`_up`/`walk`/`tuck`/`swim` frames, `_nod` and the drawn flippers
   `_turtle_flippers`, in The Lake Fills With Life and The Lakebed Through Clean Water). Idle,
   Sit, Sleep, Hide and Walking (`build_wildlife.py` `turtles`, one crop), drawn at one world
-  px a painted px (`TURTLE_ART`). **The head bobs to the song**: idle and sit play one cycle a
+  px a painted px (`TURTLE_ART`). **The head bobs to the song** (idle is the rule-built nod since 2026-10-13, see Pad and Sound Fixes): idle and sit play one cycle a
   beat (`_beat_frame`), the sheets' head up at the cycle's start, half of them half a beat
   behind (`nod_seed`), the old nod's rule. At rest it idles, head bobbing to the beat, always
   (`TURTLE_POSES`, 2026-10-12, Richard: sit and sleep are no longer rolled); sleep breathes at `TURTLE_SLEEP_FPS` with the pack's Z's.
@@ -5898,7 +5928,7 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   counted `NAV_ACROSS` times; a held push repeats after `NAV_FIRST`, then every
   `NAV_REPEAT`; a push held as a board comes up waits to be let go). **The pick drives the
   real pointer, hidden**: it is warped onto the control and A is the same left click, so
-  every board's own hover wash, swell and sound come for nothing. Over that, one gold ring
+  every board's own hover wash, swell and sound come for nothing. Over that, one mark (cream corner brackets since 2026-10-13, see Pad and Sound Fixes; a gold ring before)
   (`FocusRing`, `Pad.RING_LAYER` 39; a shining halo since 2026-10-06, see The PlayStation Pad). Optional hooks:
   `pad_press(key)` (A taken by the board), `pad_nudge(key, step)` (left/right spent on the
   control), `pad_scroll(step)` (a step off a scrolling list's end), `pad_hold()` (stick
@@ -5918,7 +5948,7 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
     screen while the roll climbs (A skips it), then the menu door. **Tour cards**: the lit
     target first when it takes the click, then go on and skip.
   - **Shed, free aim**: the stick walks the player; **A picks up the placed piece the player
-    stands at** (`_piece_near`, within `REACH`, ringed through `pad_mark`) and puts a carried
+    stands at** (`_piece_near`, within `REACH`; since 2026-10-13 a Y chip once the player stands still, not ringed, see Pad and Sound Fixes) and puts a carried
     one down where the stick has carried it; Y works a switch, X turns what is in hand.
     **RB or LB opens the shelf** (`_pad_shelf`, the shoulder shown on a chip on its title
     plank): its rows, the wash plank and the cross are stops, the list scrolls off its ends,
@@ -6006,7 +6036,8 @@ own printed legends".
     hive's tools likewise (`HiveStep.aim_stick`: right stick, else left).
   - **The shelf's R1 is the loudest glyph on the plank** (`ShedShelf.KEY_PX` 3 screen px a
     texel, against 2 elsewhere), standing proud of its left end.
-  - **The focus mark is a shining halo** (`FocusRing`): a gold glow breathing outward from the
+  - **Superseded 2026-10-13** (cream corner brackets, see Pad and Sound Fixes).
+    **The focus mark is a shining halo** (`FocusRing`): a gold glow breathing outward from the
     box (a gradient round it, never over it), a gold edge with a pale lip, two glints running
     round it, the finds' stars twinkling at its corners in turn, and a glide from pick to
     pick. Supersedes the two-pixel gold rectangle.
@@ -6510,7 +6541,8 @@ purpose. What the audit settled, against the shipped design:
     `HAUL_EVERY` (1 s) while reeling, pitch and level off the net's effort (`set_drag`).
   - Each piece lifted: `Object_Splash`, pitched lower and louder by weight, at most one every
     `SPLASH_GAP` (0.08 s). The built knock that used to go under it is cut (see above).
-  - A piece landing in a box: `Object_in_box`, three takes (`play_pop`), **except when a ferry is
+  - **Superseded 2026-10-13**: only crate-to-hull loading thuds (see Pad and Sound Fixes).
+    A piece landing in a box: `Object_in_box`, three takes (`play_pop`), **except when a ferry is
     landing its hold at a pier** (`Haul._pop` skips a `Dropoff` tag, 2026-09-16, Richard: too
     repetitive). That volley is a whole hold going into a box across the lake, several times
     a minute, and it already has a sound of its own — the run of coins to the plate, which is

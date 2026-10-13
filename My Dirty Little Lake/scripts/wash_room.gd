@@ -212,7 +212,7 @@ func pick(piece: StringName) -> bool:
 	# The pad's hidden pointer starts the nozzle from the find, not from the tray's row.
 	if Pad.is_pad() and is_inside_tree():
 		var middle := _stand.piece_box().get_center()
-		get_viewport().warp_mouse(_stand.get_global_transform_with_canvas() * middle)
+		Pad.warp_to(_stand.get_global_transform_with_canvas() * middle)
 	return true
 
 

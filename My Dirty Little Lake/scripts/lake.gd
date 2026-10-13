@@ -1999,10 +1999,8 @@ func _dog_brought_back(def_index: int) -> void:
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 	_filth_stale = true
 	_ask_the_end()
-	if _sfx != null:
-		# The crate's own thud, the same one a piece landing in it plays from anywhere else.
-		# It used to be the knock, which was the water it came out of and not the box.
-		_sfx.play_pop()
+	# Silent (2026-10-13): nothing going into the crate thuds, only what leaves it for a hull
+	# (`Haul._pop`).
 
 
 ## The starting junk set, one `.tres` per kind under `resources/trash/`. The numbers live

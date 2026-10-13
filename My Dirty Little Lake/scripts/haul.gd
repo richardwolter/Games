@@ -340,13 +340,14 @@ static func _counted(piece: Dictionary) -> bool:
 ## is silent by definition. One pop per piece, at the moment it lands, is a stream that
 ## matches what is on screen.
 ##
-## **A ferry landing its hold at a pier is silent** (2026-09-16, Richard: too repetitive).
-## That volley is a whole hold going into a box across the lake, several times a minute, and
-## it already has a sound of its own — the run of coins to the plate, which is what the
-## delivery is actually about. The angler's own throws into the crate keep the thud: that is
-## the player's hand, in front of them, one cast at a time.
+## **Only a piece going from the crate into a hull thuds** (2026-10-13, `/grill-me` with
+## Richard: "no object in box noise from player to box, only from box to boats"). The
+## angler's throws into the crate and a dog's delivery to it are silent now; the catch's pops
+## already say what came home. A ferry landing its hold at a pier stays silent (2026-09-16):
+## the run of coins to the plate says that delivery landed. Supersedes "the angler's own
+## throws into the crate keep the thud".
 func _pop(tag: Variant = null) -> void:
-	if sfx == null or tag is Dropoff:
+	if sfx == null or not (tag is Boat):
 		return
 	var now := float(Time.get_ticks_msec()) / 1000.0
 	if now - _pop_at < POP_GAP:

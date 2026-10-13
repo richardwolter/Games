@@ -1053,8 +1053,13 @@ func play_luck(lucky: bool, double: bool) -> void:
 ## Its own name, so the shed's allow-list refuses it without being asked to: a yard filling
 ## while the player decorates is out of earshot like the rest of the lake, which `play_pop`
 ## used to have to say for itself while it borrowed `drop_big`.
+## The crate's thud as a piece goes from it into a hull (`Haul._pop`), `CRATE_PITCH` down
+## (2026-10-13, Richard: "a bit lower", about three semitones) under `SOUNDS`' own roll.
+const CRATE_PITCH := 0.85
+
+
 func play_pop() -> void:
-	play(&"pop", 0.0, 1.0, next_step(&"pop", _count(&"pop")))
+	play(&"pop", 0.0, CRATE_PITCH, next_step(&"pop", _count(&"pop")))
 
 
 ## A ferry setting off from the island's dock.

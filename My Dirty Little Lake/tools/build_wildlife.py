@@ -368,7 +368,48 @@ def turtles() -> list[tuple[str, Image.Image]]:
         for k, im in enumerate(_left(_cells(sheet, (32, 32), 0, sheet.width // 32))):
             names.append(f"turtle_{anim}{k}")
             frames.append(im)
-    return list(zip(names, _stood(frames)))
+    out = list(zip(names, _stood(frames)))
+    rest = dict(out)["turtle_idle0"]
+    for k, lift in enumerate(TURTLE_NOD):
+        out.append((f"turtle_nod{k}", _nod(rest, lift)))
+    return out
+
+
+# The turtle's nod (2026-10-13, Richard: "turtles just standing, no bobbing"). The pack's
+# idle is the whole turtle sinking one art pixel and rising, drawn at 0.77 world px an art px:
+# about one screen pixel, which reads as standing still. The nod moves the head alone,
+# `TURTLE_NOD` art px a frame (negative is up), one cycle a beat: up a pixel, back, down a
+# pixel, back. The head is the block `HEAD_COLS` wide, rows `HEAD_ROWS` below the picture's
+# top, measured off the TurtlePaid idle's first frame; up stretches the neck by repeating its
+# bottom row, down lets it sink over the front leg's outline.
+TURTLE_NOD = [-1, 0, 1, 0]
+HEAD_COLS = 6
+HEAD_ROWS = (4, 9)
+
+
+def _nod(img: Image.Image, lift: int) -> Image.Image:
+    if lift == 0:
+        return img.copy()
+    left, top, _, _ = img.getbbox()
+    src = img.load()
+    out = img.copy()
+    p = out.load()
+    rows = range(top + HEAD_ROWS[0], top + HEAD_ROWS[1] + 1)
+    cols = range(left, left + HEAD_COLS)
+    assert src[left + 2, top + HEAD_ROWS[0] + 3][3] > 0, "turtle head not where measured"
+    for x in cols:
+        for y in rows:
+            p[x, y] = (0, 0, 0, 0)
+    for x in cols:
+        for y in rows:
+            if src[x, y][3] > 0:
+                p[x, y + lift] = src[x, y]
+        if lift < 0:
+            # The neck stretched: its bottom row stays where it was.
+            bottom = rows[-1]
+            if src[x, bottom][3] > 0:
+                p[x, bottom] = src[x, bottom]
+    return out
 
 
 def bunnies() -> list[tuple[str, Image.Image]]:

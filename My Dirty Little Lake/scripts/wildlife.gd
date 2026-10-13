@@ -175,6 +175,8 @@ const TURTLE_ART := 0.5 * TURTLE_DRAWN
 ## "turtles should not idle like that ever"); sitting and sleeping were rolled with it and
 ## held it still for half a minute. Their frames stay on the sheet, unused.
 const TURTLE_POSES := {"idle": 1.0}
+## The nod's frames (`turtle_nod0..`), one cycle a beat.
+const TURTLE_NODS := 4
 const TURTLE_SLEEP_FPS := 5.0
 const TURTLE_HIDE_FPS := 20.0
 const TURTLE_HIDE_FRAMES := 13
@@ -3587,8 +3589,11 @@ func _draw_turtle(on: CanvasItem, t: Dictionary) -> void:
 
 
 ## The picture a turtle shows this instant. Idle and sit bob the head on the song's beat:
-## the sheets' head is up at the start of a cycle and down half way, and one cycle is one
-## beat, so the head is up on the beat (`nod_seed` puts half of them half a beat behind).
+## one cycle a beat, the head up at its start (`nod_seed` puts half of them half a beat
+## behind). **Idle is the nod** (2026-10-13, Richard: "turtles just standing, no bobbing"):
+## `turtle_nod0..3`, the head alone up a pixel, back, down, back
+## (`tools/build_wildlife.py` `TURTLE_NOD`). The pack's idle sank the whole turtle one art
+## pixel, which at 0.77 world px an art px is a screen pixel and read as standing still.
 func _turtle_frame(t: Dictionary) -> String:
 	var state: int = t["state"]
 	match state:
@@ -3605,7 +3610,7 @@ func _turtle_frame(t: Dictionary) -> String:
 			return "turtle_sit%d" % _beat_frame(t, 7)
 		"sleep":
 			return "turtle_sleep%d" % (int(float(t["clock"]) * TURTLE_SLEEP_FPS) % 12)
-	return "turtle_idle%d" % _beat_frame(t, 8)
+	return "turtle_nod%d" % _beat_frame(t, TURTLE_NODS)
 
 
 ## Which of `count` frames a beat-bound loop shows: one loop a beat.

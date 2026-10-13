@@ -201,6 +201,16 @@ const BESIDE := 1.5
 ## ends up dragging the fridge every time they meant to open it.
 const REACH := 3.2
 const PROMPT_LIFT := 8.0
+## The pad's pick-up chip (2026-10-13, `/grill-me` with Richard: the gold box round the piece
+## in reach "should not stay shown constantly ... much more subtle and friendly"): the key
+## chip with the pick-up button's glyph over the placed piece Y would take, once the player
+## has stood still `PICK_STILL` seconds, easing in over `PICK_IN` and out over `PICK_OUT` the
+## moment they walk.
+const PICK_STILL := 0.4
+const PICK_IN := 0.2
+const PICK_OUT := 0.15
+## How far apart the interact key and the pick-up chip stand when they share a piece.
+const PICK_BESIDE := 22.0
 
 ## Resting on the furniture (2026-09-29, `/grill-me` with Richard, picked off
 ## `tools/last_pose_mockup.png`): E at a seat sits the player on it, at a bed lies them in it,
@@ -1019,6 +1029,7 @@ func _process(delta: float) -> void:
 	var you_was := _you_at
 	_walk_you(delta)
 	_you_walk = _you_at - you_was
+	_tick_pick_chip(delta)
 	_tick_house(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
@@ -3970,8 +3981,43 @@ func _draw_turn_hint(floor_box: Rect2) -> void:
 
 
 func _draw_prompt(floor_box: Rect2) -> void:
-	if _you_pet >= 0.0 or not _rest_key.is_empty():
+	var key_on := _draw_interact_prompt(floor_box)
+	_draw_pick_chip(floor_box, key_on)
+
+
+## The pick-up chip over the piece Y would take. Where the interact key already stands over
+## that same piece (a lamp, a seat), the two share one place: interact on the left, pick up
+## on the right.
+func _draw_pick_chip(floor_box: Rect2, key_on: int) -> void:
+	if _pick_shown <= 0.0:
 		return
+	var at := _piece_near()
+	if at < 0:
+		return
+	var glyph := Glyphs.lone(Binds.shown(&"open_upgrades", true))
+	if glyph == null:
+		return
+	var over := _over_piece(floor_box, at)
+	if key_on == at:
+		over.x += PICK_BESIDE * 0.5
+	Glyphs.draw_centred(self, glyph, over, -1.0, _pick_shown)
+
+
+## Over the middle of a placed piece's top edge, where the key chips stand.
+func _over_piece(floor_box: Rect2, index: int) -> Vector2:
+	var row: Dictionary = decor[index]
+	var span := span_of(StringName(row["piece"]), _row_view(row))
+	return floor_box.position + Vector2(
+		(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
+		float(int(row["cell"][1])) * _zoom() - PROMPT_LIFT
+	)
+
+
+## The interact key's chip over whatever E would use, and which placed piece that is (-1 for
+## the door, a dog, or nothing).
+func _draw_interact_prompt(floor_box: Rect2) -> int:
+	if _you_pet >= 0.0 or not _rest_key.is_empty():
+		return -1
 	var at := _switch_near()
 	var dog := _dog_near()
 	var rest := _rest_near()
@@ -3989,7 +4035,7 @@ func _draw_prompt(floor_box: Rect2) -> void:
 		_draw_key(floor_box.position + Vector2(
 			(span.x + span.y) * 0.5 * step, -minf(_door_size().y, _wall_tall()) * 0.5
 		))
-		return
+		return -1
 	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
 		# A seat, a bed or a bookcase is what E would use: the key goes over it.
 		at = rest
@@ -4000,16 +4046,15 @@ func _draw_prompt(floor_box: Rect2) -> void:
 		var step := float(CELL * _zoom())
 		over = floor_box.position + dog.at * step - Vector2(0.0, DOG_TALL * step + PROMPT_LIFT * 0.5)
 	elif at < 0:
-		return
+		return -1
 	else:
-		var row: Dictionary = decor[at]
-		var piece := StringName(row["piece"])
-		var span := span_of(piece, _row_view(row))
-		over = floor_box.position + Vector2(
-			(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
-			float(int(row["cell"][1])) * _zoom() - PROMPT_LIFT
-		)
+		over = _over_piece(floor_box, at)
+		if _pick_shown > 0.0 and _piece_near() == at:
+			over.x -= PICK_BESIDE * 0.5
+		_draw_key(over)
+		return at
 	_draw_key(over)
+	return -1
 
 
 ## The interact key's chip, centred on `over`.
@@ -4041,6 +4086,31 @@ func _stamp_piece(
 	)
 
 
+## How long the player has stood still, and how much of the pick-up chip shows (0..1).
+var _pick_still := 0.0
+var _pick_shown := 0.0
+
+
+func _tick_pick_chip(delta: float) -> void:
+	var pushed := Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down").length() > 0.2
+	if pushed or _you_walk.length() > 0.0001:
+		_pick_still = 0.0
+	else:
+		_pick_still += delta
+	var wants := _pick_chip_wanted() and _pick_still >= PICK_STILL
+	_pick_shown = move_toward(_pick_shown, 1.0 if wants else 0.0, delta / (PICK_IN if wants else PICK_OUT))
+
+
+## Whether the pick-up chip may show at all: the pad, empty hands, the room's own stick.
+func _pick_chip_wanted() -> bool:
+	return Pad.is_pad() and carrying.is_empty() and not _pad_shelf and not record_up() 		and _rest_key.is_empty() and _you_pet < 0.0 and _piece_near() >= 0
+
+
+## How much of the pick-up chip shows, for the harness.
+func pick_chip_alpha() -> float:
+	return _pick_shown
+
+
 ## The pad in the shed (2026-09-26, `/grill-me` with Richard). **The room is free aim**: the
 ## left stick walks the player and, with a piece in hand, carries it; **Y picks up the placed
 ## piece the player stands at (ringed) and puts a carried one down**; A is Interact, which
@@ -4062,7 +4132,7 @@ func _pad_tick() -> void:
 			var at := _piece_near()
 			if at >= 0:
 				_pointer = _piece_box(at).get_center()
-				get_viewport().warp_mouse(get_global_transform_with_canvas() * _pointer)
+				Pad.warp_to(get_global_transform_with_canvas() * _pointer)
 				_pick_up()
 		else:
 			_put_down()
@@ -4071,7 +4141,7 @@ func _pad_tick() -> void:
 		# Taken off the shelf: into the player's hands, out in the room.
 		_pad_shelf = false
 		var hands := _floor_origin() + _you_at * float(CELL) * _zoom()
-		get_viewport().warp_mouse(get_global_transform_with_canvas() * hands)
+		Pad.warp_to(get_global_transform_with_canvas() * hands)
 		_pointer = hands
 
 
@@ -4113,12 +4183,10 @@ func pad_press(_key: Variant) -> bool:
 	return not _pad_shelf
 
 
-## What Y would pick up, ringed.
+## Nothing is ringed in the room (2026-10-13): what Y would pick up wears the pick-up chip
+## instead (`_draw_pick_chip`). It was ringed in the focus mark whenever a piece was in reach.
 func pad_mark() -> Rect2:
-	if _pad_shelf or not carrying.is_empty():
-		return Rect2()
-	var at := _piece_near()
-	return _piece_box(at) if at >= 0 else Rect2()
+	return Rect2()
 
 
 ## The placed piece nearest the player within `REACH`, as an index into `decor`, or -1.
