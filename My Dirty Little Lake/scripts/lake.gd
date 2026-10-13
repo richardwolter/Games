@@ -7776,15 +7776,15 @@ func _save_and_quit() -> void:
 ## read as two shadows.
 const SHED_SEED := 4477
 
-## The hut by the meter (2026-10-01, `tools/build_shed_v2.py`): neglected until half the lake is
-## cleaned, tidied from there, cosy from nine tenths. Picked off `pollution` each draw and
+## The hut by the meter (2026-10-01, `tools/build_shed_v2.py`): neglected until a third of the lake is
+## cleaned, tidied from there, cosy from two thirds (was a half and nine tenths until 2026-10-12). Picked off `pollution` each draw and
 ## nothing saved, so a loaded run shows the hut its meter has earned. One silhouette for all
 ## three; only what grows on and round it changes.
 const SHED_ARTS: Array[String] = [
 	"res://assets/shed_neglected.png", "res://assets/shed_tidied.png", "res://assets/shed_cosy.png",
 ]
 ## The share of the lake cleaned where each later stage begins.
-const SHED_STAGE_AT: Array[float] = [0.5, 0.9]
+const SHED_STAGE_AT: Array[float] = [0.33, 0.66]
 
 ## The lit window (`shed_glow.png`, the glass's pixels alone), drawn over the hut in a warm
 ## white whose alpha rises late in the afternoon and under a storm's grey: the window is the one

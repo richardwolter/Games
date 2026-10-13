@@ -5056,11 +5056,14 @@ func _check_house(room: ShedRoom) -> void:
 	decor.append({"piece": "decor_pk_wood_chair", "cell": [on_hole.x, on_hole.y], "view": 0})
 	_main.call(&"_settle_house")
 	_check(decor.is_empty(), "a piece standing on a hole goes back to the shelf", str(decor))
+	# The stages come at a third and two thirds cleaned (2026-10-12).
+	var cuts := [int(_main.call(&"shed_stage_for", 0.32)), int(_main.call(&"shed_stage_for", 0.34)), int(_main.call(&"shed_stage_for", 0.65)), int(_main.call(&"shed_stage_for", 0.67))]
+	_check(cuts == [0, 1, 1, 2], "the house mends at 33% and 66% cleaned", str(cuts))
 	# The latch: forward only.
 	var kept_pollution: float = _main.get(&"pollution")
 	var kept_house: int = _main.get(&"house_stage")
 	_main.set(&"house_stage", 0)
-	_main.set(&"pollution", 0.4)
+	_main.set(&"pollution", 0.5)
 	_main.call(&"_latch_house")
 	var reached: int = _main.get(&"house_stage")
 	_main.set(&"pollution", 0.9)

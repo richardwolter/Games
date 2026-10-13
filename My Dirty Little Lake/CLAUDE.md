@@ -2761,7 +2761,7 @@ old source) and the 1.4 grain notes above for what the lake draws.
   unchanged. Rule-built, then picked off `tools/last_shed_mockup.png` over five passes:
   oak-moss palette, lap siding on every wall (the "small planks"), fascia, frieze and barge as
   planks of the same wood, corner boards, sage shutters with a heart cut out.
-- **Three stages by the meter** (`Lake.SHED_ARTS`, `SHED_STAGE_AT` 0.5 / 0.9 cleaned,
+- **Three stages by the meter** (`Lake.SHED_ARTS`, `SHED_STAGE_AT` 0.33 / 0.66 cleaned since 2026-10-12, Richard: the fixing comes quicker; was 0.5 / 0.9;
   `shed_stage_for`, `_restage_shed`): latched and saved since 2026-10-11 (`house_stage`, see The House
   Inside Matches the Outside), no `SAVE_VERSION` bump. A change rebuilds the hem (`_shed_skirt`), re-sweeps the shadow
   (`Shade.Cast.forget`) and hands the decorate button the new hut.
@@ -2807,13 +2807,13 @@ old source) and the 1.4 grain notes above for what the lake draws.
 The room inside the house wears the hut's three stages. Picked off a mockup Richard approved
 ("pretty cool for now"), then baked into the game. `HouseInside` (`scripts/house_inside.gd`),
 `ShedRoom`'s "the house's stages" block, `Lake.house_stage`.
-- **Stage 1, abandoned** (under 50% cleaned): about 19% of the boards lost to four holes (earth
+- **Stage 1, abandoned** (under 33% cleaned): about 19% of the boards lost to four holes (earth
   and weeds below, splintered plank ends, a shadow band under the rim) and three broken runs
   (sunk, tented, fallen through). The window's sunny side and the rotten side: the left half
   dries in the light, the right half holds the dark holes. Three leak puddles with drops
   falling from ceiling height; dead ivy and moss on the frame, peeling stained wallpaper,
   cobwebs, mushrooms, weeds in cracks, dust motes in the sun shaft, the room dimmer.
-- **Stage 2** (50% to 90%): fresh tan patches, two small holes left (about 4.5%: the sun
+- **Stage 2** (33% to 66%): fresh tan patches, two small holes left (about 4.5%: the sun
   hole's core in flower, the low corner with boards and a saw waiting), one slow drip, green
   ivy on the frame hanging onto the lake and tendrils down the wallpaper.
 - **Stage 3**: the clean room, roses, wisteria and ivy on the frame, bees, butterflies,
