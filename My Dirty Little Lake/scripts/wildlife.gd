@@ -557,23 +557,36 @@ func _process(delta: float) -> void:
 ## tufts in front of it to be drawn again over it (2026-10-05, Richard: "make sure animals go
 ## behind the bushes and vegetation"; `Flora.cover`, `Ground.cover`). Boxes are generous
 ## halves and heights of what each is drawn at, world px.
+## World rects the ending's bubble is filming, set by `EndingReel` every frame; empty
+## otherwise (2026-10-12).
+var film_views: Array[Rect2] = []
+
+
 func _cover_plants() -> void:
 	var bodies: Array = []
 	# Only what is on screen: a plant drawn over an animal nobody can see is work for nothing.
-	var view := get_canvas_transform().affine_inverse() * get_viewport_rect()
-	view = view.grow(40.0)
+	# And what the ending's bubble is filming (`EndingReel`, `film_views`), or an animal in it
+	# stands over the plants in front of it.
+	var views: Array[Rect2] = [(get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(40.0)]
+	for r: Rect2 in film_views:
+		views.append(r.grow(40.0))
+	var seen := func(at: Vector2) -> bool:
+		for r: Rect2 in views:
+			if r.has_point(at):
+				return true
+		return false
 	for c: Dictionary in _critters_on_land:
 		var k: Dictionary = KINDS[c["kind"]]
-		if view.has_point(c["at"]):
+		if seen.call(c["at"]):
 			bodies.append(_body(c["at"], float(k["half"]), float(k["tall"])))
 	for f: Dictionary in _frogs:
-		if int(f["state"]) != Frog.SWIM and view.has_point(f["at"]):
+		if int(f["state"]) != Frog.SWIM and seen.call(f["at"]):
 			bodies.append(_body(f["at"], 10.0 * FROG_DRAWN, 18.0 * FROG_DRAWN))
 	for t: Dictionary in _turtles:
-		if int(t["state"]) != Turtle.UNDER and view.has_point(t["at"]):
+		if int(t["state"]) != Turtle.UNDER and seen.call(t["at"]):
 			bodies.append(_body(t["at"], 14.0 * TURTLE_DRAWN, 21.0 * TURTLE_DRAWN))
 	for s: Dictionary in _birds:
-		if float(s["alt"]) <= 0.5 and view.has_point(s["at"]):
+		if float(s["alt"]) <= 0.5 and seen.call(s["at"]):
 			bodies.append(_body(s["at"], 8.0, 14.0))
 	if flora != null:
 		flora.cover(bodies)
@@ -1917,6 +1930,11 @@ func _turn_with(c: Dictionary, step: Vector2, delta: float) -> void:
 	if step.length_squared() < 0.0001:
 		return
 	var heading: Vector2 = c.get("heading", step.normalized())
+	# A turn back on itself is taken at once: eased through it, a bunny bolting the other way
+	# ran a few frames facing where it had come from (2026-10-12, Richard: "running
+	# backwards").
+	if heading.dot(step.normalized()) < 0.0:
+		heading = step.normalized()
 	heading = heading.lerp(step.normalized(), 1.0 - exp(-TURN_RATE * delta))
 	if heading.length_squared() < 0.0001:
 		heading = step.normalized()
@@ -1933,7 +1951,12 @@ func _turn_with(c: Dictionary, step: Vector2, delta: float) -> void:
 	else:
 		view = "front" if heading.y > 0.0 else "back"
 	c["view"] = view
-	if across > FACE_LEAST:
+	# A kind with no front or back pictures always shows its side, so any sideways part of
+	# the heading decides which way it faces; held to `FACE_LEAST` it kept facing where it
+	# had been while it ran mostly up or down the screen.
+	var kind: Variant = c.get("kind")
+	var sided: bool = kind == &"capy" or kind == &"peacock"
+	if across > (FACE_LEAST if sided else 0.02):
 		c["facing"] = Flock.facing_of(Vector2.ZERO, heading)
 
 

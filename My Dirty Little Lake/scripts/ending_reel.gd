@@ -123,6 +123,7 @@ func _process(delta: float) -> void:
 		_block = block
 		_cut(false)
 	_follow(delta)
+	_hand_view()
 	_cam.zoom = Vector2.ONE * _zoom_to * _stretch
 	_lay_out()
 	var into := fposmod(_beat(), float(SHOT_BEATS))
@@ -219,7 +220,9 @@ func _find(name: StringName) -> Variant:
 		&"frog":
 			pool = wild._frogs.filter(func(f): return int(f["state"]) != Wildlife.Frog.SWIM)
 		&"turtle":
-			pool = wild._turtles
+			# Walking or swimming only: a basking turtle holds still for half a minute
+			# (2026-10-12, Richard: "turtle isn't moving when filmed").
+			pool = wild._turtles.filter(func(t): return int(t["state"]) == Wildlife.Turtle.WALK 				or int(t["state"]) == Wildlife.Turtle.SWIM)
 		&"duck":
 			pool = wild._broods.filter(func(b): return int(b["state"]) != Wildlife.Brood.FLY_IN \
 				and int(b["state"]) != Wildlife.Brood.TAKE_OFF)
@@ -232,3 +235,18 @@ func _find(name: StringName) -> Variant:
 	if pool.is_empty():
 		return null
 	return pool[randi() % pool.size()]
+
+
+## What the camera sees, in the world, for the plants to be drawn over the animals in it.
+func _hand_view() -> void:
+	var wild: Wildlife = lake.get(&"_wildlife") if lake != null else null
+	if wild == null:
+		return
+	var half := Vector2(_view.size) / (_cam.zoom * 2.0)
+	wild.film_views = [Rect2(_cam.position - half, half * 2.0)]
+
+
+func _exit_tree() -> void:
+	var wild: Wildlife = lake.get(&"_wildlife") if lake != null else null
+	if wild != null:
+		wild.film_views = []
