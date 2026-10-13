@@ -171,7 +171,10 @@ const TURTLE_STEPS := 8
 ## its rings and its plant-cover box come in with it, so the feet still carry the body.
 const TURTLE_DRAWN := 1.0 / 1.3
 const TURTLE_ART := 0.5 * TURTLE_DRAWN
-const TURTLE_POSES := {"idle": 0.45, "sit": 0.35, "sleep": 0.2}
+## A basking turtle always idles, its head bobbing a cycle a beat (2026-10-12, Richard:
+## "turtles should not idle like that ever"); sitting and sleeping were rolled with it and
+## held it still for half a minute. Their frames stay on the sheet, unused.
+const TURTLE_POSES := {"idle": 1.0}
 const TURTLE_SLEEP_FPS := 5.0
 const TURTLE_HIDE_FPS := 20.0
 const TURTLE_HIDE_FRAMES := 13

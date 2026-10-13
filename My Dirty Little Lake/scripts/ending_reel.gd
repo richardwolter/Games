@@ -220,9 +220,8 @@ func _find(name: StringName) -> Variant:
 		&"frog":
 			pool = wild._frogs.filter(func(f): return int(f["state"]) != Wildlife.Frog.SWIM)
 		&"turtle":
-			# Walking or swimming only: a basking turtle holds still for half a minute
-			# (2026-10-12, Richard: "turtle isn't moving when filmed").
-			pool = wild._turtles.filter(func(t): return int(t["state"]) == Wildlife.Turtle.WALK 				or int(t["state"]) == Wildlife.Turtle.SWIM)
+			# Not dived or tucked into its shell: a basking turtle bobs its head to the beat.
+			pool = wild._turtles.filter(func(t): return int(t["state"]) != Wildlife.Turtle.UNDER 				and int(t["state"]) != Wildlife.Turtle.TUCK)
 		&"duck":
 			pool = wild._broods.filter(func(b): return int(b["state"]) != Wildlife.Brood.FLY_IN \
 				and int(b["state"]) != Wildlife.Brood.TAKE_OFF)

@@ -5110,8 +5110,8 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   Sit, Sleep, Hide and Walking (`build_wildlife.py` `turtles`, one crop), drawn at one world
   px a painted px (`TURTLE_ART`). **The head bobs to the song**: idle and sit play one cycle a
   beat (`_beat_frame`), the sheets' head up at the cycle's start, half of them half a beat
-  behind (`nod_seed`), the old nod's rule. At rest it rolls idle, sit or sleep
-  (`TURTLE_POSES`, `_turtle_rest`); sleep breathes at `TURTLE_SLEEP_FPS` with the pack's Z's.
+  behind (`nod_seed`), the old nod's rule. At rest it idles, head bobbing to the beat, always
+  (`TURTLE_POSES`, 2026-10-12, Richard: sit and sleep are no longer rolled); sleep breathes at `TURTLE_SLEEP_FPS` with the pack's Z's.
   A fright on land plays Hide into the shell, holds, and plays it back out over the tuck's
   last stretch (`TURTLE_HIDE_FPS`). On the water it swims the dogs' and the capybaras' way:
   cut at the waterline (`TURTLE_SINK` of `TURTLE_INK`, the walking turtle's own 15 px: the
