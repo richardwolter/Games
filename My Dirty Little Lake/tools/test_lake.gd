@@ -6006,7 +6006,7 @@ func _check_one_sun(day: DayCycle) -> void:
 
 
 ## The ending filmed (2026-10-12): a bubble on the full game's ending, alternating sides on
-## every cut, falling through the shot list to a subject the lake has, the wide shot always.
+## every cut, falling through the shot list to a subject the lake has.
 func _check_reel(ending: Farewell) -> void:
 	var reel: EndingReel = ending.reel if ending != null else null
 	_check(reel != null, "the full game's ending films the lake in a bubble", "")
@@ -6019,13 +6019,14 @@ func _check_reel(ending: Farewell) -> void:
 	reel.call(&"_cut", false)
 	_check(reel.side != side and reel.shots_taken == taken + 1,
 		"a cut takes the next shot and hops the bubble to the other side", "")
-	_check(reel.call(&"_find", &"wide") != null and EndingReel.SHOTS.has(reel.shot),
-		"and the shot list always has the wide shot to fall to", String(reel.shot))
+	_check(reel.call(&"_find", &"dogs") != null and EndingReel.SHOTS.has(reel.shot)
+		and not EndingReel.SHOTS.has(&"house"),
+		"and films the dogs and nature, never the house or the angler", String(reel.shot))
 	var r := reel.bubble_rect()
 	var band: Vector2 = ending.call(&"_message_band")
 	_check(r.size.x > 0.0 and r.end.x <= reel.size.x and r.position.x >= 0.0,
 		"the bubble stands inside the window", str(r))
-	_check(EndingReel.SHOT_BEATS % 4 == 0, "a shot holds whole bars", "")
+	_check(EndingReel.SHOT_BEATS == 4, "a shot holds four beats", "")
 	_check(band.y > band.x, "beside the words", "")
 
 

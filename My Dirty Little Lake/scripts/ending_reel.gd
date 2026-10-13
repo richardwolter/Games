@@ -10,30 +10,34 @@ extends Control
 ## it. Drawn only: nothing in the lake reads the reel back.
 ##
 ## A shot is a subject found off the lake (`_find`), followed for the shot's length. The list
-## falls through: a subject that is not there is skipped, and the wide shot of the island is
-## always there. A subject that goes away mid-shot leaves the camera where it was.
+## falls through: a subject that is not there is skipped; with nothing found the shot before
+## carries on. A subject that goes away mid-shot leaves the camera where it was.
 
 const Iso := preload("res://scripts/iso.gd")
 
 ## The shot list, in order. Each pick starts from the one after the last.
+## No angler and no house (2026-10-12, Richard: "just dogs and nature"); a grown pad or
+## flower is the shot the list falls to.
 const SHOTS: Array[StringName] = [
-	&"frog", &"duck", &"fish", &"bees", &"capy", &"peacock", &"turtle", &"songbird",
-	&"dogs", &"house", &"bunny", &"wide",
+	&"frog", &"dogs", &"duck", &"fish", &"bees", &"capy", &"peacock", &"turtle",
+	&"songbird", &"dogs", &"bunny", &"fox", &"wolf", &"snake", &"plants",
 ]
-## Beats a shot holds: four bars of four.
-const SHOT_BEATS := 16
+## Beats a shot holds (Richard: a cut every four beats).
+const SHOT_BEATS := 4
 ## The bubble's diameter, a share of the window's height.
 const SIZE := 0.3
 ## Its near edge's gap from the window's side, a share of the width, and its middle down.
 const SIDE_GAP := 0.03
 const DOWN_AT := 0.5
-## The camera's zoom inside the bubble, and the wide shot's.
-const ZOOM := 2.0
-const WIDE_ZOOM := 1.0
+## The camera's zoom inside the bubble.
+const ZOOM := 3.0
 ## How fast the camera follows its subject (seconds to close most of the gap).
-const FOLLOW := 0.35
+const FOLLOW := 0.12
+## How far up from its feet the camera aims, world px: the middle of what is drawn.
+const AIM_UP := 4.0
+const DOG_UP := 14.0
 ## Beats the iris takes to close before a cut and to open after it.
-const IRIS_BEATS := 0.5
+const IRIS_BEATS := 0.25
 ## The circle's edge is cut on this many canvas px, so it steps like the art.
 const EDGE_STEP := 3.0
 ## How long the bubble takes to come in once the words are up.
@@ -149,7 +153,7 @@ func _cut(first: bool) -> void:
 			_pick = (_pick + i + 1) % SHOTS.size()
 			break
 	shots_taken += 1
-	_zoom_to = WIDE_ZOOM if shot == &"wide" else ZOOM
+	_zoom_to = ZOOM
 	var at: Variant = _where(_subject)
 	if at != null:
 		_cam.position = at
@@ -168,10 +172,18 @@ static func _where(subject: Variant) -> Variant:
 	if subject is Vector2:
 		return subject
 	if subject is Node2D:
-		return (subject as Node2D).global_position if is_instance_valid(subject) else null
+		if not is_instance_valid(subject):
+			return null
+		return (subject as Node2D).global_position - Vector2(0.0, DOG_UP)
 	if subject is Dictionary:
 		var at: Variant = (subject as Dictionary).get("at")
-		return at if at is Vector2 else null
+		if not at is Vector2:
+			return null
+		var up := AIM_UP
+		var kind: Variant = (subject as Dictionary).get("kind")
+		if kind is StringName and Wildlife.KINDS.has(kind):
+			up = float(Wildlife.KINDS[kind]["tall"]) * 0.5
+		return at - Vector2(0.0, up + float((subject as Dictionary).get("alt", 0.0)))
 	return null
 
 
@@ -179,11 +191,12 @@ static func _where(subject: Variant) -> Variant:
 func _find(name: StringName) -> Variant:
 	var wild: Wildlife = lake.get(&"_wildlife") if lake != null else null
 	match name:
-		&"wide":
-			return Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
-		&"house":
-			var hut := Iso.shed_centre()
-			return Iso.tile_to_world(hut.x, hut.y)
+		&"plants":
+			var fl: Flora = lake.get(&"_flora") if lake != null else null
+			if fl == null:
+				return null
+			var pads := fl.pad_spots()
+			return pads[randi() % pads.size()] if not pads.is_empty() else null
 		&"dogs":
 			for d in Dog.pack:
 				if is_instance_valid(d) and d.visible:
@@ -214,6 +227,8 @@ func _find(name: StringName) -> Variant:
 			pool = wild._birds.filter(func(b): return float(b.get("alt", 0.0)) <= 0.0)
 		_:
 			pool = wild._critters_on_land.filter(func(c): return c["kind"] == name)
+	# Only what is there to be seen: an animal still fading in or out is no shot.
+	pool = pool.filter(func(a): return float(a.get("fade", 1.0)) > 0.6)
 	if pool.is_empty():
 		return null
 	return pool[randi() % pool.size()]

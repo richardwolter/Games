@@ -2339,11 +2339,12 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   `EndingReel`, `shaders/ending_bubble.gdshader`): one round bubble beside the words and the
   roll, showing the player's own lake **live** (a `SubViewport` sharing the lake's `World2D`,
   a camera of its own; the HUD and the farewell are CanvasLayers and not in it). It cuts every
-  `SHOT_BEATS` (16, four bars) on Habibs' beat clock, irising shut over the last
+  `SHOT_BEATS` (4, Richard's second pass; was 16) on Habibs' beat clock, irising shut over the last
   `IRIS_BEATS` and open over the first, and **hops to the other side on every cut**. Shots
-  come off `SHOTS` in order (frog, ducks, fish, bees, capybaras, peacock, turtle, songbird,
-  dogs, the house, bunny, the wide shot), a subject the lake does not have skipped, the camera
-  following it; the wide shot is always there. A stepped pixel circle, a foam-white rim, a
+  come off `SHOTS` in order (frog, dogs, ducks, fish, bees, capybaras, peacock, turtle,
+  songbird, bunny, fox, wolf, snake, a grown plant; **never the angler or the house**,
+  Richard: "just dogs and nature"), a subject not there or still fading skipped, the camera
+  aimed at the middle of its drawing (`AIM_UP`, a land animal's half height) at zoom 3. A stepped pixel circle, a foam-white rim, a
   vignette. **Full game only** (`Farewell.reel_of`, set by `Lake._show_farewell` outside the
   demo; not the menu's Credits board). It comes in once the words are up and **runs until the
   ending is dismissed**, past the roll. While it is up the roll narrows to `REEL_ROLL_WIDE`
