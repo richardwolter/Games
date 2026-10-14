@@ -884,6 +884,10 @@ var _moment_kind: StringName = &""
 ## (the kinds once seen); **a save without the key has seen none** (the camera tip's rule,
 ## Richard's call), so a run past its first tornado gets the moment on its next one.
 const HINT_HOLD := 8.0
+## The lucky and double casts' hints go sooner (2026-10-14, Richard: they held too long), full
+## game and demo alike: they sit over the count above the angler, in the middle of the play.
+const LUCK_HINT_HOLD := 3.5
+const LUCK_HINTS := [&"lucky", &"double"]
 ## The ferry's hint: every hull docked with pieces in the box short of a load, for this many
 ## seconds of play running.
 const FERRY_HINT_AFTER := 20.0
@@ -5927,7 +5931,7 @@ func _hint_step(delta: float) -> void:
 		if held or _hint_card.age() >= 0.0:
 			return
 		_hint_up = _hints.pop_front()
-		_hint_left = HINT_HOLD
+		_hint_left = LUCK_HINT_HOLD if LUCK_HINTS.has(_hint_up) else HINT_HOLD
 		_cues_seen[_hint_up] = true
 	var target := _hint_target(_hint_up)
 	if held or target.size.x <= 0.0:

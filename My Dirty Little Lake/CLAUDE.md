@@ -1592,7 +1592,10 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
 - **English is the first language**, demo and full game: `Prefs.current_language` no longer
   reads the OS locale; the flag in the menu's corner changes it. A language already chosen in
   `settings.cfg` is kept.
-- `test_lake` guards the bed dealt last at tier 1, no bed given, the free first wash and the
+- **The lucky and double casts' hints hold 3.5 s** (`Lake.LUCK_HINT_HOLD`, `LUCK_HINTS`),
+  full game and demo; the other hints keep `HINT_HOLD` 8 s. A click on the paper still
+  closes any of them sooner.
+- `test_lake` guards the luck hints' hold, the bed dealt last at tier 1, no bed given, the free first wash and the
   next one paying, the empty house starting no tour, sync on and a stored off kept, and
   English with no `OS.get_locale`. Probe: `tools/shot_decor_tour.tscn` (hint shot).
 

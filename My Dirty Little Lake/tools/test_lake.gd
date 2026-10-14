@@ -7369,9 +7369,14 @@ func _check_cues() -> void:
 	_main.set(&"_moment", 0.0)
 	_check(bool(_main.call(&"_hint_held")), "a moment holds a hint back", "")
 	_main.set(&"_moment", -1.0)
-	for i in int((Lake.HINT_HOLD + 0.2) * 60.0):
+	for i in int((Lake.LUCK_HINT_HOLD - 0.3) * 60.0):
 		_main.call(&"_hint_step", 1.0 / 60.0)
-	_check(StringName(_main.get(&"_hint_up")) == &"", "it goes by itself after its hold", "")
+	_check(StringName(_main.get(&"_hint_up")) == &"lucky", "it holds for its 3.5 s", "")
+	for i in int(0.5 * 60.0):
+		_main.call(&"_hint_step", 1.0 / 60.0)
+	_check(StringName(_main.get(&"_hint_up")) == &"" and Lake.LUCK_HINT_HOLD == 3.5
+		and Lake.HINT_HOLD > Lake.LUCK_HINT_HOLD,
+		"and goes by itself after it, sooner than the other hints (2026-10-14)", "")
 	hint._process(CueCard.FADE + 0.05)
 	_main.call(&"_hint_step", 1.0 / 60.0)
 	_check(hint.showing() and hint.kind == &"double" and hint.text == Text.CUE_DOUBLE,
