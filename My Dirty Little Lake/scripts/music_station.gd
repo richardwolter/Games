@@ -101,8 +101,10 @@ const FALLBACK_BPM := 120.0
 var muffled: bool = false
 var indoors: bool = false
 var ending: bool = false
-## The shed hears the lake's track through the radio instead of its own.
-var synced: bool = false
+## The shed hears the lake's track through the radio instead of its own. On from a new game
+## (2026-10-14, Richard): the house plays the lake's song until the player turns Sync off on
+## the record player. A save that stored it off keeps it off.
+var synced: bool = true
 ## Habibs may be put on a list: the lake has been cleaned once on this run.
 var habibs_open: bool = false
 
@@ -113,7 +115,7 @@ var follow_players: bool = true
 var _radio_at: float = 0.0
 var _shed_at: float = 0.0
 var _ending_at: float = 0.0
-var _sync_at: float = 0.0
+var _sync_at: float = 1.0
 
 var _lake: Track = Track.new()
 var _shed: Track = Track.new()
@@ -493,7 +495,7 @@ func take_picks(saved: Dictionary) -> void:
 		lake = _read_list(lake + LOOBAS, MusicStation.playlist())
 	_lake.take(lake)
 	_shed.take(_read_list(saved.get("shed"), [SHED_SONG]))
-	synced = bool(saved.get("synced", false))
+	synced = bool(saved.get("synced", true))
 	_sync_at = 1.0 if synced else 0.0
 	_push()
 

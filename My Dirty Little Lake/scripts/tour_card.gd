@@ -21,6 +21,10 @@ signal skip_asked
 const DIM := Color(0.0, 0.0, 0.0, 0.58)
 const OUTLINE := Color(1.0, 1.0, 1.0, 0.9)
 const GAP := 20.0
+## Between a target at the top of the screen (and its arrow) and the card hung under it.
+const NEAR_GAP := 2.0
+## Rows under the arrow tile's ink (`assets/ui/prompts/arrow_up.png`, ink on rows 3 to 12).
+const ARROW_EMPTY_ROWS := 3.0
 ## The foot's two words are `Text.TOUR_SKIP` and `Text.TOUR_CONTINUE`, read at draw time.
 
 ## What is pointed at, in this control's pixels. Empty: nothing up.
@@ -186,11 +190,16 @@ func _draw() -> void:
 func _card_at(card: Vector2) -> Vector2:
 	if target.size.x > size.x * 0.45 and target.size.y > size.y * 0.55:
 		return Vector2(target.end.x - card.x - GAP, target.position.y + GAP)
+	# Near the top (the corner buttons): hung straight off the arrow's foot, centred under the
+	# target (2026-10-14, Richard: the found-a-decoration card stood too far from the Decorate
+	# button). It used to start a whole `GAP` under the arrow, with its right edge on the
+	# target's middle, so it hung off to the left.
 	if target.end.y < size.y * 0.25:
-		var below := target.end.y + GAP
+		var below := target.end.y + NEAR_GAP
 		if _arrow != null and _arrow_below(_arrow.get_size() * _px()):
-			below += _arrow.get_size().y * _px()
-		return Vector2(target.get_center().x - card.x, below)
+			# The tile's last `ARROW_EMPTY_ROWS` rows are see-through, so not counted.
+			below += (_arrow.get_size().y - ARROW_EMPTY_ROWS + FirstSteps.ARROW_BOB) * _px()
+		return Vector2(target.get_center().x - card.x * 0.5, below)
 	if target.position.y > size.y * 0.7:
 		return Vector2(target.get_center().x - card.x * 0.5, target.position.y - card.y - GAP * 2.0)
 	if target.get_center().x < size.x * 0.5:

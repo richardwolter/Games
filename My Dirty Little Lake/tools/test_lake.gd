@@ -2462,14 +2462,15 @@ func _check_achievements() -> void:
 		achieved.clear()
 		return not before and after
 
-	# Decoraholic: sixty finds, read off the catalogue.
+	# Decoraholic: sixty-one finds, read off the catalogue (the Small Bed joined 2026-10-14;
+	# an older save already holds it, so nothing new is asked of it).
 	var finds := 0
 	var all_finds: Array[String] = []
 	for def: TrashDef in _grid.defs:
 		if def.keepsake:
 			finds += 1
 			all_finds.append(String(def.piece))
-	_check(finds == 60, "the lake hides sixty finds", str(finds))
+	_check(finds == 61, "the lake hides sixty-one finds", str(finds))
 	var unlocked: Array[String] = _main.get(&"unlocked")
 	var unlocked_was := unlocked.duplicate()
 	_check(earns.call(Achievements.DECORAHOLIC,
@@ -2485,7 +2486,7 @@ func _check_achievements() -> void:
 		func() -> void:
 			unlocked.clear()
 			unlocked.append_array(unlocked_was)),
-		"one find short of sixty earns nothing", "")
+		"one find short earns nothing", "")
 
 	var purse := float(_main.get(&"sludge"))
 	_check(not earns.call(Achievements.CHEAPSKATE,
@@ -3623,8 +3624,16 @@ func _stage_art() -> void:
 	_check(undressed == 0, "every def is pointed at a picture",
 		"%d are not" % undressed)
 	_check(keepsakes > 0, "there are finds to find", "%d of them" % keepsakes)
-	_check(not keepsake_names.has(Lake.STARTER_BED),
-		"the house's own bed is not in the lake", "")
+	# The Small Bed is a catch since 2026-10-14: an early find, tier 1, and the last def, so no
+	# saved stack's index moved.
+	var last_keep: TrashDef = null
+	for def: TrashDef in _grid.defs:
+		if def.keepsake:
+			last_keep = def
+	_check(last_keep != null and String(last_keep.piece) == Lake.STARTER_BED and last_keep.tier == 1
+		and Lake.EARLY_FINDS.has(StringName(Lake.STARTER_BED)),
+		"the Small Bed is in the lake: early, tier 1, dealt last",
+		str(last_keep.piece) if last_keep != null else "none")
 
 	# Where they lie: one pet bed afloat in the first band past the shelf, the early finds
 	# within EARLY_OUT under nothing heavier than themselves, the rest banded by tier.
@@ -6474,6 +6483,8 @@ func _stage_music() -> void:
 		"%s" % music.now_playing())
 
 	music.indoors = true
+	# Sync is on from a new game (2026-10-14); the shed's own list is what is asked here.
+	music.set_synced(false)
 	_run_music(music, 0.4)
 	g = music.gains()
 	_check(is_equal_approx(float(g["shed_indie_boi"]), 1.0)
@@ -6907,8 +6918,12 @@ func _check_record_lists(music: MusicStation) -> void:
 	music.indoors = false
 	music.take_picks({})
 	_check(music.list_of(MusicStation.LAKE) == MusicStation.PLAYLIST
-		and music.list_of(MusicStation.SHED) == [MusicStation.SHED_SONG] and not music.synced,
-		"no picks in the save read as the old fixed lists", str(music.picks()))
+		and music.list_of(MusicStation.SHED) == [MusicStation.SHED_SONG] and music.synced,
+		"no picks in the save read as the old fixed lists, synced (2026-10-14)", str(music.picks()))
+	music.take_picks({"lake": ["beatgucci"], "shed": ["indie_boi"], "synced": false, "loobas": true})
+	_check(not music.synced, "a save that stored Sync off keeps it off", "")
+	music.take_picks({})
+	music.set_synced(false)
 	_check(not music.toggle(MusicStation.SHED, MusicStation.SHED_SONG),
 		"the last song on a list cannot be unticked", "")
 	music.habibs_open = false
@@ -7038,8 +7053,8 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		"and lifts its lid", "view %d" % int(room.decor[0]["view"]))
 	_check(not room.pad_free(), "the room gives up the stick while the menu is up", "")
 	if menu != null:
-		var synced := station.synced
-		_check(menu.press(&"sync") and station.synced != synced, "the switch syncs the two", "")
+		station.set_synced(false)
+		_check(menu.press(&"sync") and station.synced, "the switch syncs the two", "")
 		_check(not menu.press(&"tick:shed:goin"), "synced, the shed's ticks are not the player's", "")
 		menu.press(&"sync")
 		# Two records (2026-10-12): red NUVEN for Nuven's songs, blue LOOBAS for Loobas'. Each
@@ -10864,10 +10879,11 @@ func _stage_wash() -> void:
 	var soap := room.soap_of(StringName(find))
 	var prices := {}
 	for name: String in sheets.names:
-		# The new game's bed washes free (the decoration tour): every other find pays.
-		if WashRoom.is_find(sheets, name) and not room.free.has(name):
+		# Only a new game's first wash is free (`_free_wash`), and a borrowed lake has spent it.
+		if WashRoom.is_find(sheets, name):
 			prices[room.soap_of(StringName(name))] = true
-	_check(room.soap_of(StringName(Lake.STARTER_BED)) == 0, "the starter bed washes free", "")
+	_check(room.free.is_empty() and room.soap_of(StringName(Lake.STARTER_BED)) > 0,
+		"the Small Bed pays its soap like any find (2026-10-14)", "")
 	_check(prices.size() == 3 and prices.has(5) and prices.has(10) and prices.has(15),
 		"soap is 5, 10 or 15, and the catalogue has finds at all three", str(prices.keys()))
 	_check(not room.pick(StringName(find)) and room.on_stand() == &"",
@@ -11318,17 +11334,26 @@ func _stage_first_steps() -> void:
 	_main.call(&"_set_menu", true)
 	_check(shop.tour == -1, "a finished tour is not shown again", str(shop.tour))
 	_main.call(&"_set_menu", false)
-	# The decoration tour: the bed at the pump, the hint giving way to the shed, the cards
-	# following the rooms, a washed find walking back into the shed, and the flag.
+	# The decoration tour (2026-10-14: the house starts empty and the bed is a catch): an empty
+	# house starts nothing, a find at the pump does, the hint giving way to the shed, the
+	# cards following the rooms, the first wash free, a washed find walking back into the
+	# shed, and the flag.
+	var lake_src := (load("res://scripts/lake.gd") as GDScript).source_code
+	_check(lake_src.find("func _seed_starter_bed") < 0 and lake_src.find("func _bed_to_the_pump") < 0,
+		"a new game's house is given no bed, at the pump or on the floor", "")
 	var bed := Lake.STARTER_BED
-	_main.call(&"_bed_to_the_pump")
-	_check((_main.get(&"unwashed") as Array).has(bed) and not (_main.get(&"unlocked") as Array).has(bed),
-		"a new game's bed waits at the pump", "")
-	var placed := false
-	for row: Dictionary in _main.get(&"decor"):
-		placed = placed or String(row["piece"]) == bed
-	_check(not placed, "and does not stand in the shed", "")
+	var kept_unlocked: Array = (_main.get(&"unlocked") as Array).duplicate()
+	var kept_unwashed: Array = (_main.get(&"unwashed") as Array).duplicate()
+	(_main.get(&"unlocked") as Array).clear()
+	(_main.get(&"unwashed") as Array).clear()
 	_main.set(&"_decor_tour_done", false)
+	_main.set(&"_decor_tour", Lake.DecorTour.OFF)
+	_main.call(&"_set_shed", true)
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.OFF,
+		"an empty house opened starts no tour", str(_main.get(&"_decor_tour")))
+	_main.call(&"_set_shed", false)
+	(_main.get(&"unwashed") as Array).append(bed)
+	_main.set(&"_free_wash", true)
 	_main.set(&"_decor_tour", Lake.DecorTour.HINT)
 	_main.call(&"_set_shed", true)
 	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.PLANK,
@@ -11339,9 +11364,13 @@ func _stage_first_steps() -> void:
 	_main.call(&"_decor_tour_next")
 	_main.call(&"_decor_tour_next")
 	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.WASHING, "then the stand's, then the washing", "")
+	var washer: WashRoom = _main.get(&"_wash")
+	_check(washer.soap_of(StringName(bed)) == 0, "a new game's first wash is free, whatever the find", "")
 	var purse: float = _main.get(&"sludge")
 	_main.call(&"_on_find_washed", StringName(bed), 0)
-	_check(is_equal_approx(float(_main.get(&"sludge")), purse), "the bed cost nothing", "")
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse), "the first wash cost nothing", "")
+	_check(not bool(_main.get(&"_free_wash")) and washer.free.is_empty()
+		and washer.soap_of(StringName(bed)) > 0, "and the next one pays", "")
 	_main.call(&"_decor_tour_step", Lake.DECOR_BACK_AFTER + 0.1)
 	_check(bool(_main.get(&"_shed_open")) and not bool(_main.get(&"_wash_open"))
 		and int(_main.get(&"_decor_tour")) == Lake.DecorTour.SHELF,
@@ -11359,6 +11388,8 @@ func _stage_first_steps() -> void:
 	_main.call(&"_set_wash", true)
 	_main.call(&"_set_wash", false)
 	_check(not bool(_main.get(&"_shed_open")), "a forced close goes to the lake", "")
+	(_main.get(&"unlocked") as Array).assign(kept_unlocked)
+	(_main.get(&"unwashed") as Array).assign(kept_unwashed)
 	_check_cast_facing()
 	_check_rope_curve()
 	_check_walk_weight()
@@ -12652,6 +12683,13 @@ func _check_language(menu: MainMenu) -> void:
 			missing.append(entry["locale"])
 	_check(Prefs.LANGUAGES.size() == 8 and missing.is_empty(),
 		"eight languages, each with its words and its flag", str(missing))
+	# English until one is chosen, whatever the machine speaks (2026-10-14), demo and full game.
+	var chosen := Prefs.language
+	Prefs.language = ""
+	var prefs_src := (load("res://scripts/prefs.gd") as GDScript).source_code
+	_check(Prefs.current_language() == "en" and prefs_src.find("OS.get_locale") < 0,
+		"a first launch plays English, not the machine's locale", Prefs.current_language())
+	Prefs.language = chosen
 	var board := menu.languages()
 	menu.call(&"_show_languages", true)
 	board.queue_redraw()

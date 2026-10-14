@@ -482,7 +482,9 @@ const SAVE_PATH := "user://my_dirty_little_lake.save"
 ## is _builds/lake_cleanup_v21_20261003.save.
 const SAVE_VERSION := 22
 
-## The piece of furniture the shed starts with, and so the one find not in the lake.
+## The Small Bed. The house started with it until 2026-10-14; since then it is an early find
+## like the sofa (Richard: caught, not given), tier 1, dealt last (`_all_defs`) and washed for
+## its soap like any other. The name is kept: saves and tools know it by it.
 const STARTER_BED := "decor_pk_bed"
 
 ## The one find that starts on the surface, by the island, so the first casts have a
@@ -510,6 +512,7 @@ const EARLY_FINDS := {
 	&"decor_pk_sofa": 1,
 	&"decor_pk_coffee_table": 1,
 	&"decor_pk_chair": 1,
+	&"decor_pk_bed": 1,
 }
 ## The bands the rest are dealt into by tier, in tiles past the shelf: tiers 1-2 between
 ## `EARLY_OUT` and `MID_OUT`, tiers 3-4 beyond. By rule, so a new find needs no authoring.
@@ -643,6 +646,9 @@ var unwashed: Array[String] = []
 ## The wash room's hose, levels 1 to 3 (2026-10-01): wider and harder a level. Saved as
 ## `hose`; a save without it reads as 1.
 var hose_level := 1
+## Whether this run's first wash is still free (2026-10-14): set by a new game's arrival,
+## spent by the first find that comes clean. Saved as `free_wash`; absent reads as spent.
+var _free_wash := false
 
 ## What the player has put where, as `{piece, cell}` rows. Owned here rather than by the
 ## room so it saves with everything else.
@@ -1605,7 +1611,6 @@ func _ready() -> void:
 		_latch_house()
 		if _room != null:
 			_room.house_seen = house_inside()
-	_seed_starter_bed()
 	_mark("end")
 	_raise_front(loaded)
 
@@ -2107,33 +2112,41 @@ func _all_defs() -> Array[TrashDef]:
 		# the player carried home and could not name. Kept as the gate that stops that.
 		if _pretty(name).is_empty():
 			continue
-		# The house's own bed is never in the water: the shed starts with it
-		# (`_seed_starter_bed`), so a second one to fish out was a find nobody needed.
-		# Richard, 2026-09-13. Leaves the pet bed, which is a find.
+		# The Small Bed is dealt last, after every other find (below).
 		if name == STARTER_BED:
 			continue
-		var cells := _sheets.cells_of(name)
-		var bulk := cells.x * cells.y
-		var find := _def(
-			_pretty(name),
-			TrashDef.Kind.WOOD if bulk % 2 == 0 else TrashDef.Kind.METAL,
-			Vector2(26.0, 26.0),
-			clampi(bulk / 2, 1, 4), Color(0.58, 0.44, 0.32), StringName(name)
-		)
-		# The tier tagged on the Lake Pack Tagger, where there is one.
-		if _sheets.tier_of(StringName(name)) >= 0:
-			find.tier = clampi(_sheets.tier_of(StringName(name)), 0, 4)
-		find.keepsake = true
-		# The first find is for the first net: tier 0, or a net at power 0 cannot lift it.
-		if EARLY_FINDS.has(StringName(name)):
-			find.tier = int(EARLY_FINDS[StringName(name)])
-		# One def per copy, not one def hidden several times: `_hide_treasures` plants one of
-		# each keepsake def, and every copy has to be its own object in the water with its own
-		# hiding place. Four chairs in one corner is a stack, not a set.
-		for copy in _sheets.copies_of(StringName(name)):
-			all.append(find if copy == 0 else find.duplicate() as TrashDef)
+		_add_find(all, name)
+	# The Small Bed was the house's own piece and never in the water until 2026-10-14
+	# (Richard: caught, not given). Appended after every other find so no saved stack's index
+	# moves: no `SAVE_VERSION` bump, and an older save already holds its bed.
+	if _sheets.names.has(STARTER_BED) and not _pretty(STARTER_BED).is_empty():
+		_add_find(all, STARTER_BED)
 	_dress(all)
 	return all
+
+
+## One find's defs, a def a copy, onto `all`.
+func _add_find(all: Array[TrashDef], name: String) -> void:
+	var cells := _sheets.cells_of(name)
+	var bulk := cells.x * cells.y
+	var find := _def(
+		_pretty(name),
+		TrashDef.Kind.WOOD if bulk % 2 == 0 else TrashDef.Kind.METAL,
+		Vector2(26.0, 26.0),
+		clampi(bulk / 2, 1, 4), Color(0.58, 0.44, 0.32), StringName(name)
+	)
+	# The tier tagged on the Lake Pack Tagger, where there is one.
+	if _sheets.tier_of(StringName(name)) >= 0:
+		find.tier = clampi(_sheets.tier_of(StringName(name)), 0, 4)
+	find.keepsake = true
+	# The first find is for the first net: tier 0, or a net at power 0 cannot lift it.
+	if EARLY_FINDS.has(StringName(name)):
+		find.tier = int(EARLY_FINDS[StringName(name)])
+	# One def per copy, not one def hidden several times: `_hide_treasures` plants one of
+	# each keepsake def, and every copy has to be its own object in the water with its own
+	# hiding place. Four chairs in one corner is a stack, not a set.
+	for copy in _sheets.copies_of(StringName(name)):
+		all.append(find if copy == 0 else find.duplicate() as TrashDef)
 
 
 ## Hide one of every find in the lake.
@@ -2177,7 +2190,9 @@ func _hide_treasures() -> void:
 		# their beams up, as a tease (Richard, 2026-10-09: "some be completely visible").
 		var tease := false
 		if Demo.on():
-			if def.tier > Demo.FIND_TIER or dealt >= Demo.FINDS:
+			# The early finds are always in reach, past the count if need be: the Small Bed
+			# is the last def in the list and would otherwise miss the demo's fifteen.
+			if def.tier > Demo.FIND_TIER or (dealt >= Demo.FINDS and not early):
 				tease = true
 			else:
 				early = true
@@ -2903,7 +2918,7 @@ func _set_wash(open: bool) -> void:
 	# No shed sound: the pump is outdoors (2026-09-28).
 	_wash_open = open
 	_wash.waiting = unwashed
-	_wash.free.assign([STARTER_BED])
+	_wash.free.assign(unwashed if _free_wash else [])
 	if open and _decor_tour in [DecorTour.PLANK, DecorTour.PLANK_WAIT]:
 		_decor_tour = DecorTour.LIST
 	_wash.hose_level = hose_level
@@ -2964,6 +2979,12 @@ func _on_find_washed(piece: StringName, soap: int) -> void:
 	unwashed.erase(name)
 	unlocked.append(name)
 	sludge = maxf(sludge - float(soap), 0.0)
+	# The run's free wash is spent; the rows still on the tray price themselves again.
+	if _free_wash:
+		_free_wash = false
+		if _wash != null:
+			_wash.free.clear()
+			_wash.queue_redraw()
 	if _decor_tour in [DecorTour.LIST, DecorTour.STAND, DecorTour.WASHING]:
 		_decor_tour = DecorTour.SHELF
 		_decor_tour_wait = DECOR_BACK_AFTER
@@ -3385,8 +3406,14 @@ func _set_shed(open: bool) -> void:
 		_room.carrying = &""
 		_room.opened()
 		_room.queue_redraw()
+		# Only once there is something to show: a new house is empty since the bed became a
+		# catch (2026-10-14), and the shelf's card over "Nothing kept yet" taught nothing.
+		# Left alone, the tour starts with the first find (`_keep`'s hint).
 		if not _decor_tour_done and _decor_tour <= DecorTour.HINT:
-			_decor_tour = DecorTour.PLANK if not unwashed.is_empty() else DecorTour.SHELF
+			if not unwashed.is_empty():
+				_decor_tour = DecorTour.PLANK
+			elif not unlocked.is_empty():
+				_decor_tour = DecorTour.SHELF
 	# The lake's own readouts are not readable through a room and are not about it. The coins
 	# go with them: they are drawn over everything, and they are a receipt for the plate.
 	_skin.visible = not open
@@ -3784,7 +3811,9 @@ func _start_arrival() -> void:
 	_shop_tour_done = false
 	_decor_tour_done = false
 	_wildlife_seen = false
-	_bed_to_the_pump()
+	# The first find washed in a new game costs nothing, whichever it is (2026-10-14): the
+	# decoration tour teaches washing on it, and the bed that used to wash free is a catch now.
+	_free_wash = true
 	_arrive = Arrive.SAILING
 	_arrive_wait = ARRIVE_STEP_OFF
 	var hull := _boats[0]
@@ -3957,19 +3986,6 @@ func _begin_first_steps() -> bool:
 	_steps.crate = Vector2.INF
 	_steps.step = FirstSteps.Step.MOVE
 	return true
-
-
-## A new game's bed starts at the pump, not in the shed: the decoration tour washes it first.
-func _bed_to_the_pump() -> void:
-	unlocked.erase(STARTER_BED)
-	for i in range(decor.size() - 1, -1, -1):
-		if String((decor[i] as Dictionary)["piece"]) == STARTER_BED:
-			decor.remove_at(i)
-	if not unwashed.has(STARTER_BED):
-		unwashed.append(STARTER_BED)
-	if _room != null:
-		_room.unlocked = unlocked
-		_room.unwashed = unwashed
 
 
 ## One frame of the decoration tour: what the card points at and says, given which room is
@@ -4859,21 +4875,6 @@ func _build_trophy() -> void:
 ## Put a find on the shed's shelf. Once each: the lake holds one of every piece, and a
 ## second copy of the same name would be a bug worth swallowing quietly rather than
 ## showing the player twice in their inventory.
-## The bed the shed starts with rather than one anybody has to fish out — the one piece of
-## furniture that was never dirty. Runs once per session after load_game(), whether a save
-## was read or not, so a fresh game gets it and a save from before it existed backfills it
-## the same way: only added when it is not already on the shelf.
-func _seed_starter_bed() -> void:
-	var piece := STARTER_BED
-	# Waiting at the pump is still had: a new game's bed goes there (the decoration tour).
-	if unlocked.has(piece) or unwashed.has(piece):
-		return
-	unlocked.append(piece)
-	if _room != null:
-		# One cell in from the corner, as it always stood — in pixels now.
-		_room.place(StringName(piece), Vector2i(ShedRoom.CELL, ShedRoom.CELL))
-
-
 func _keep(def: TrashDef) -> void:
 	var name := String(def.piece)
 	if name.is_empty():
@@ -7375,6 +7376,7 @@ func save_game() -> bool:
 		"unlocked": unlocked,
 		"unwashed": unwashed,
 		"hose": hose_level,
+		"free_wash": _free_wash,
 		"decor": decor,
 		# The house's stage and the last one seen inside (2026-10-11). Absent: worked out
 		# off the meter on the way in, and seen, so an older run plays no stage-up.
@@ -7509,6 +7511,7 @@ func load_game() -> bool:
 	unwashed.clear()
 	# The wash room's hose (2026-10-01). Absent reads as the hose the pump came with.
 	hose_level = clampi(int(save.get("hose", 1)), 1, WashRoom.HOSE_MOST)
+	_free_wash = bool(save.get("free_wash", false))
 	for name: String in save.get("unwashed", []) as Array:
 		if _pretty(name).is_empty():
 			continue

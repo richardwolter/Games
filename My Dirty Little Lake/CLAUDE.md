@@ -1538,10 +1538,9 @@ The first time a new game opens the shed, five cards walk washing and placing, i
 tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
 `Lake._decor_tour_step` (the `DecorTour` states, the targets, the room swaps). Approved off
 `tools/last_decor_tour_mockup.png`.
-- **A new game's bed starts at the pump** (`_bed_to_the_pump`, from `_start_arrival`), not
-  standing in the shed, and **washes free** (`WashRoom.free`, the row reads "Free"). Older
-  saves keep their bed where it stands; `_seed_starter_bed` treats a bed waiting at the pump
-  as had.
+- **Superseded 2026-10-14** (see Bed, Sync, Tooltip, English): no bed is given. The tour
+  teaches on the first find netted, and the first wash of a new game is free. It used to
+  read: a new game's bed starts at the pump (`_bed_to_the_pump`) and washes free.
 - **Two ways in**: the shed opened first starts on card 1; **a find netted before the shed
   was ever opened** puts a hint on the Decorate button `DECOR_HINT_AFTER` (2.8 s, after the
   find-caught card) — outline, arrow and a card with no count, **no dimming and clicks
@@ -1568,6 +1567,34 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
 - Probe: `tools/shot_decor_tour.tscn` saves `tools/last_decor_tour_{hint,1,2,3,3pad,4,4pad,5}.png`.
   `test_lake`'s `_stage_first_steps` guards the bed at the pump, the hint giving way, the
   cards following the rooms, the free wash, the walk back into the shed and the flag.
+
+### Bed, Sync, Tooltip, English (2026-10-14, `/grill-me` with Richard)
+- **The Small Bed is a catch, not a gift** (`Lake.STARTER_BED`, name kept): `_seed_starter_bed`
+  and `_bed_to_the_pump` are deleted, so a new house is empty. The bed is in `EARLY_FINDS` at
+  tier 1 (4 to 15 tiles out, one piece down, under nothing heavier, after the first Strength
+  buy). `_all_defs` deals it **after every other find**, so no saved stack's index moves and
+  there is no `SAVE_VERSION` bump. Older saves already own their bed. Netted, it waits at the
+  pump and **pays its soap** like any find. In the demo every early find is dealt in reach,
+  past the fifteen if need be. 61 finds now; Decoraholic counts it.
+- **A new game's first wash is free, whatever the find** (`_free_wash`, set by
+  `_start_arrival`, spent in `_on_find_washed`, saved as `free_wash`, absent reads as spent):
+  `WashRoom.free` holds every waiting find while it lasts, so the tour's wash costs nothing.
+- **The decoration tour waits for something to show**: opening an empty house starts
+  nothing. A find at the pump starts it on the plank's card, a kept find on the shelf's card,
+  and a find netted first still raises the hint on the Decorate button.
+- **The hint card hangs right under the button** (`TourCard._card_at`, `NEAR_GAP`,
+  `ARROW_EMPTY_ROWS`): centred under any target at the top of the screen, off the arrow's
+  ink. It stood a `GAP` lower with its right edge on the button's middle. The camera tip
+  moves the same way.
+- **Sync is on from a new game** (`MusicStation.synced`, `take_picks`): the house plays the
+  lake's song until the player turns it off on the record player. A save that stored it off
+  keeps it off, by Richard's call.
+- **English is the first language**, demo and full game: `Prefs.current_language` no longer
+  reads the OS locale; the flag in the menu's corner changes it. A language already chosen in
+  `settings.cfg` is kept.
+- `test_lake` guards the bed dealt last at tier 1, no bed given, the free first wash and the
+  next one paying, the empty house starting no tour, sync on and a stored off kept, and
+  English with no `OS.get_locale`. Probe: `tools/shot_decor_tour.tscn` (hint shot).
 
 ### Onboarding Fixes (2026-09-24, `/grill-me` with Richard)
 - **The boat sets off from the plastic pier's berth** (`Lake._arrival_berth`), moored there
@@ -2098,8 +2125,8 @@ pipeline and English only"** in Every Word Is a Key above.
   `es`, DE `de`, FR `fr`, JA `jp`, ZH `cn`, KO `kr`. `qps` wears `unknown` and is offered in
   **debug builds only** (`Prefs.languages()`).
 - **`Prefs` owns the language** (`LANGUAGES`, `language`, `set_language`, saved as
-  `language` in `settings.cfg`). Empty until chosen: the first launch takes the OS locale if
-  it is one of the eight (whole locale, then its language), otherwise English. Translations
+  `language` in `settings.cfg`). Empty until chosen, which plays English, whatever the
+  machine's locale (2026-10-14, demo and full game; it used to take the OS locale). Translations
   are loaded by `Prefs._load_translations`, **not listed in `project.godot`**, which the open
   editor re-saves from memory. A change redraws every canvas item once (`_redraw_all`) and
   emits `language_changed`, which boards with cached layouts listen to.
@@ -6903,7 +6930,9 @@ now only the defaults.
   empty**: the last tick will not come off.
 - **Sync, an on/off switch centred under the list**: the shed plays the lake's own song
   through the radio, at the same second; the Shed column greys out and shows the lake's
-  ticks. The radio copy stays, by decision.
+  ticks. The radio copy stays, by decision. **On from a new game since 2026-10-14**, so the
+  house plays the lake's song until the player turns it off; a save that stored it off keeps
+  it off.
 - **Two tracks, each on its own players** (`MusicStation.Track`): one song can be on both
   lists at different places in it. Every song now has an outdoors and a radio copy
   (`build_music.py`, `--only`); `indie_boi.mp3` and `habibs_radio.mp3` are new. The ending's
@@ -7686,7 +7715,9 @@ furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
   `decor_pet_bed`'s are shapes (round/oval), so a gate on the role `front` would have given
   both beds no seat at all and **deleted the one seat that already worked**. Authored or
   not is the whole rule.
-- **The starter bed is a seat too** (Richard, asked and answered): `Lake.STARTER_BED` is
+- **The starter bed is a seat too** (Richard, asked and answered). **Since 2026-10-14 the bed
+  is a catch** and a new house is empty, so the dogs lie on the floor until it is netted and
+  washed. It read: `Lake.STARTER_BED` is
   `decor_bed` and every save has one from a new game, so a dog nearly always has somewhere
   to lie and the walk/idle/laid/sleep mood roll is what a dog with no *free* seat gets.
 - **One dog to a seat**, claimed the way a stick in the lake is (`Dog.claims`): not a lock —
@@ -7903,8 +7934,9 @@ catalogue (the shed's tests still use them) and are no longer dealt (`Lake.FIND_
 - **The record player is the first find** (`FIRST_FIND`), afloat by the island at tier 0. It is
   the old `decor_vynil_player` entry redrawn as the pack turntable (`REPLACES`), a small piece
   that sits on furniture; the song menu is drawn in its greys.
-- **The shed starts with the pack bed** (`STARTER_BED` `decor_pk_bed`). Early finds:
-  record player, flower vase, nightstand, coat stand (tier 0), sofa, coffee table, chair (1).
+- **The shed started with the pack bed** (`STARTER_BED` `decor_pk_bed`) until 2026-10-14,
+  when it became an early find (tier 1). Early finds:
+  record player, flower vase, nightstand, coat stand (tier 0), sofa, coffee table, chair, Small Bed (1).
   Sit/lie/read spots for the pack seats, beds and bookshelf are in `ShedRoom.RESTS` (first
   guesses).
 - **Finds float at the rubbish's grain**, one world px an art px (`_is_pack_find` in `_dress`).
@@ -8160,7 +8192,8 @@ Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down
 the **pet bed** (`FIRST_FIND`) is planted first, afloat on top of a stack in the first
 `FIRST_FIND_OUT` (0.8) tiles of water past the island's shelf and **at tier 0**, so a new
 game's net — power 0, a 3.4-tile throw — can bring it home on the first casts; and the **house's bed** (`STARTER_BED`, `decor_bed`) is not a
-find at all — the shed starts with it (`_seed_starter_bed`), so `_all_defs` skips it.
+find at all — the shed starts with it (`_seed_starter_bed`), so `_all_defs` skips it
+(superseded 2026-10-14: the Small Bed is a find again, dealt last; see Bed, Sync, Tooltip, English).
 `SAVE_VERSION` went to 7 for the def list (8 on 2026-09-13, same reason). `test_lake` guards all three. The
 glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shows through the
 muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's floor loot**

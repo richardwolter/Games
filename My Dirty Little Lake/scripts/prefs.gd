@@ -114,7 +114,7 @@ const LANGUAGES: Array[Dictionary] = [
 const TRANSLATIONS := "res://locale/translations.%s.translation"
 const Style := preload("res://scripts/style.gd")
 
-## Empty until chosen: the first launch reads the OS locale (`_os_language`).
+## Empty until chosen, which plays English (`current_language`).
 var language: String = ""
 
 ## Emitted when the language changes, after `TranslationServer` and `Style` both have it.
@@ -322,23 +322,11 @@ static func _known(locale: String) -> bool:
 	return false
 
 
-## The shipped language nearest the machine's own: the whole locale first (`pt_BR`), then
-## its language alone (`pt` finds `pt_BR`), then English.
-static func _os_language() -> String:
-	var os := OS.get_locale()
-	var lang := os.split("_")[0]
-	for entry in LANGUAGES:
-		if entry["locale"] == os:
-			return entry["locale"]
-	for entry in LANGUAGES:
-		if str(entry["locale"]).split("_")[0] == lang:
-			return entry["locale"]
-	return "en"
-
-
-## The language in play: the one chosen, or the machine's own until one is.
+## The language in play: the one chosen, or English until one is. The machine's own locale
+## is not read any more (2026-10-14, Richard: the demo and the full game start in English);
+## the flag in the main menu's corner is the way to another.
 func current_language() -> String:
-	return language if language != "" else _os_language()
+	return language if language != "" else "en"
 
 
 ## The table entry for the language in play.

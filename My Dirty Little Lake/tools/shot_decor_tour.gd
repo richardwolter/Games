@@ -4,8 +4,8 @@ extends Node
 ## Desktop build, not `--headless`: `<exe> --path . --fixed-fps 60 tools/shot_decor_tour.tscn`.
 ## Saves `tools/last_decor_tour_{hint,1,2,3,3pad,4,4pad,5}.png` and `last_decor_tour.log`. Its
 ## own save, deleted first and after, the lake under this node (see `tools/shot_letter.gd`).
-## A borrowed lake has done its tours and has its bed in the shed, so the probe undoes both
-## the way a new game's arrival does.
+## A borrowed lake has done its tours, so the probe undoes that the way a new game's arrival
+## does, and puts the Small Bed at the pump as the first find netted.
 
 const SHOT := "res://tools/last_decor_tour_%s.png"
 const LOG := "res://tools/last_decor_tour.log"
@@ -44,7 +44,11 @@ func _physics_process(_delta: float) -> void:
 	match _stage:
 		0:
 			_log = FileAccess.open(LOG, FileAccess.WRITE)
-			_main.call(&"_bed_to_the_pump")
+			# A new game nets its first find and has its free wash (2026-10-14); the Small
+			# Bed stands in for whatever came up first.
+			(_main.get(&"unlocked") as Array).erase(Lake.STARTER_BED)
+			(_main.get(&"unwashed") as Array).append(Lake.STARTER_BED)
+			_main.set(&"_free_wash", true)
 			_main.set(&"_decor_tour_done", false)
 			_main.set(&"_decor_tour", Lake.DecorTour.HINT)
 			_next()
