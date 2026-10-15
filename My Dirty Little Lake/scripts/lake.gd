@@ -1662,6 +1662,11 @@ func _lend_button_art(ferry: Dictionary) -> void:
 	var lent := {}
 	if not ferry.is_empty():
 		lent["boat"] = ferry
+	# The ferry bar's little hull, sailing right along it: the frame the boat's own heading rule
+	# picks for a hull heading right on screen, never a mirror sign written here.
+	var sailing := Boat.art_frame(Boat.turn_sailing(Vector2.RIGHT))
+	if not sailing.is_empty():
+		lent["boat_right"] = sailing
 	if _shed_art != null:
 		lent["shed"] = _shed_art
 	if _sheets != null and _sheets.atlas != null:

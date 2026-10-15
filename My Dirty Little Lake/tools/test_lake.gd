@@ -10772,6 +10772,16 @@ func _check_ferry_bar() -> void:
 	_main.call(&"_push_ferry_bar")
 	_check(is_equal_approx(hud.ferry_trip, 0.4) and hud.ferry_fill < 0.0,
 		"a hull out shows how far through its run it is", "%.2f / %.2f" % [hud.ferry_trip, hud.ferry_fill])
+	# The little ferry rides the end of the fill, on the bar, sailing right (2026-10-15).
+	var boat := hud.ferry_boat_box()
+	var end_x := bar.position.x + bar.size.x * 0.4
+	_check(hud.sprites.has("boat_right") and boat.size.x > 0.0
+		and boat.position.x <= end_x and boat.end.x >= end_x and boat.end.y >= bar.position.y
+		and boat.end.y <= bar.end.y,
+		"a little ferry rides the end of the bar", "%s, bar %s" % [boat, bar])
+	var right: Dictionary = Boat.art_frame(Boat.turn_sailing(Vector2.RIGHT))
+	_check((hud.sprites["boat_right"] as Dictionary).get("region") == right.get("region"),
+		"its frame is the one the boat picks for sailing right", "")
 	hull.set(&"_trip_total", -1.0)
 	# Home: the bar is the next load filling.
 	var held_was := yard.held.duplicate()

@@ -145,6 +145,14 @@ var ferry_fill: float = -1.0
 const FERRY_BAR_TALL := 6.0
 const FERRY_TRIP_INK := Style.BOX_BLUE_LIT
 const FERRY_FILL_INK := Color(0.93, 0.74, 0.40)
+## The little ferry riding the bar's end, so the bar says what it is about (Richard,
+## 2026-10-15): the ferry's own sprite heading right (`sprites["boat_right"]`), this tall, its keel sunk this
+## far into the groove, bobbing a whole pixel at `FERRY_BOB` cycles a second while a run is
+## out, still at the berth.
+const FERRY_BOAT_TALL := 18.0
+const FERRY_BOAT_SINK := 3.0
+const FERRY_BOB := 1.3
+var _ferry_clock := 0.0
 
 ## How many upgrades can be paid for right now. Drawn as a tag under the upgrades button:
 ## the money plate says what the player has and the shop says what things cost, and this is
@@ -362,6 +370,7 @@ func snap_meter() -> void:
 
 
 func _process(delta: float) -> void:
+	_ferry_clock += delta
 	var wanted := clampf(pollution, 0.0, 1.0)
 	# Exactly, not approximately: a sliver left over the empty lake rounds up to 1%.
 	if _shown != wanted:
@@ -531,7 +540,7 @@ func _paint_key() -> int:
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
 		stock, available, hint, _hovered, plates_only,
-		roundi(ferry_trip * 200.0), roundi(ferry_fill * 200.0)
+		roundi(ferry_trip * 200.0), roundi(ferry_fill * 200.0), _ferry_bob()
 	])
 
 
@@ -983,6 +992,32 @@ func _draw_ferry_bar() -> void:
 	if filled.size.x > 0.0:
 		draw_rect(filled, ink, true)
 		draw_rect(Rect2(filled.position, Vector2(filled.size.x, 1.0)), ink.lightened(0.3), true)
+	var boat := ferry_boat_box()
+	if boat.size.x > 0.0:
+		HudButtons.fit(self, sprites["boat_right"], boat, 1.0, Color.WHITE, true, false)
+
+
+## Where the little ferry is drawn: at the end of the fill, held inside the bar's ends, its
+## keel in the groove. Empty with no bar or no sprite.
+func ferry_boat_box() -> Rect2:
+	var share := ferry_trip if ferry_trip >= 0.0 else ferry_fill
+	if share < 0.0 or not sprites.has("boat_right"):
+		return Rect2()
+	var bar := ferry_bar_box()
+	var span := HudButtons.span_of(sprites["boat_right"], Vector2(INF, FERRY_BOAT_TALL), 1.0).round()
+	if span.x <= 0.0:
+		return Rect2()
+	var x := bar.position.x + roundf(bar.size.x * clampf(share, 0.0, 1.0)) - span.x * 0.5
+	x = clampf(x, bar.position.x - span.x * 0.25, bar.end.x - span.x * 0.75)
+	var foot := bar.position.y + FERRY_BOAT_SINK - float(_ferry_bob())
+	return Rect2(Vector2(roundf(x), foot - span.y), span)
+
+
+## The bob, a whole pixel up and down while a run is out.
+func _ferry_bob() -> int:
+	if ferry_trip < 0.0:
+		return 0
+	return 1 if sin(_ferry_clock * TAU * FERRY_BOB) > 0.0 else 0
 
 
 func _draw_stock() -> void:

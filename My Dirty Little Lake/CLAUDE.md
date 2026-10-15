@@ -1614,12 +1614,17 @@ far, all but the rotation:
   round every stop and home at the hull's speed, plus each berthing and volley ashore) and
   the bar shows the hull home first, in the recycle mark's blue, held under full until it ties
   up. With none out it shows the docked hull's next load filling (`held / capacity`), in
-  amber. One bar for the fleet, by decision.
+  amber. One bar for the fleet, by decision. **A little ferry rides the fill's end**
+  (`ferry_boat_box`, `FERRY_BOAT_TALL` 18, keel `FERRY_BOAT_SINK` in the groove, bobbing a
+  whole pixel while a run is out; Richard, same day: so the bar says it is about the boats),
+  the frame `Boat.turn_sailing(Vector2.RIGHT)` picks, lent as `sprites["boat_right"]`.
 - **The wash jet is a flat fan** (`WashStand.FAN_WIDE` 2.6, `FAN_TALL` 0.6 of `JET_RADIUS`,
-  `FAN_POWER` 0.65, `fan_half`, `_fan_spot`): `_wash_at` wears a wide, low ellipse, strongest
-  along its middle row and even most of the way across, so a sweep down the piece cleans it;
-  the stream draws as `FAN_RAYS` dashed rays opening from the tip to the fan's ends, the froth
-  along the fan's line, and drips start along it. Fixed horizontal, by decision (no switch to
+  `FAN_POWER` 0.5, `fan_half`, `_fan_spot`): `_wash_at` wears a wide, low box with soft ends,
+  even across nearly all of it (second pass the same day, Richard: the first cut, an ellipse
+  strongest along its middle, was too concentrated in the centre), so a sweep down the piece
+  cleans the whole width; the stream draws as `FAN_RAYS` (7) dashed rays of one weight
+  opening from the tip to the fan's ends, the froth spread evenly along the fan's line, and
+  drips start anywhere along it. Fixed horizontal, by decision (no switch to
   vertical); the hose's levels widen it (`jet_radius` unchanged). **Supersedes the round jet**
   in The Pump and the Wash Room. Numbers are first guesses for Richard's hand.
 - `test_lake` guards the meter's figure, the badge, the gap and both walks down the strip,
