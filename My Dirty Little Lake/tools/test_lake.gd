@@ -10639,7 +10639,26 @@ func _check_wash_plank() -> void:
 
 ## The upgrades button's pulse (2026-09-22): fires when the affordable count rises, never
 ## on a hold or a fall, breathes, fades out on its own, and is cut by a hover or the shop.
+## The meter counts up and the shed's upgrades button wears its name (2026-10-15, issue #41).
+func _check_meter_and_shed_button() -> void:
+	_check(HudSkin.cleaned_figure(1.0) == 0 and HudSkin.cleaned_figure(0.5) == 50
+		and HudSkin.cleaned_figure(0.004) == 99 and HudSkin.cleaned_figure(0.0) == 100,
+		"the meter reads the share cleaned, 100% only when nothing is left",
+		"%d %d %d %d" % [HudSkin.cleaned_figure(1.0), HudSkin.cleaned_figure(0.5),
+			HudSkin.cleaned_figure(0.004), HudSkin.cleaned_figure(0.0)])
+	var button: UiButton = _main.get(&"_open_upgrades")
+	_main.call(&"_update_hud")
+	# The HUD read just now may set a pulse going; the pulse checks after this want it still.
+	var hud: HudSkin = _main.get(&"_skin")
+	hud.hush_pulse(&"shed")
+	hud.hush_pulse(&"upgrades")
+	_check(button.count >= 0 and not &"note" in button,
+		"the shed's upgrades button wears the count on a badge, not a line in place of its name",
+		str(button.count))
+
+
 func _check_upgrades_pulse() -> void:
+	_check_meter_and_shed_button()
 	var skin := _main.get(&"_skin") as HudSkin
 	skin.hush_pulse(&"upgrades")
 	var now := skin.available
@@ -10728,6 +10747,21 @@ func _stage_wash() -> void:
 		"and somebody south of it in front", "")
 	_angler.tile_pos = Pump.tile + Vector2(6.0, 6.0)
 	_check(not bool(_main.call(&"_at_pump")), "away from it the key is not the pump's", "")
+	# The strip between the hut and the pump is walkable (2026-10-15, issue #41): about a tile
+	# free between the two walk margins, and walking down it, straight or at the screen's
+	# down, never sticks.
+	var hut := Iso.shed_centre()
+	var gap_from := hut.x + Iso.SHED_FOOT.x + Iso.SHED_KEEP
+	var gap_to := Pump.tile.x - Pump.FOOT_HALF - Pump.WALK_KEEP
+	_check(gap_to - gap_from >= 0.9, "a tile free between the hut and the pump",
+		"%.2f tiles" % (gap_to - gap_from))
+	for push: Vector2 in [Vector2(0.0, 1.0), Vector2(1.0, 1.0).normalized()]:
+		_angler.tile_pos = Vector2((gap_from + gap_to) * 0.5 if push.x == 0.0 else gap_from + 0.05,
+			hut.y - Iso.SHED_FOOT.y - 0.6)
+		for _i in 240:
+			_angler.call(&"_move_by", push * 0.05)
+		_check(_angler.tile_pos.y > Pump.tile.y + 0.6, "walking down the strip by the pump gets past it",
+			"pushed %s, ended at %s, pump %s" % [str(push), str(_angler.tile_pos), str(Pump.tile)])
 	_angler.tile_pos = stood
 
 	# The room.
@@ -10906,6 +10940,9 @@ func _stage_wash() -> void:
 		stand.call(&"_process", 0.05)
 	var part := stand.share_clean()
 	_check(part > 0.02 and part < 0.99, "spraying it wears the coat away", "%.2f clean" % part)
+	# The figure under the pallet says it (2026-10-15, issue #41).
+	_check(stand.clean_figure() == mini(floori(part / WashStand.DONE_AT * 100.0), 99),
+		"the clean figure counts the coat worn away", "%d%% at %.3f" % [stand.clean_figure(), part])
 	_main.call(&"_set_wash", false)
 	_check(unwashed.has(find) and not unlocked.has(find)
 		and is_equal_approx(float(_main.get(&"sludge")), 100.0),
@@ -10938,6 +10975,7 @@ func _stage_wash() -> void:
 		passes += 1
 	_check(stand.state != WashStand.State.WASHING, "sprayed all over, it finishes by itself",
 		"%d passes, %.3f clean" % [passes, stand.share_clean()])
+	_check(stand.clean_figure() == 100, "and the figure reads 100% when it does", str(stand.clean_figure()))
 	for k in 60:
 		stand.call(&"_process", 0.05)
 	_check(unlocked.has(find) and not unwashed.has(find),

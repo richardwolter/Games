@@ -790,6 +790,14 @@ class MeterFrame extends Control:
 			draw_texture_rect(sheet, Rect2(sheet_box.position - position, sheet_box.size), false)
 
 
+## The figure the meter writes: how much of the lake is cleaned, as a whole percent, 100 only
+## when nothing is left. `shown` is the dirty share, 1 to 0.
+static func cleaned_figure(shown: float) -> int:
+	if shown <= 0.0:
+		return 100
+	return 100 - maxi(ceili(shown * 100.0 - 0.0001), 1)
+
+
 class MeterFace extends Control:
 	var shown: float = 1.0
 	## The water's track, in this node's own pixels.
@@ -802,10 +810,12 @@ class MeterFace extends Control:
 		var baseline := track.position.y + track.size.y * 0.5 + float(height) * 0.36
 		Style.write(
 			self,
-			# Rounded up: "0%" is the finished lake and nothing else (Richard, 2026-09-25).
-			# Rounded to nearest it read 0% with the last half percent still in the water.
-			# `_check_cleaned` zeroes `pollution` outright, so the float dust never holds 1%.
-			"%d%%" % (0 if shown <= 0.0 else maxi(ceili(shown * 100.0 - 0.0001), 1)),
+			# The share cleaned, counting up from 0% (2026-10-15, issue #41: a demo player
+			# wanted to see it go up, not down). "100%" is the finished lake and nothing else
+			# (Richard, 2026-09-25): the dirty share is rounded up before it is taken off, so
+			# the last half percent in the water still reads 99%. `_check_cleaned` zeroes
+			# `pollution` outright, so the float dust never holds 99.
+			"%d%%" % HudSkin.cleaned_figure(shown),
 			height,
 			Vector2(0.0, baseline),
 			Style.INK,

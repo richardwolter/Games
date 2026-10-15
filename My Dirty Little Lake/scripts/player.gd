@@ -461,7 +461,10 @@ func _slide(move: Vector2) -> Vector2:
 	var step := tile_pos + move
 	if Iso.in_shed(step.x, step.y, Iso.SHED_KEEP) \
 			and not Iso.in_shed(tile_pos.x, tile_pos.y, Iso.SHED_KEEP):
-		var out_of := tile_pos - Iso.ISLAND_CENTRE
+		# Off the hut's own middle, not the island's: the hut stands two thirds of a tile off it,
+		# and measured from the island the face was guessed wrong in the strip between the hut
+		# and the pump, where the slide then ran into the pump and stuck (2026-10-15, #41).
+		var out_of := tile_pos - Iso.shed_centre()
 		var wall := Iso.SHED_FOOT + Vector2(Iso.SHED_KEEP, Iso.SHED_KEEP)
 		var slip := Vector2(0.0, move.y) if absf(out_of.x) >= wall.x else Vector2(move.x, 0.0)
 		if slip.length_squared() > 0.0000001 and _can_stand(tile_pos + slip):

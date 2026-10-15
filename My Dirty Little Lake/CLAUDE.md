@@ -1568,6 +1568,34 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
   `test_lake`'s `_stage_first_steps` guards the bed at the pump, the hint giving way, the
   cards following the rooms, the free wash, the walk back into the shed and the flag.
 
+### Demo Playtest Feedback (2026-10-15, `/grill-me` with Richard, issue #41)
+A friend's notes on the demo, for both builds. Ten points grilled; rotation (9) left alone
+(the chairs already turn 90 degrees; he most likely tried a piece with no side view). Done so
+far, the four small ones:
+- **The meter counts up** (`HudSkin.cleaned_figure`): it writes the share **cleaned**, 0% on
+  a new lake, 100% only when nothing is left (the dirty share is still rounded up before it is
+  taken off, so the last half percent reads 99%). Supersedes "0% is the finished lake". The
+  water's seam is unchanged. `CUE_METER` reworded to match in all eight languages (machine
+  drafts but PT and EN).
+- **The shed's upgrades button wears its name** (`UiButton.count`, `HudButtons.label` and
+  `badge`, the HUD's own two calls): "Upgrades" across the foot and the count on the badge.
+  It read "3 for sale" in place of the name and a player could not tell what it was.
+  `HUD_AVAILABLE` and `UiButton.note` are deleted.
+- **A tile between the hut and the pump** (`Lake.PUMP_AT` 2.05 to 2.6, 0.99 tiles free between
+  the two walk margins), and **the hut's slide measures off the hut**: `Angler._slide` picked
+  the face it hit off `Iso.ISLAND_CENTRE`, two thirds of a tile from the hut's middle, so in
+  that strip it slid the wrong way, into the pump, and stuck. Now `Iso.shed_centre()`.
+- **The wash stand says how clean** (`WashStand.clean_figure`, `CLEAN_FIGURE_PX`/`_GAP`): a
+  figure under the pallet's foot, counted against `DONE_AT` so it reaches 100 when the stand
+  finishes and holds at 99 before. First guesses for size and place.
+- **Still to build** (decided, see the issue): the forced first upgrade (dim, only the button
+  takes clicks, then only the cheapest affordable row buys until bought), one ferry bar under
+  Waiting (next hull home, or the docked hold filling), click the house, pump or hive to walk
+  there and open it, "need more Strength" over the net from the third empty heavy landing, and
+  a fixed horizontal wash fan replacing the round jet.
+- `test_lake` guards the meter's figure, the badge, the gap and both walks down the strip, and
+  the stand's figure part way and at the finish.
+
 ### Bed, Sync, Tooltip, English (2026-10-14, `/grill-me` with Richard)
 - **The Small Bed is a catch, not a gift** (`Lake.STARTER_BED`, name kept): `_seed_starter_bed`
   and `_bed_to_the_pump` are deleted, so a new house is empty. The bed is in `EARLY_FINDS` at

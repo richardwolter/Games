@@ -14,16 +14,19 @@ const HudButtons := preload("res://scripts/hud_buttons.gd")
 ## Which button this is, set in the scene: `upgrades` or `shed`.
 @export var piece: StringName = &"upgrades"
 
-## A line written across the foot of the button, or empty for none.
+## How many upgrades can be paid for, worn on a badge the way the HUD's own upgrades button
+## wears it, or -1 for no badge.
 ##
-## The HUD writes how many upgrades can be paid for on its own upgrades button, and the shed
-## has the same button on it — so without this, walking indoors was walking away from the one
-## number that says whether the board is worth opening.
-var note: String = "":
+## The shed has the same button on it, so without this, walking indoors was walking away from
+## the one number that says whether the board is worth opening. It used to be written across
+## the foot as "3 for sale" in place of the button's name (2026-10-15, issue #41: a demo player
+## clicked it and could not tell what it had become). The foot says "Upgrades" now, as the
+## HUD's does, and the count rides the badge.
+var count: int = -1:
 	set(value):
-		if value == note:
+		if value == count:
 			return
-		note = value
+		count = value
 		queue_redraw()
 
 ## How much it lifts under the cursor. The same feedback the HUD's buttons give, because
@@ -82,15 +85,9 @@ func _draw() -> void:
 			HudButtons.draw_shed(self, box, _hovered, sprites)
 		_:
 			HudButtons.draw_upgrades(self, box, _hovered, sprites)
-	if not note.is_empty():
-		_draw_note(HudButtons.face_of(box))
-
-
-## The note, on a sunken panel across the foot of the button.
-##
-## Drawn the way HudSkin draws its own, down to the panel and the lettering, because it is the
-## same button saying the same thing in a different room. Set to the panel's height and then
-## shrunk to its width — the button is small and the game's ladder of text sizes starts wider
-## than this panel.
-func _draw_note(face: Rect2) -> void:
-	HudButtons.label(self, face, note)
+	if count >= 0:
+		# HudSkin._draw_available's own two calls: the same button saying the same thing in a
+		# different room.
+		var face := HudButtons.face_of(box)
+		HudButtons.label(self, face, Text.HUD_UPGRADES)
+		HudButtons.badge(self, face, str(count), count > 0)

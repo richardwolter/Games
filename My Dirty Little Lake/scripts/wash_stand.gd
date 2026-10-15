@@ -85,6 +85,11 @@ const COAT_GRAIN := 0.12
 ## Washed this far, the rest goes by itself. PowerWash's known pain is hunting the last two
 ## percent, and nobody is to be sent looking for a pixel.
 const DONE_AT := 0.99
+
+## The clean figure under the pallet (`clean_figure`): its size and its gap below the
+## pallet's foot, in canvas px. First guesses.
+const CLEAN_FIGURE_PX := Style.TEXT_TITLE
+const CLEAN_FIGURE_GAP := 10.0
 const RINSE_TIME := 0.7
 const SHINE_TIME := 1.6
 
@@ -1145,10 +1150,37 @@ func _draw() -> void:
 	_draw_impact()
 	_draw_flecks()
 	_draw_stars()
+	_draw_clean_figure()
 	_draw_nozzle()
 	# Over the nozzle, not under it (2026-10-02, Richard: the water came from underneath the
 	# tip): drawn first, the brass hid the stream's start and it showed below the bore.
 	_draw_stream()
+
+
+## How clean the find on the stand is, as a whole percent (2026-10-15, issue #41: a demo
+## player wanted to feel the progress beyond the picture). Counted against `DONE_AT`, where
+## the stand finishes the wash itself, so the figure reaches 100 on the frame the rinse starts
+## and never stops short at 99; held at 99 until then.
+func clean_figure() -> int:
+	if state == State.EMPTY:
+		return 0
+	if state != State.WASHING:
+		return 100
+	return mini(floori(share_clean() / DONE_AT * 100.0), 99)
+
+
+## The figure, centred under the pallet's foot.
+func _draw_clean_figure() -> void:
+	if state == State.EMPTY or _pallet_tex == null:
+		return
+	var foot := _pallet_at.y + _pallet_size.y * _zoom
+	var tall := float(CLEAN_FIGURE_PX)
+	Style.write(
+		self, "%d%%" % clean_figure(), CLEAN_FIGURE_PX,
+		Vector2(0.0, foot + CLEAN_FIGURE_GAP + tall),
+		Style.INK, HORIZONTAL_ALIGNMENT_CENTER,
+		Rect2(_mid() - 100.0, foot + CLEAN_FIGURE_GAP, 200.0, tall)
+	)
 
 
 func _cell_box(cx: float, cy: float, cells: float = 1.0) -> Rect2:

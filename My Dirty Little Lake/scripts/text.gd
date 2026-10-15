@@ -617,9 +617,6 @@ static var DECOR_RUG: String:
 static var DECOR_AQUARIUM: String:
 	get: return TranslationServer.translate(&"DECOR_AQUARIUM")
 
-static var HUD_AVAILABLE: String:
-	get: return TranslationServer.translate(&"HUD_AVAILABLE")
-
 static var STEPS_NOTE: String:
 	get: return TranslationServer.translate(&"STEPS_NOTE")
 

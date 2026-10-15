@@ -356,7 +356,9 @@ var _economy: EconomyConfig
 ## (2026-10-01, Richard: "smaller and closer to the shed"): slid along the gable towards the
 ## near corner, which is what brings it in on the screen. It was kept clear of the line a
 ## dog rounded the hut on; since 2026-10-11 the dogs plan their way round (`DogPaths`).
-const PUMP_AT := Vector2(2.05, 0.3)
+## Out to 2.6 (2026-10-15, issue #41: a demo player stuck between it and the hut): about a
+## tile free between the two walk margins, where there was under half of one.
+const PUMP_AT := Vector2(2.6, 0.3)
 const PUMP_RANGE := 1.5
 
 ## The beehive (2026-09-30, the beehive sidequest; `docs/hive/contract.md` section 9): where
@@ -7258,7 +7260,7 @@ func _update_hud() -> void:
 	_skin.waiting = unwashed.size()
 	# And on the shed's copy of the same button, which is the only one on screen while the
 	# player is inside.
-	_open_upgrades.note = Text.HUD_AVAILABLE % affordable
+	_open_upgrades.count = affordable
 	_skin.hint = _last_pieces_line()
 
 	if not _menu_open:
