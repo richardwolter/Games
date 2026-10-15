@@ -477,6 +477,11 @@ func _pulse_moving() -> bool:
 
 ## Whether the pointer is on one of the two picture buttons: the lake's edge scroll asks, so a
 ## hand going for a corner button does not slide the view out from under itself.
+## The upgrades button's box, for a hint to point at.
+func upgrades_box() -> Rect2:
+	return _upgrades_box
+
+
 ## The decorate button's box, for the decoration tour's hint to point at.
 func shed_box() -> Rect2:
 	return _shed_box
@@ -610,8 +615,15 @@ class HintLine extends Control:
 	func _draw() -> void:
 		if text.is_empty():
 			return
+		# A size down rather than past the bar's span (the demo's "%d upgrades left" in French
+		# is 248 px at the body size, 2026-10-15).
+		var px := Style.TEXT_BODY
+		for step: int in [Style.TEXT_SMALL, Style.TEXT_TINY]:
+			if across.size.x <= 0.0 or Style.measure(text, px).x <= across.size.x:
+				break
+			px = step
 		Style.write(
-			self, text, Style.TEXT_BODY, Vector2(0.0, baseline),
+			self, text, px, Vector2(0.0, baseline),
 			Style.GOLD.lerp(Style.INK, 0.5), HORIZONTAL_ALIGNMENT_CENTER, across
 		)
 

@@ -48,7 +48,6 @@ func _physics_process(_delta: float) -> void:
 			# Bed stands in for whatever came up first.
 			(_main.get(&"unlocked") as Array).erase(Lake.STARTER_BED)
 			(_main.get(&"unwashed") as Array).append(Lake.STARTER_BED)
-			_main.set(&"_free_wash", true)
 			_main.set(&"_decor_tour_done", false)
 			_main.set(&"_decor_tour", Lake.DecorTour.HINT)
 			_next()
@@ -85,7 +84,7 @@ func _physics_process(_delta: float) -> void:
 			if wait == 1:
 				Pad.set_mode(Pad.Mode.MOUSE)
 				_main.call(&"_decor_tour_next")
-				_main.call(&"_on_find_washed", StringName(Lake.STARTER_BED), 0)
+				_main.call(&"_on_find_washed", StringName(Lake.STARTER_BED))
 			if wait < 150:
 				return
 			_say("shed open %s, wash open %s, state %d" % [

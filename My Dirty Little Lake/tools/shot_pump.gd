@@ -81,10 +81,7 @@ func _physics_process(delta: float) -> void:
 				if room.pick(StringName(name)):
 					_say("picked %s" % name)
 					break
-			for name: String in waiting:
-				_say("%s soap %d, affordable %s" % [
-					name, room.soap_of(StringName(name)), room.can_afford(StringName(name))
-				])
+			_say("waiting: %s (washing is free)" % str(waiting))
 			_step = 2
 			_age = 0.0
 		2:

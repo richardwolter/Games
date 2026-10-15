@@ -211,6 +211,14 @@ func rolling() -> bool:
 	return _rolling
 
 
+## Whether the doors are up: once the roll is done, and **from the start in the demo**
+## (2026-10-15, `/grill-me` with Richard, a second player: "add the wishlist button as soon as
+## the credits roll, I don't think most players care about the credits"). There the roll dims
+## behind the doors as it does behind the words (`_dim_band`).
+func doors_up() -> bool:
+	return not _rolling or wishlist
+
+
 ## Hurry the roll off. What a click does while it is running; a click after that dismisses
 ## the screen as it always did.
 func skip_roll() -> void:
@@ -382,13 +390,21 @@ func _message_band() -> Vector2:
 ## How much of itself a credit row keeps at this height: all of it clear of the message,
 ## `ROLL_BEHIND` of it inside, and an ease of `ROLL_BEHIND_SOFT` between the two.
 func _roll_clear(top: float, tall: float) -> float:
-	var band := _message_band()
+	var band := _dim_band()
 	var gap := maxf(band.x - (top + tall), top - band.y)
 	if gap >= ROLL_BEHIND_SOFT:
 		return 1.0
 	if gap <= 0.0:
 		return ROLL_BEHIND
 	return lerpf(ROLL_BEHIND, 1.0, gap / ROLL_BEHIND_SOFT)
+
+
+## The band the roll dims in: the words', run down over the doors when they stand in it.
+func _dim_band() -> Vector2:
+	var band := _message_band()
+	if _menu_rect.size != Vector2.ZERO:
+		band.y = maxf(band.y, _menu_rect.end.y)
+	return band
 
 
 ## Where the roll's first row stands this frame, before any row's own rounding.
@@ -435,8 +451,8 @@ func dismiss() -> void:
 func _gui_input(event: InputEvent) -> void:
 	var moved := event as InputEventMouseMotion
 	if moved != null:
-		var home := not _rolling and _menu_rect.has_point(moved.position)
-		var wish := not _rolling and _wish_rect.has_point(moved.position)
+		var home := doors_up() and _menu_rect.has_point(moved.position)
+		var wish := doors_up() and _wish_rect.has_point(moved.position)
 		if home != _menu_hot or wish != _wish_hot:
 			if (home and not _menu_hot) or (wish and not _wish_hot):
 				Sfx.ui(&"ui_hover")
@@ -450,11 +466,11 @@ func _gui_input(event: InputEvent) -> void:
 	accept_event()
 	# The door is a rectangle inside the screen, and the screen is dismissed by clicking
 	# anywhere else on it. Testing the door first is what keeps the two apart.
-	if not _rolling and _menu_rect.has_point(click.position):
+	if doors_up() and _menu_rect.has_point(click.position):
 		Sfx.ui(&"ui_click")
 		take_menu()
 		return
-	if not _rolling and _wish_rect.has_point(click.position):
+	if doors_up() and _wish_rect.has_point(click.position):
 		Sfx.ui(&"ui_click")
 		open_store()
 		return
@@ -503,8 +519,8 @@ func _draw() -> void:
 	_line(String(said[1]), int(second), second_baseline, ink, shade)
 	var under := second_baseline
 	# The doors wait for the roll: a plaque under a climbing credit is one nobody can aim at,
-	# and the credits pass over exactly the band they stand in.
-	if _rolling:
+	# and the credits pass over exactly the band they stand in. Not in the demo (`doors_up`).
+	if not doors_up():
 		_menu_rect = Rect2()
 		_wish_rect = Rect2()
 		return
@@ -561,7 +577,7 @@ func _line(text: String, height: int, baseline: float, ink: Color, shade: Color)
 func pad_focus() -> Array:
 	if _leaving:
 		return []
-	if _rolling:
+	if not doors_up():
 		return [{"box": Rect2(Vector2.ZERO, size), "key": &"skip", "ring": false}]
 	var out: Array = []
 	if _wish_rect.size != Vector2.ZERO:

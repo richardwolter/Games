@@ -17,6 +17,13 @@ extends RefCounted
 const DATA := "res://assets/house/house.json"
 const ROOT := "res://assets/house/"
 
+## **The demo's half step** (2026-10-15, `/grill-me` with Richard: "tease the player with
+## some fixings"): stage 1 with the stove's ghost and the tented boards boarded over and the
+## fresh leak dried (sets s1h, s1hr, u1h and blocks "1h", baked by
+## `build_house_inside.py --half`). One house in the game, so one flag: the lake sets it once
+## the demo has earned it, and stage 1 then reads the half step's sets and blocks.
+static var half := false
+
 static var _data: Dictionary = {}
 static var _sets: Dictionary = {}
 
@@ -45,7 +52,9 @@ static func region() -> Rect2i:
 
 static func _rects(stage: int, which: String) -> Array[Rect2i]:
 	var out: Array[Rect2i] = []
-	var by: Dictionary = data().get("blocks", {}).get(str(stage), {})
+	var blocks: Dictionary = data().get("blocks", {})
+	var key := "1h" if stage <= 1 and half and blocks.has("1h") else str(stage)
+	var by: Dictionary = blocks.get(key, {})
 	for r: Array in by.get(which, []):
 		out.append(Rect2i(int(r[0]), int(r[1]), int(r[2]), int(r[3])))
 	return out
@@ -80,6 +89,8 @@ static func base_blocked(stage: int, base: Rect2i) -> bool:
 
 ## The loop shown at a stage, in a shower or not.
 static func loop_of(stage: int, rain: bool) -> String:
+	if stage <= 1 and half and has_set("s1h"):
+		return "s1hr" if rain else "s1h"
 	if stage <= 1:
 		return "s1r" if rain else "s1"
 	return "s2" if stage == 2 else "s3"

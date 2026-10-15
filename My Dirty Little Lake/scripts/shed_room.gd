@@ -803,6 +803,10 @@ var _dogs: Array[ShedDog] = []
 ## once, the next time the door opens. 3 for a room no lake drives: the room as it always was.
 var house_stage: int = 3
 var house_seen: int = 3
+## The demo's half step (`HouseInside.half`): whether its play-in has been seen. Emits
+## `half_played` the visit it plays, for the lake's card.
+signal half_played
+var half_seen: bool = true
 var _house_under: Array[HouseInside.Layer] = []
 var _house_over: Array[HouseInside.Layer] = []
 var _house_clock: float = 0.0
@@ -1026,6 +1030,8 @@ func _process(delta: float) -> void:
 			_wash_plank.pulse = wash_pulse_amount()
 	_pad_tick()
 	_tick_turn_hint(delta)
+	if is_visible_in_tree():
+		_drive_walk_hint(delta)
 	var you_was := _you_at
 	_walk_you(delta)
 	_you_walk = _you_at - you_was
@@ -1178,10 +1184,59 @@ func _toned(art: Image) -> Image:
 	return out
 
 
+## **The walk prompt** (2026-10-15, `/grill-me` with Richard, a second player: "only then I
+## understand that I can move the character around and it's not some sort of menu"): the
+## first time the house opens in a new game, the walk keys (the stick on the pad) float over
+## the player until they have walked `WALK_HINT_MOVED` cells. The lake sets `walk_hint` and
+## saves the answer when `walk_learned` comes.
+signal walk_learned
+const WALK_HINT_MOVED := 1.5
+const WALK_HINT_OVER := 10.0
+const WALK_HINT_PX := 2.0
+var walk_hint := false
+## The player's walk keys as this keyboard prints them, up/left/down/right.
+var walk_keys: Array = ["W", "A", "S", "D"]
+var _walk_from := Vector2.INF
+var _walk_clock := 0.0
+
+
+func _drive_walk_hint(delta: float) -> void:
+	if not walk_hint:
+		_walk_from = Vector2.INF
+		return
+	_walk_clock += delta
+	if _walk_from == Vector2.INF:
+		_walk_from = _you_at
+	elif _you_at.distance_to(_walk_from) >= WALK_HINT_MOVED:
+		walk_hint = false
+		_walk_from = Vector2.INF
+		walk_learned.emit()
+
+
+func _draw_walk_hint(floor_box: Rect2) -> void:
+	if not walk_hint or carrying != &"":
+		return
+	var step := float(CELL * _zoom())
+	var head := floor_box.position + _you_at * step - Vector2(0.0, YOU_TALL * step + WALK_HINT_OVER)
+	# `WALK_HINT_PX` physical pixels to one of the pack's, through the window's stretch.
+	var canvas := get_viewport_rect().size.y
+	var window := float(get_window().size.y) if get_window() != null else canvas
+	var px := WALK_HINT_PX * canvas / maxf(window, 1.0)
+	FirstSteps.draw_walk_keys(self, head.round(), px, Pad.is_pad(), walk_keys, _walk_clock)
+
+
+## The door takes no E while the decoration tour is up (2026-10-15, a player's notes: told by
+## the room's card to press E on a lit piece, they stood by the door and were put out on the
+## lake). Set by the lake.
+var door_off := false
+
+
 ## How far the player's feet are from the doorway, in cells, or INF when they are not in
 ## front of it: across the opening (`_door_span`, a little either side) and within
 ## `DOOR_REACH` of the back wall's foot. Where E leaves the house (`switch_near`).
 func door_gap() -> float:
+	if door_off:
+		return INF
 	var span := _door_span()
 	if _you_at.x < span.x - DOOR_SIDE or _you_at.x > span.y + DOOR_SIDE:
 		return INF
@@ -2009,7 +2064,7 @@ func _blockers() -> Array:
 ## What the walkers' floor is made of: the furniture and the house's stage. A change to either
 ## throws the blockers and the dogs' path grids away.
 func _floor_key() -> int:
-	return hash([decor.hash(), house_stage])
+	return hash([decor.hash(), house_stage, HouseInside.half])
 
 
 ## Take one step of a walk, sliding along whatever face refuses it (2026-09-27): the whole
@@ -2179,7 +2234,61 @@ func can_place(piece: StringName, cell: Vector2i, view: int = 0, _ignore: int = 
 	if cell.y + span.y - base < 0 or cell.y + span.y > PLACE_ROWS:
 		return false
 	# Not on a hole, a broken board or a puddle (2026-10-11, `HouseInside`).
-	return not HouseInside.base_blocked(house_stage, base_rect(piece, cell, view))
+	if HouseInside.base_blocked(house_stage, base_rect(piece, cell, view)):
+		return false
+	return overlap_at(piece, cell, view, _ignore) < 0
+
+
+## **Bases may not overlap** (2026-10-15, `/grill-me` with Richard, a second player: "being
+## able to place everything inside of each other ... makes it feel arbitrary"). Two standing
+## floor pieces may not share floor: their bases may meet but not cross by more than
+## `OVERLAP_LEEWAY` placement px either way. Pictures still may: a sofa in front of a tall
+## bookcase is fine. Small pieces stand on a host, rugs lie under anything, and paintings may
+## not overlap each other. Supersedes "free overlap kept" (2026-09-13).
+const OVERLAP_LEEWAY := 1
+
+
+## Whether a piece takes part in the rule as a standing floor piece.
+func stands(piece: StringName) -> bool:
+	return sheets != null and not sheets.is_small(piece) and not sheets.lies_flat(piece) 		and not sheets.on_wall(piece)
+
+
+## What a piece covers for the rule at `cell`: its base on the floor, its whole picture on the
+## wall, nothing for a small piece or a rug.
+func _claim(piece: StringName, cell: Vector2i, view: int) -> Rect2i:
+	if sheets.on_wall(piece):
+		return Rect2i(cell, span_of(piece, view))
+	if not stands(piece):
+		return Rect2i()
+	return base_rect(piece, cell, view)
+
+
+## The index of a placed piece this one would cross at `cell`, or -1. `ignore` is a row of
+## `decor` left out (the piece itself, when a load checks what is already down); `among` the
+## rows to ask, `decor` by default.
+func overlap_at(piece: StringName, cell: Vector2i, view: int = 0, ignore: int = -1,
+		among: Variant = null) -> int:
+	if sheets == null:
+		return -1
+	var mine := _claim(piece, cell, view)
+	if mine.size == Vector2i.ZERO:
+		return -1
+	var rows: Array = among if among is Array else decor
+	var wall := sheets.on_wall(piece)
+	for i in rows.size():
+		if i == ignore:
+			continue
+		var row: Dictionary = rows[i]
+		var other := StringName(row["piece"])
+		if sheets.on_wall(other) != wall:
+			continue
+		var theirs := _claim(other, Vector2i(int(row["cell"][0]), int(row["cell"][1])), _row_view(row))
+		if theirs.size == Vector2i.ZERO:
+			continue
+		var cross := mine.intersection(theirs)
+		if cross.size.x > OVERLAP_LEEWAY and cross.size.y > OVERLAP_LEEWAY:
+			return i
+	return -1
 
 
 ## A piece's floor base at `cell`, in placement px: the bottom `base_of` rows of its span.
@@ -2617,6 +2726,13 @@ func _drop_cell(piece: StringName, view: int = 0) -> Vector2i:
 	var floor_at := (_pointer - _floor_origin()) / maxf(_zoom(), 0.001)
 	var corner := floor_at - Vector2(span) * 0.5
 	var cell := Vector2i(roundi(corner.x), roundi(corner.y))
+	# Shift held snaps the piece to the walkers' `CELL` grid, its left edge and its foot
+	# (2026-10-15, `/grill-me` with Richard, a second player asked for a grid toggle; this
+	# reverses "no coarse snap anywhere", 2026-09-16). Lining pieces up is what it is for.
+	if snapping():
+		cell.x = int(roundf(float(cell.x) / CELL)) * CELL
+		var foot := int(roundf(float(cell.y + span.y) / CELL)) * CELL
+		cell.y = foot - span.y
 	# Held rather than refused, on both axes (2026-09-16): a wide piece dragged up against a
 	# wall used to be let go over the edge, fail `can_place` and go back to the shelf. It
 	# slides along the wall instead, the way one let go too high slides down.
@@ -2628,6 +2744,14 @@ func _drop_cell(piece: StringName, view: int = 0) -> Vector2i:
 			cell.y, maxi(base_of(piece, view) - span.y, -PLACE_WALL), PLACE_ROWS - span.y
 		)
 	return cell
+
+
+## Whether the drop snaps to the grid: Shift held. A harness sets `force_snap`.
+var force_snap := false
+
+
+func snapping() -> bool:
+	return force_snap or Input.is_key_pressed(KEY_SHIFT)
 
 
 ## Held between two bounds that may have crossed. `clampi` with a low over its high keeps
@@ -3249,6 +3373,7 @@ func _draw() -> void:
 	draw_rect(_shed_rect(), ROOM_DIM)
 	_draw_hands(floor_box)
 	_draw_prompt(floor_box)
+	_draw_walk_hint(floor_box)
 	_dress_shelf()
 
 	# The piece in hand off the room — over the shelf, say — follows the cursor over
@@ -4563,6 +4688,10 @@ func _house_shown() -> void:
 			_house_playing.append("u12")
 		if house_stage >= 3 and HouseInside.has_set("u23"):
 			_house_playing.append("u23")
+	elif house_stage <= 1 and HouseInside.half and not half_seen and HouseInside.has_set("u1h"):
+		_house_playing.append("u1h")
+		half_seen = true
+		half_played.emit()
 	house_seen = house_stage
 
 

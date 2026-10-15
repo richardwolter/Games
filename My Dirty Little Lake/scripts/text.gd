@@ -713,9 +713,6 @@ static var CREDITS_GODOT: String:
 static var WASH_TITLE_N: String:
 	get: return TranslationServer.translate(&"WASH_TITLE_N")
 
-static var WASH_FREE: String:
-	get: return TranslationServer.translate(&"WASH_FREE")
-
 static var WASH_WASHING: String:
 	get: return TranslationServer.translate(&"WASH_WASHING")
 
@@ -997,3 +994,12 @@ static var FIRST_BUY: String:
 
 static var FIRST_BUY_ROW: String:
 	get: return TranslationServer.translate(&"FIRST_BUY_ROW")
+
+static var DEMO_GOAL: String:
+	get: return TranslationServer.translate(&"DEMO_GOAL")
+
+static var DEMO_LEFT: String:
+	get: return TranslationServer.translate(&"DEMO_LEFT")
+
+static var DEMO_HOUSE: String:
+	get: return TranslationServer.translate(&"DEMO_HOUSE")

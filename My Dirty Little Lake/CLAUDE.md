@@ -1634,6 +1634,76 @@ far, all but the rotation:
   bar's place, a reckoned run, the run and the fill (`_check_ferry_bar`), and the fan wearing a
   strip much wider than tall (`_stage_wash`).
 
+### A Second Player's Notes (2026-10-15, `/grill-me` with Richard)
+A second friend's notes on the demo, played on a 10-13/14 build (the tornado's gusts and the
+silent crate in, the #41 fixes above not yet). Both builds unless it says demo.
+- **Washing is free** (`WashRoom`: `SOAP`, `soap_of`, `can_afford`, `free`, `price_slot`, the tray's
+  price tag, `Lake._free_wash` and the `free_wash` save key and `WASH_FREE` all deleted;
+  `washed(piece)` carries no soap). He called 5 / 10 / 15 "bad/arbitrary". **Supersedes "Soap is
+  flavour, not a sink"** (The Pump and the Wash Room) and the free first wash (Bed, Sync,
+  Tooltip, English). An old save's `free_wash` key is simply not read.
+- **A find washed part way keeps its wash for the session** (`WashStand._kept`, `_stash`,
+  `_take_kept`, `kept_share`): stashed when another find goes on the stand or the room closes,
+  laid back over the coat when it returns; the tray row says how clean ("40%"). Not saved.
+  **A click on the find on the stand does nothing** (`WashRoom.pick`): it used to put the whole
+  coat back. **The next waiting find goes on the stand by itself** once one comes clean
+  (`WashRoom.auto_next`, off while the decoration tour walks the player back to the shed).
+- **The last grime is pointed at** (`WashStand.LAST_*`, `_drive_last`, `_draw_last`): from
+  `LAST_FROM` (0.95) of the way to `DONE_AT`, every patch left (cells in `LAST_BLOCK` squares,
+  at most `LAST_MOST`) wears gold corner marks pulsing a whole cell out and back.
+- **The door takes no E while the decoration tour is up** (`ShedRoom.door_off`, set in
+  `Lake._decor_tour_step` from the plank's card on): told by the room's card to press E on a
+  lit piece, he stood by the door and was put out on the lake.
+- **The wash room's ferries step in their own lane's pixels** (`snappedf(hull.x, grain)`): the
+  far lane jumped two of its art pixels at a time and read as lag.
+- **Demo: the capped Strength line says "Not in the demo"** (`HeavyNote.words`,
+  `Text.DEMO_LOCKED`), from the first empty landing once Strength is at the demo's cap. The
+  heavy pieces stay.
+- **Demo: the goal** (`DEMO_GOAL`, a coin-gold hint card at the Upgrades button once the first
+  upgrade is bought; then `DEMO_LEFT`, "%d upgrades left", on the hint line over the meter,
+  `Lake._demo_levels_left`).
+- **Demo: the doors are up as the credits start** (`Farewell.doors_up`, the roll dimming behind
+  them, `_dim_band`). **Supersedes "The doors are not drawn while the roll is running"** for
+  the demo; the full game's doors still wait.
+- **Demo: the room inside mends a little** (`HouseInside.half`, sets `s1h` / `s1hr` / `u1h` and
+  blocks `1h`, `Lake.house_half` / `DEMO_HALF_AT` 0.05, saved as `house_half` and
+  `house_half_seen`, absent reads as not earned): stage 1 with the stove's ghost (h4) and the
+  tented boards (b3) boarded over and the fresh leak (p2) dried. Baked by
+  `tools/build_house_inside.py --half`, which renders stage 1 off a layout with those three
+  left out and the flue's drip off (`damp.NO_FLUE`), and lays stage 2's own `under` pixels
+  over `f4`'s and `f7`'s boards, `m3` and `s2`'s ring, so what is mended is what stage 2
+  mends. The next time the door opens the half step plays in (`u1h`, stage 2's own stage-up
+  inside the mask) and a sprout-green card says "As you clean the lake, your house will fix
+  itself" (`DEMO_HOUSE`, the one hint shown inside the house: `_hint_held_for`). **The hut
+  outside does not change**, by Richard's call. Stage 2 and 3 are never reached in the demo.
+- **The rain falls on after a tornado** (`Weather.STORM_LINGER` 30 s, `clear_storm(linger)`),
+  then eases off over `CLEAR`.
+- **Fresh settings: Master 100%, Music, SFX and Ambience 50%** (`Prefs`; were 75 / 80 / 70). A
+  written `settings.cfg` keeps the player's.
+- **How to play's "Start cleaning" starts the game from the menu** (`Letter.start_asked`,
+  `MainMenu._start_from_letter`: Continue on a run, New game without one).
+- **The house's walk prompt** (`ShedRoom.walk_hint`, `FirstSteps.draw_walk_keys`): a new game's
+  first visit floats the walk keys (the stick on the pad) over the player until they walk
+  `WALK_HINT_MOVED` cells. Saved as `house_walk`, absent reads as done.
+- **Bases may not overlap** (`ShedRoom.overlap_at`, `stands`, `OVERLAP_LEEWAY` 1 px): two
+  standing floor pieces may not share floor; small pieces sit on a host, rugs lie under
+  anything, paintings may not overlap each other; pictures still may. A load sends the later
+  of two crossing pieces back to the shelf (`Lake._settle_house`). **Supersedes "Free overlap
+  kept"** (2026-09-13) and "refusing overlaps" being out of scope (2026-09-16). **Richard's
+  furnished `play_decor` save loses pieces**: re-place them before the next store shot.
+- **Shift snaps a carried piece to the 8 px grid** (`ShedRoom.snapping`, `force_snap` for the
+  harness): its left edge and its foot. **Reverses "No coarse snap anywhere"** (2026-09-16).
+- **Leaving the house shows the lake** (`Lake._begin_reveal`, `_reveal_owed`, `REVEAL_TIME`
+  1.4 s): the view starts at the far stop and glides in to the player's zoom, only when the
+  meter has moved `REVEAL_STEP` (0.05; demo `REVEAL_STEP_DEMO` 0.02) since the session began
+  or the last reveal. The menu's glide machinery with the HUD left alone (`_glide_hud`).
+- **Out of scope, by decision**: the crate's sound (stays silent), the tornado's movement, the
+  hose, the luck hints' 3.5 s, the money pace.
+- **Open**: walking over the nightstand next to the small desk (#25 of his notes) could not be
+  explained from the code; a repro is owed. All new numbers are first guesses. New strings
+  (`DEMO_GOAL`, `DEMO_LEFT`, `DEMO_HOUSE`) are machine drafts in seven languages.
+- `test_lake`'s `_check_wash_notes` and `_check_oct15_notes` guard all of it.
+
 ### Bed, Sync, Tooltip, English (2026-10-14, `/grill-me` with Richard)
 - **The Small Bed is a catch, not a gift** (`Lake.STARTER_BED`, name kept): `_seed_starter_bed`
   and `_bed_to_the_pump` are deleted, so a new house is empty. The bed is in `EARLY_FINDS` at
@@ -1642,6 +1712,7 @@ far, all but the rotation:
   there is no `SAVE_VERSION` bump. Older saves already own their bed. Netted, it waits at the
   pump and **pays its soap** like any find. In the demo every early find is dealt in reach,
   past the fifteen if need be. 61 finds now; Decoraholic counts it.
+- **Superseded 2026-10-15** (A Second Player's Notes): washing is free.
 - **A new game's first wash is free, whatever the find** (`_free_wash`, set by
   `_start_arrival`, spent in `_on_find_washed`, saved as `free_wash`, absent reads as spent):
   `WashRoom.free` holds every waiting find while it lasts, so the tour's wash costs nothing.
@@ -5774,6 +5845,7 @@ A find is washed before the shed will have it. The one named exception to the sc
   has no such key and everything in its `unlocked` is simply washed already, so Richard's
   furnished save and the trailer's shed shot are untouched. The ending does not wait on
   washing: a run still ends when the last piece is in the crate.
+- **Superseded 2026-10-15**: washing is free, no soap (A Second Player's Notes).
 - **The pump is free and there from a new game. Soap is flavour, not a sink**: 5 / 10 / 15
   by the restored picture's area, in thirds of the catalogue (`WashRoom.soap_of`), about
   400 over a run against the 870k the lake holds. **This supersedes issue #37's and the
@@ -8046,6 +8118,7 @@ Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richa
 went from 24 screen pixels to 3.
 - **Whole art pixels, never finer**, by decision: the room is pixel art, and a piece at half
   a pixel blurs or crawls on the screen grid.
+- **Reversed 2026-10-15**: Shift snaps to the 8 px grid (A Second Player's Notes).
 - **No coarse snap anywhere**, by decision: no Shift modifier, no magnet to a neighbour's
   edge. One gesture, one thing. Lining four chairs up at a table is done by eye.
 - **`ShedRoom.CELL` (8) stays the walkers' grid.** The player and the dog still move in
@@ -8142,7 +8215,8 @@ went from 24 screen pixels to 3.
 - **`place`**: `floor` (default), `wall` (the paintings — hang on the wall strip only,
   `can_place` wants the whole picture above row 0, no floor cell blocked, drawn first),
   `small` (pots, table lamp, clock, chew toy, globe — may be set over a big piece).
-  **Free overlap kept, by Richard's call** over refusing shared base cells.
+  **Free overlap kept, by Richard's call** over refusing shared base cells. **Superseded
+  2026-10-15**: bases may not overlap (A Second Player's Notes).
 - **One draw order** (`_order`, `_before`): wall, flats, then standing by foot row, **ties
   by the order the pieces went down** (`sort_custom` is not stable — two pieces on one
   row swapped frame to frame, the "chair through the desk"). A small piece keyed

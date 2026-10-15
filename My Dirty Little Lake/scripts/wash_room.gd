@@ -6,22 +6,20 @@
 ## wash it and it goes to the shed. **Must wash to place**: a netted find waits here, not on
 ## the shed's shelf, until it has been through this room.
 ##
-## **Soap is flavour, not a sink** (Richard, 2026-09-18): 5, 10 or 15 by how big the find's
-## picture is, in thirds of the catalogue — about 400 over a whole run against the 870k the
-## lake holds. **Checked when a find is picked, charged when it comes clean**: walking away
-## from a half-washed find costs nothing and puts its whole coat back, the same coat, and the
-## save knows only washed or not. A purse that cannot cover a find's soap leaves its row
-## drawn back and deaf, and the find waits.
+## **Washing is free** (2026-10-15, `/grill-me` with Richard, a player's notes: the soap's
+## 5 / 10 / 15 "feels bad/arbitrary"). It was flavour, not a sink, and is gone. A find washed
+## part way keeps what came off for the session (`WashStand._kept`), and the next waiting
+## find goes on the stand by itself once one comes clean.
 ##
 ## Holds no state of the lake's: it is lent the waiting list and asks the purse through a
-## callable, and says `washed` when there is something to pay for and keep.
+## callable (for the hose), and says `washed` when a find is clean.
 class_name WashRoom
 extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-## A find came clean: `piece`, and what its soap cost.
-signal washed(piece: StringName, soap: int)
+## A find came clean.
+signal washed(piece: StringName)
 signal close_asked
 ## The hose plank was pressed with the purse able to cover it: the level bought, and its cost.
 signal hose_bought(level: int, cost: int)
@@ -38,8 +36,6 @@ static func hose_most() -> int:
 ## The plank under the tray, and the gap over it.
 const HOSE_TALL := 52.0
 const HOSE_GAP := 22.0
-
-const SOAP := [5, 10, 15]
 
 ## Down under the HUD's money and Waiting plates, which stay up in the room (2026-10-01).
 const TRAY_AT := Vector2(28.0, 172.0)
@@ -60,7 +56,7 @@ static var EMPTY_LINES: Array:
 var sheets: Sheets
 ## The lake's own list of what waits, oldest first. Read, never written.
 var waiting: Array[String] = []
-## How much is in the purse right now.
+## How much is in the purse right now, for the hose.
 var purse := Callable()
 
 ## The lake's day, for the backdrop's sky and tint, and how much of the lake's filth is
@@ -76,14 +72,16 @@ var flock: Flock
 ## is on the backdrop's water.
 var fleet_size := Callable()
 var rubbish: Array = []
-## Finds washed for nothing: the new game's bed (the decoration tour, 2026-09-22).
-var free: Array[String] = []
 ## The hose's level, the lake's, pushed in each time the room comes up and after a buy.
 var hose_level := 1:
 	set(value):
 		hose_level = clampi(value, 1, HOSE_MOST)
 		if _stand != null:
 			_stand.hose_level = hose_level
+
+## Whether a find coming clean puts the next waiting one on the stand by itself. The lake
+## turns it off while the decoration tour is walking the player back to the shed.
+var auto_next := true
 
 var _backdrop: WashBackdrop
 var _stand: WashStand
@@ -92,7 +90,6 @@ var _close: CloseButton
 var _hose: HoseRow
 var _on_stand := &""
 var _scroll := 0
-var _thirds := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -175,38 +172,14 @@ static func is_find(book: Sheets, name: String) -> bool:
 	return not book.title_of(StringName(name)).is_empty()
 
 
-## What a find's soap costs: the catalogue's restored pictures sorted by area and cut in
-## thirds. Worked out once, off the art, so a find added later prices itself.
-func soap_of(piece: StringName) -> int:
-	if free.has(String(piece)):
-		return 0
-	if sheets == null:
-		return SOAP[0]
-	if _thirds == Vector2.ZERO:
-		var areas: Array[float] = []
-		for name: String in sheets.names:
-			if is_find(sheets, name):
-				areas.append(sheets.view_region_of(StringName(name), 0).get_area())
-		areas.sort()
-		if areas.is_empty():
-			return SOAP[0]
-		_thirds = Vector2(areas[areas.size() / 3], areas[areas.size() * 2 / 3])
-	var area := sheets.view_region_of(piece, 0).get_area()
-	if area < _thirds.x:
-		return SOAP[0]
-	return SOAP[1] if area < _thirds.y else SOAP[2]
-
-
-func can_afford(piece: StringName) -> bool:
-	var held := float(purse.call()) if purse.is_valid() else 0.0
-	return held >= float(soap_of(piece))
-
-
-## Put one of the waiting finds on the stand. False when it is not waiting or the purse
-## cannot cover its soap. A find already on the stand goes back on the tray, coat and all.
+## Put one of the waiting finds on the stand. False when it is not waiting. Picking the find
+## already on the stand does nothing (it used to put its whole coat back); picking another
+## leaves this one's wash kept for when it comes back.
 func pick(piece: StringName) -> bool:
-	if not waiting.has(String(piece)) or not can_afford(piece):
+	if not waiting.has(String(piece)):
 		return false
+	if piece == _on_stand and _stand.state == WashStand.State.WASHING:
+		return true
 	_on_stand = piece
 	_stand.put(piece)
 	# The pad's hidden pointer starts the nozzle from the find, not from the tray's row.
@@ -217,7 +190,7 @@ func pick(piece: StringName) -> bool:
 
 
 func _on_washed(piece: StringName) -> void:
-	washed.emit(piece, soap_of(piece))
+	washed.emit(piece)
 
 
 func _process(delta: float) -> void:
@@ -238,10 +211,12 @@ func _process(delta: float) -> void:
 	var wet := _stand.jet_past_piece()
 	if wet != Vector2.INF:
 		_backdrop.sprayed_at(wet)
-	# The shine has run: the stand is cleared for the next one.
+	# The shine has run: the stand is cleared, and the next waiting find goes on it.
 	if _on_stand != &"" and _stand.state == WashStand.State.CLEAN:
 		_on_stand = &""
 		_stand.clear()
+		if auto_next and not waiting.is_empty():
+			pick(StringName(waiting[0]))
 	_lay_out()
 	_tray.queue_redraw()
 
@@ -336,15 +311,6 @@ func hose_cost() -> String:
 ## What the hose row says, as one line: for logs and the harness.
 func hose_label() -> String:
 	return "%s %s %s" % [Text.HOSE_NAME, hose_value(), hose_cost()]
-
-
-## Where a tray row's price tag may stand: the shop's slot, a share of the row's width at its
-## right end, inset as the shop's rows are. The tag itself shrinks onto the figure inside it.
-static func price_slot(box: Rect2) -> Rect2:
-	var wide := box.size.x * ShopSkin.TAG_SHARE
-	return Rect2(
-		Vector2(box.end.x - wide - 6.0, box.position.y + 8.0), Vector2(wide, box.size.y - 16.0)
-	)
 
 
 ## The hose row's price tag, in the room's coordinates: the one part of the row that buys.
@@ -447,24 +413,22 @@ class Tray:
 			box.position += off
 			_draw_row(box, StringName(room.waiting[room._scroll + k]), k == _hover)
 
-	## A row in the shelf's own plate and the shop's price tag (2026-10-09, `/grill-me` with
-	## Richard: the flat boxes were "square and ugly"). The whole row still picks: putting a
-	## find on the stand is not paying for it, the soap is taken when it comes clean. A row
-	## the purse cannot cover is greyed the shop's way, plate and tag.
+	## A row in the shelf's own plate (2026-10-09, `/grill-me` with Richard: the flat boxes
+	## were "square and ugly"). No price tag since washing is free (2026-10-15); a find washed
+	## part way says how clean it is under its name.
 	func _draw_row(box: Rect2, piece: StringName, hovered: bool) -> void:
-		var can := room.can_afford(piece)
 		var standing := piece == room.on_stand()
-		var face := Style.BOARD_ROW if can else ShopSkin.drawn_back(Style.BOARD_ROW_OFF)
+		var face := Style.BOARD_ROW
 		if standing:
 			face = Style.ON_WATER
-		elif hovered and can:
+		elif hovered:
 			face = Color(
 				face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
 			)
 		Style.plate(self, box, face)
-		if can and (hovered or standing):
+		if hovered or standing:
 			Style.lit_edge(self, box, face)
-		var ink := Style.BOARD_INK if can else ShopSkin.INK_DIM
+		var ink := Style.BOARD_INK
 		# The find as the lake showed it: grimy. What it looks like clean is the reward.
 		var cut := room.sheets.region_of(piece)
 		var fit := minf(ICON / cut.size.x, ICON / cut.size.y)
@@ -473,13 +437,11 @@ class Tray:
 		draw_texture_rect_region(
 			room.sheets.atlas, Rect2(slot.get_center() - drawn * 0.5, drawn), cut
 		)
-		var soap := room.soap_of(piece)
-		var price := "$%d" % soap if soap > 0 else Text.WASH_FREE
-		var tag_slot := WashRoom.price_slot(box)
-		var tag := ShopSkin.tag_box_of(box, tag_slot.size.x, price, Style.TEXT_BODY)
 		var words := Rect2(
-			slot.end.x + 8.0, box.position.y, tag.position.x - 6.0 - (slot.end.x + 8.0), box.size.y
+			slot.end.x + 8.0, box.position.y, box.end.x - 8.0 - (slot.end.x + 8.0), box.size.y
 		)
+		var kept := room.stand().kept_share(piece) if not standing else 0.0
+		var second := Text.WASH_WASHING if standing else ("%d%%" % int(kept * 100.0) if kept > 0.0 else "")
 		# A long name drops a size before it is cut (2026-10-02, Richard: "Kitchen Coun…"),
 		# the shop's own ladder.
 		var title := room.sheets.title_of(piece)
@@ -487,18 +449,17 @@ class Tray:
 		if Style.measure(title, name_px).x > words.size.x:
 			name_px = Style.TEXT_TINY
 		var name_y := box.position.y + (box.size.y + float(name_px) * 0.62) * 0.5
-		if standing:
+		if not second.is_empty():
 			name_y = box.position.y + 22.0
 		Style.write(
 			self, _cut_to(title, name_px, words.size.x), name_px,
 			Vector2(0.0, name_y), ink, HORIZONTAL_ALIGNMENT_LEFT, words
 		)
-		if standing:
+		if not second.is_empty():
 			Style.write(
-				self, Text.WASH_WASHING, Style.TEXT_TINY,
+				self, second, Style.TEXT_TINY,
 				Vector2(0.0, box.position.y + 39.0), ink, HORIZONTAL_ALIGNMENT_LEFT, words
 			)
-		ShopSkin.draw_tag_on(self, tag_slot, price, Style.TEXT_BODY, can, hovered and can)
 
 	## A name that does not fit is cut with an ellipsis: `Style.write` has no clip box.
 	func _cut_to(text: String, size_px: int, room_wide: float) -> String:

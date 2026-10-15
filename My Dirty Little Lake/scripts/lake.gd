@@ -485,8 +485,8 @@ const SAVE_PATH := "user://my_dirty_little_lake.save"
 const SAVE_VERSION := 22
 
 ## The Small Bed. The house started with it until 2026-10-14; since then it is an early find
-## like the sofa (Richard: caught, not given), tier 1, dealt last (`_all_defs`) and washed for
-## its soap like any other. The name is kept: saves and tools know it by it.
+## like the sofa (Richard: caught, not given), tier 1, dealt last (`_all_defs`) and washed
+## like any other. The name is kept: saves and tools know it by it.
 const STARTER_BED := "decor_pk_bed"
 
 ## The one find that starts on the surface, by the island, so the first casts have a
@@ -648,9 +648,6 @@ var unwashed: Array[String] = []
 ## The wash room's hose, levels 1 to 3 (2026-10-01): wider and harder a level. Saved as
 ## `hose`; a save without it reads as 1.
 var hose_level := 1
-## Whether this run's first wash is still free (2026-10-14): set by a new game's arrival,
-## spent by the first find that comes clean. Saved as `free_wash`; absent reads as spent.
-var _free_wash := false
 
 ## What the player has put where, as `{piece, cell}` rows. Owned here rather than by the
 ## room so it saves with everything else.
@@ -915,9 +912,14 @@ const HINT_TEXT := {
 	&"meter": "CUE_METER",
 	# The demo's hive (2026-10-13, Richard): E at it says "Not in the demo", once a save.
 	&"hive_demo": "DEMO_LOCKED",
+	# The demo's goal (2026-10-15, `/grill-me` with Richard, a second player: "unsure what the
+	# goal right now is"): once the first upgrade is bought, at the Upgrades button.
+	&"demo_goal": "DEMO_GOAL",
+	# The demo's half-mended room, in the house the visit its play-in runs (2026-10-15).
+	&"demo_house": "DEMO_HOUSE",
 }
 const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter",
-	&"hive_demo"]
+	&"hive_demo", &"demo_goal", &"demo_house"]
 var _cues_seen: Dictionary = {}
 var _hints: Array[StringName] = []
 var _hint_up: StringName = &""
@@ -1066,6 +1068,9 @@ var _shop_tour_done: bool = true
 # where it had got to is the session's.
 enum DecorTour { OFF, HINT, PLANK, PLANK_WAIT, LIST, STAND, WASHING, SHELF, ROOM }
 var _decor_tour_done: bool = true
+## Whether the house's walk prompt has been learned (2026-10-15, `ShedRoom.walk_hint`). Saved
+## as `house_walk`; absent reads as done (the tours' rule), a new game sets it false.
+var _house_walk_done: bool = true
 var _decor_tour: int = DecorTour.OFF
 var _tour_card: TourCard
 ## Seconds before the hint goes up (the find-caught card first), and before a washed find
@@ -1597,6 +1602,11 @@ func _ready() -> void:
 	_room.close_asked.connect(_shut.bind(_set_shed))
 	_room.wash_asked.connect(_shed_to_wash)
 	_room.dog_petted.connect(_note_pet)
+	_room.walk_learned.connect(func() -> void: _house_walk_done = true)
+	# The demo's half step plays in: its card, ahead of anything else owed, up in the house.
+	_room.half_played.connect(func() -> void:
+		if not _cues_seen.has(&"demo_house") and not &"demo_house" in _hints:
+			_hints.push_front(&"demo_house"))
 	# The pad going away in the player's hands, and coming back (issue #33).
 	Pad.pad_lost.connect(_on_pad_lost)
 	Pad.pad_found.connect(_on_pad_found)
@@ -3063,10 +3073,10 @@ func _set_wash(open: bool) -> void:
 	# No shed sound: the pump is outdoors (2026-09-28).
 	_wash_open = open
 	_wash.waiting = unwashed
-	_wash.free.assign(unwashed if _free_wash else [])
 	if open and _decor_tour in [DecorTour.PLANK, DecorTour.PLANK_WAIT]:
 		_decor_tour = DecorTour.LIST
 	_wash.hose_level = hose_level
+	_wash.auto_next = true
 	_wash.open(open)
 	# The money and Waiting plates stay up over the wash room; the rest of the HUD does not.
 	_skin.plates_only = open
@@ -3105,8 +3115,6 @@ func _shed_to_wash() -> void:
 	_set_wash(true)
 
 
-## A find has come clean on the stand: the soap is paid for now, not when it was picked, and
-## the find goes on the shed's shelf. Saved on the spot, like everything else kept.
 ## The wash room's hose plank: the next level bought out of the purse, saved on the spot.
 func _on_hose_bought(level: int, cost: int) -> void:
 	if level <= hose_level or float(cost) > sludge:
@@ -3117,22 +3125,20 @@ func _on_hose_bought(level: int, cost: int) -> void:
 	save_game()
 
 
-func _on_find_washed(piece: StringName, soap: int) -> void:
+## A find has come clean on the stand: it goes on the shed's shelf. Washing is free
+## (2026-10-15). Saved on the spot, like everything else kept.
+func _on_find_washed(piece: StringName) -> void:
 	var name := String(piece)
 	if not unwashed.has(name):
 		return
 	unwashed.erase(name)
 	unlocked.append(name)
-	sludge = maxf(sludge - float(soap), 0.0)
-	# The run's free wash is spent; the rows still on the tray price themselves again.
-	if _free_wash:
-		_free_wash = false
-		if _wash != null:
-			_wash.free.clear()
-			_wash.queue_redraw()
 	if _decor_tour in [DecorTour.LIST, DecorTour.STAND, DecorTour.WASHING]:
 		_decor_tour = DecorTour.SHELF
 		_decor_tour_wait = DECOR_BACK_AFTER
+	# The tour walks the player back into the shed after its first wash: no next find then.
+	if _wash != null:
+		_wash.auto_next = _decor_tour != DecorTour.SHELF
 	if _room != null:
 		_room.unlocked = unlocked
 
@@ -3549,6 +3555,13 @@ func _set_shed(open: bool) -> void:
 		_room.decor = decor
 		_room.switch_tried = switch_tried
 		_room.carrying = &""
+		_room.walk_hint = not _house_walk_done
+		_room.walk_keys = [
+			Binds.label_of(Binds.bound(&"walk_up", "key")),
+			Binds.label_of(Binds.bound(&"walk_left", "key")),
+			Binds.label_of(Binds.bound(&"walk_down", "key")),
+			Binds.label_of(Binds.bound(&"walk_right", "key")),
+		]
 		_room.opened()
 		_room.queue_redraw()
 		# Only once there is something to show: a new house is empty since the bed became a
@@ -3579,11 +3592,14 @@ func _set_shed(open: bool) -> void:
 ## by another board opening over it, which is the only case that makes the closing sound.
 func _shut(close: Callable) -> void:
 	# The shed is left through its door, shut solid behind the player (2026-09-28).
-	if close == Callable(self, &"_set_shed") and _shed_open and _sfx != null:
+	var leaving_house := close == Callable(self, &"_set_shed") and _shed_open
+	if leaving_house and _sfx != null:
 		_sfx.play_door(false)
 	else:
 		Sfx.ui(&"ui_close")
 	close.call(false)
+	if leaving_house and _reveal_owed():
+		_begin_reveal()
 
 
 ## The bind board. It lies over the settings board that opened it, and closing it leaves
@@ -3956,10 +3972,8 @@ func _start_arrival() -> void:
 	_shop_tour_done = false
 	_first_buy_done = false
 	_decor_tour_done = false
+	_house_walk_done = false
 	_wildlife_seen = false
-	# The first find washed in a new game costs nothing, whichever it is (2026-10-14): the
-	# decoration tour teaches washing on it, and the bed that used to wash free is a catch now.
-	_free_wash = true
 	_arrive = Arrive.SAILING
 	_arrive_wait = ARRIVE_STEP_OFF
 	var hull := _boats[0]
@@ -4138,6 +4152,9 @@ func _begin_first_steps() -> bool:
 ## up. A card waits for its room — shut the shed on the second card and it is there again
 ## the next time the shed opens.
 func _decor_tour_step(delta: float) -> void:
+	# The door takes no E while the tour is walking the room (see `ShedRoom.door_off`).
+	if _room != null:
+		_room.door_off = not _decor_tour_done and _decor_tour >= DecorTour.PLANK
 	if _decor_tour_done or _decor_tour == DecorTour.OFF:
 		if _tour_card != null and _tour_card.visible:
 			_tour_card.show_card(Rect2())
@@ -4358,6 +4375,7 @@ func _set_letter(open: bool) -> void:
 		_letter.name = &"Letter"
 		_letter.set_anchors_preset(Control.PRESET_FULL_RECT)
 		_letter.close_asked.connect(_shut.bind(_set_letter))
+		_letter.start_asked.connect(_shut.bind(_set_letter))
 		_settings.get_parent().add_child(_letter)
 	if _letter == null:
 		return
@@ -4527,6 +4545,10 @@ var _in_menu: bool = false
 var _leaving: bool = false
 ## Seconds into the glide, or under zero when there is none.
 var _glide: float = -1.0
+## How long this glide runs, and whether it brings the HUD in: the menu's Continue does, the
+## house's reveal does not (it was never gone).
+var _glide_time: float = GLIDE_TIME
+var _glide_hud: bool = true
 var _glide_zoom_from: float = 1.0
 var _glide_zoom_to: float = 1.0
 ## Where the angler stood on the screen when the glide began, off the middle, in pixels.
@@ -4693,6 +4715,10 @@ func _begin_glide() -> void:
 	_release_world()
 	var stops := _zoom_stops()
 	_glide = 0.0
+	_glide_time = GLIDE_TIME
+	_glide_hud = true
+	# The house's reveal counts from where the session starts playing.
+	_reveal_from = 1.0 - pollution
 	_glide_zoom_from = _camera.zoom.x
 	_glide_zoom_to = stops[_nearest_stop(stops, VIEW_ZOOM)]
 	_glide_offset = (_watching() - _camera.position) * _glide_zoom_from
@@ -4710,21 +4736,60 @@ func _begin_glide() -> void:
 ## instead of swinging in on the curve a lerped position makes under a moving zoom.
 func _glide_step(delta: float) -> void:
 	_glide += delta
-	var t := clampf(_glide / GLIDE_TIME, 0.0, 1.0)
+	var t := clampf(_glide / _glide_time, 0.0, 1.0)
 	var eased := t * t * (3.0 - 2.0 * t)
 	var zoom := exp(lerpf(log(_glide_zoom_from), log(_glide_zoom_to), eased))
 	_camera.zoom = Vector2(zoom, zoom)
 	_camera.position = _clamped_view(_watching() - _glide_offset * (1.0 - eased) / zoom)
-	var hud := clampf((t - GLIDE_HUD_FROM) / (1.0 - GLIDE_HUD_FROM), 0.0, 1.0)
-	_skin.modulate.a = hud
-	_open_settings.modulate.a = hud
-	_free_camera.modulate.a = hud
+	if _glide_hud:
+		var hud := clampf((t - GLIDE_HUD_FROM) / (1.0 - GLIDE_HUD_FROM), 0.0, 1.0)
+		_skin.modulate.a = hud
+		_open_settings.modulate.a = hud
+		_free_camera.modulate.a = hud
 	if t < 1.0:
 		return
 	_glide = -1.0
 	_view_zoom = _glide_zoom_to
 	_push_zoom()
 	_hold_the_angler()
+
+
+## **Leaving the house shows how far the lake has come** (2026-10-15, `/grill-me` with
+## Richard, a second player: zoomed out by accident at the end, "pretty cool to see the
+## progress"). Stepping out of the house, the view starts at the far stop and glides in to the
+## player's zoom over `REVEAL_TIME`, but only when the meter has moved `REVEAL_STEP` (the
+## demo's own, smaller, since it cleans about a tenth) since the last reveal, or since the
+## session began. Not saved. First guesses.
+const REVEAL_TIME := 1.4
+const REVEAL_STEP := 0.05
+const REVEAL_STEP_DEMO := 0.02
+var _reveal_from := -1.0
+
+
+func _reveal_owed() -> bool:
+	var cleaned := 1.0 - pollution
+	if _reveal_from < 0.0:
+		_reveal_from = cleaned
+	return cleaned - _reveal_from >= (REVEAL_STEP_DEMO if Demo.on() else REVEAL_STEP)
+
+
+func _begin_reveal() -> void:
+	if _in_menu or _glide >= 0.0 or _moment >= 0.0 or _free_view or _farewell != null:
+		return
+	_reveal_from = 1.0 - pollution
+	var stops := _zoom_stops()
+	var from := stops[0]
+	_glide_zoom_to = stops[_nearest_stop(stops, _view_zoom)]
+	if from >= _glide_zoom_to - 0.001:
+		return
+	_camera.zoom = Vector2(from, from)
+	_camera.position = _clamped_view(_watching())
+	_glide = 0.0
+	_glide_time = REVEAL_TIME
+	_glide_hud = false
+	_glide_zoom_from = from
+	_glide_offset = (_watching() - _camera.position) * from
+	_angler.can_walk = false
 
 
 ## This lake is thrown away for another, behind the loading screen: a fresh run over this
@@ -6125,6 +6190,16 @@ func _hint_held() -> bool:
 	)
 
 
+## The house's own card is shown in the house, which holds every other hint back.
+func _hint_held_for(kind: StringName) -> bool:
+	if kind != &"demo_house":
+		return _hint_held()
+	return (
+		not _shed_open or _settings_open or _menu_open or _controls_open or _fronted()
+		or _farewell != null
+	)
+
+
 ## One frame of the hints: the ferry's watch, then the one up (moved to its target, timed,
 ## hidden while something holds it), or the next owed one put up.
 func _hint_step(delta: float) -> void:
@@ -6133,17 +6208,20 @@ func _hint_step(delta: float) -> void:
 	# water; it waits behind the first steps' note like any hint.
 	if pollution < 0.9999 and not _cues_seen.has(&"meter"):
 		_owe_hint(&"meter")
+	if Demo.on() and _first_buy_done and not _farewell_shown and not _cues_seen.has(&"demo_goal"):
+		_owe_hint(&"demo_goal")
 	if _hint_up == &"" and _hints.is_empty():
 		return
 	if _settings == null:
 		return
+	var next: StringName = _hint_up if _hint_up != &"" else _hints[0]
 	if _hint_card == null:
 		_hint_card = CueCard.new()
 		_hint_card.name = &"HintCard"
 		_settings.get_parent().add_child(_hint_card)
 		_hint_card.closed.connect(_end_hint.bind(true))
 	_settings.get_parent().move_child(_hint_card, _settings.get_parent().get_child_count() - 1)
-	var held := _hint_held()
+	var held := _hint_held_for(next)
 	if _hint_up == &"":
 		# The last one's fade is let finish before the next comes in.
 		if held or _hint_card.age() >= 0.0:
@@ -6184,6 +6262,13 @@ func _hint_target(kind: StringName) -> Rect2:
 			return _skin.get_global_transform() * _skin.stock_box()
 		&"meter":
 			return _skin.get_global_transform() * _skin.meter_box()
+		&"demo_goal":
+			return _skin.get_global_transform() * _skin.upgrades_box()
+		&"demo_house":
+			if _room == null:
+				return Rect2()
+			var room := _room.get_global_transform() * _room.room_box()
+			return Rect2(room.get_center() - Vector2(20.0, room.size.y * 0.3), Vector2(40.0, 40.0))
 		&"hive_demo":
 			if _hive == null:
 				return Rect2()
@@ -6295,7 +6380,10 @@ func _on_net_landed_heavy(at: Vector2) -> void:
 		_heavy_level = net_strength_level
 		_heavy_landings = 0
 	_heavy_landings += 1
-	if _heavy_landings < HEAVY_NOTE_FROM or _settings == null:
+	# At the demo's Strength cap the line says so from the first landing: there is no more
+	# Strength to buy, and the heavy pieces are the full game's (2026-10-15).
+	var capped := Demo.on() and net_strength_level >= _level_cap(&"net_strength")
+	if (_heavy_landings < HEAVY_NOTE_FROM and not capped) or _settings == null:
 		return
 	if _heavy_note == null:
 		_heavy_note = HeavyNote.new()
@@ -6303,6 +6391,7 @@ func _on_net_landed_heavy(at: Vector2) -> void:
 		var hud := _settings.get_parent()
 		hud.add_child(_heavy_note)
 		hud.move_child(_heavy_note, 0)
+	_heavy_note.words = Text.DEMO_LOCKED if capped else Text.NEED_STRENGTH
 	_heavy_note.show_at(at)
 
 
@@ -7096,6 +7185,14 @@ func _demo_step(held: bool) -> void:
 
 
 ## Whether every track is at the demo's cap.
+## How many levels the demo still sells, every track's cap less its level.
+func _demo_levels_left() -> int:
+	var left := 0
+	for what: StringName in TRACKS:
+		left += maxi(_level_cap(what) - _level_of(what), 0)
+	return left
+
+
 func demo_bought_out() -> bool:
 	for what: StringName in TRACKS:
 		if not is_maxed(what):
@@ -7533,6 +7630,11 @@ const LAST_PIECES_FROM := 50
 
 
 func _last_pieces_line() -> String:
+	# The demo's line says how many upgrades are left to finish it, once the goal's card has
+	# been up (2026-10-15). It never reaches the last fifty pieces.
+	if Demo.on() and _cues_seen.has(&"demo_goal") and not _farewell_shown:
+		var left := _demo_levels_left()
+		return Text.DEMO_LEFT % left if left > 0 else ""
 	if _cleaned or _left_over <= 0 or _left_over > LAST_PIECES_FROM:
 		return ""
 	if _left_over == 1:
@@ -7608,6 +7710,7 @@ func save_game() -> bool:
 		"first_steps": _steps_done,
 		"shop_tour": _shop_tour_done,
 		"decor_tour": _decor_tour_done,
+		"house_walk": _house_walk_done,
 		"wildlife_seen": _wildlife_seen,
 		"camera_tip": _camera_tip_seen,
 		"first_buy": _first_buy_done,
@@ -7623,12 +7726,14 @@ func save_game() -> bool:
 		"unlocked": unlocked,
 		"unwashed": unwashed,
 		"hose": hose_level,
-		"free_wash": _free_wash,
 		"decor": decor,
 		# The house's stage and the last one seen inside (2026-10-11). Absent: worked out
 		# off the meter on the way in, and seen, so an older run plays no stage-up.
 		"house": house_stage,
 		"house_seen": _room.house_seen if _room != null else house_stage,
+		# The demo's half step (2026-10-15). Absent: not earned, and nothing to see.
+		"house_half": house_half,
+		"house_half_seen": _room.half_seen if _room != null else true,
 		"switch_tried": switch_tried,
 		"petted": petted,
 		"afloat": afloat,
@@ -7758,7 +7863,6 @@ func load_game() -> bool:
 	unwashed.clear()
 	# The wash room's hose (2026-10-01). Absent reads as the hose the pump came with.
 	hose_level = clampi(int(save.get("hose", 1)), 1, WashRoom.HOSE_MOST)
-	_free_wash = bool(save.get("free_wash", false))
 	for name: String in save.get("unwashed", []) as Array:
 		if _pretty(name).is_empty():
 			continue
@@ -7824,6 +7928,7 @@ func load_game() -> bool:
 	_steps_done = bool(save.get("first_steps", true))
 	_shop_tour_done = bool(save.get("shop_tour", true))
 	_decor_tour_done = bool(save.get("decor_tour", true))
+	_house_walk_done = bool(save.get("house_walk", true))
 	# Absent means seen, the tours' rule: an older save is past its first animal, or near
 	# enough, and a load would otherwise fire the moment the stock refills the lake.
 	_wildlife_seen = bool(save.get("wildlife_seen", true))
@@ -7895,9 +8000,11 @@ func load_game() -> bool:
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 	# The house's stage (2026-10-11), off the meter just worked out when the file has none.
 	house_stage = maxi(int(save.get("house", shed_stage_for(1.0 - pollution) + 1)), 1)
+	house_half = bool(save.get("house_half", false))
 	_latch_house()
 	if _room != null:
 		_room.house_seen = clampi(int(save.get("house_seen", house_stage)), 1, house_stage)
+		_room.half_seen = bool(save.get("house_half_seen", true))
 	_settle_house()
 	_camera.position = Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	_load_extra(save)
@@ -8207,11 +8314,25 @@ func house_inside() -> int:
 	return _inside_pin if _inside_pin >= 1 else maxi(house_stage, 1)
 
 
+## **The demo's half step** (2026-10-15, `/grill-me` with Richard: "tease the player with some
+## fixings ... saying 'as you clean the lake, your house will fix itself'"): in the demo the
+## room inside mends a little at `DEMO_HALF_AT` cleaned (`HouseInside.half`; the hut outside
+## stays as it is). Latched and saved as `house_half`; the play-in comes the next time the
+## door opens, with the card `DEMO_HOUSE`. A first guess.
+const DEMO_HALF_AT := 0.05
+var house_half := false
+
+
 ## The latch: the meter's stage, if it is past the one held. Pushed to the room.
 func _latch_house() -> void:
 	var earned := shed_stage_for(1.0 - pollution) + 1
 	if earned > house_stage:
 		house_stage = earned
+	if Demo.on() and not house_half and 1.0 - pollution >= DEMO_HALF_AT:
+		house_half = true
+		if _room != null:
+			_room.half_seen = false
+	HouseInside.half = house_half and Demo.on()
 	if _room != null and _room.house_stage != house_inside():
 		_room.house_stage = house_inside()
 
@@ -8231,6 +8352,10 @@ func _settle_house() -> void:
 		if not _room.sheets.on_wall(piece) and HouseInside.base_blocked(
 			stage, _room.base_rect(piece, cell, view)
 		):
+			continue
+		# Bases may not overlap (2026-10-15): of two that cross, the one put down later goes
+		# back to the shelf.
+		if _room.overlap_at(piece, cell, view, -1, kept) >= 0:
 			continue
 		kept.append(row)
 	if kept.size() != decor.size():

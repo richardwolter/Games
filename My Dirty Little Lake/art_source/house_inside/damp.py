@@ -351,6 +351,9 @@ PUDDLES = {
     "p2": ("open", 23, (8, 1), 3.3, -0.16),   # beside the boots: the fall clears the angler's figure
     "p3": ("shade", 37, (2, 0), 2.2, 0.75),   # a bead swelling at the ceiling
 }
+# The demo's half-mended room (tools/build_house_inside.py --half, 2026-10-15) boards h4 over:
+# no flue drip falls into it.
+NO_FLUE = False
 FLUE = ((221, 101), 3.8, -0.28)               # h4's ash-mud left of the joist and the seedling (rel), period, offset
 ASH = [(56, 50, 40), (70, 66, 58), (82, 78, 71)]   # the ash-mud's own steps (floor.py's h4)
 
@@ -1703,7 +1706,7 @@ def _drip_points(ctx, stage, pud):
         if at not in pts and pts:
             at = min(pts, key=lambda p: (p[0] - at[0]) ** 2 + (p[1] - at[1]) ** 2)
         out.append((pid, at, period, offset, seed, pts, "water"))
-    if stage == 1:
+    if stage == 1 and not NO_FLUE:
         (fx, fy), period, offset = FLUE
         out.append(("flue", rel(fx, fy), period, offset, 55, set(), "mud"))
     return out

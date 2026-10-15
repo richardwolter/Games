@@ -81,6 +81,12 @@ const THEMES := {
 		"ink": Color(0.32, 0.17, 0.0), "icon": &"coin", "entrance": &"hop"},
 	&"meter": {"band": Color(0.50, 0.46, 0.18), "mark": Color(0.80, 0.86, 0.40),
 		"ink": Color(0.18, 0.32, 0.02), "icon": &"meter", "entrance": &"rise"},
+	# The demo's half-mended house (2026-10-15): the wildlife's green, things growing back.
+	&"demo_house": {"band": Color(0.30, 0.50, 0.30), "mark": Color(0.72, 0.88, 0.48),
+		"ink": Color(0.10, 0.26, 0.04), "icon": &"sprout", "entrance": &"sprout"},
+	# The demo's goal (2026-10-15): the coin's gold, the shop's own colour.
+	&"demo_goal": {"band": Color(0.72, 0.52, 0.10), "mark": Color(1.0, 0.84, 0.28),
+		"ink": Color(0.33, 0.19, 0.0), "icon": &"coin", "entrance": &"pop"},
 	&"ferry": {"band": Color(0.22, 0.48, 0.62), "mark": Color(0.60, 0.82, 0.94),
 		"ink": Color(0.02, 0.21, 0.34), "icon": &"boat", "entrance": &"sail"},
 }

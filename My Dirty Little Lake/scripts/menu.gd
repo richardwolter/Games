@@ -192,6 +192,7 @@ func _ready() -> void:
 	_letter.name = &"Letter"
 	_letter.visible = false
 	_letter.close_asked.connect(_shut.bind(_show_letter))
+	_letter.start_asked.connect(_start_from_letter)
 	add_child(_letter)
 
 	_languages = LanguageBoard.new()
@@ -396,6 +397,13 @@ func _show_controls(open: bool) -> void:
 ## The same board the letter on the shed door opens, for the harness to ask.
 func letter() -> Letter:
 	return _letter
+
+
+## "Start cleaning" on How to play's last card: the letter goes and the game starts, the
+## run behind the menu if there is one, a new one if not (what Continue and New game do).
+func _start_from_letter() -> void:
+	_show_letter(false)
+	_play()
 
 
 func _show_letter(open: bool) -> void:

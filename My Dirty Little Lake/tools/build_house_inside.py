@@ -57,11 +57,27 @@ GRID_ORIGIN = (84, 84)
 REGION = (64, 24, 368, 328)          # x, y, w, h on the 640x360 grid
 
 
+# The demo's half step (2026-10-15, `/grill-me` with Richard: "tease the player with some
+# fixings"): stage 1 with the stove's ghost (h4) and the tented boards (b3) boarded over and
+# the fresh leak (p2) dried. Run with --half: it renders stage 1 with those three left out of
+# the layout and the flue's drip off, and lays stage 2's own pixels over MENDED (floor-rel
+# rects: f4's and f7's fresh boards, the mushrooms at b3's foot, p2's ring), so what is mended
+# is exactly what stage 2 mends. Sets: s1h, s1hr (in a shower), u1h (the play-in, stage 2's
+# own stage-up inside the mask). Appended to an existing house.json; the other sets untouched.
+HALF_DROP = ("h4", "b3", "p2")
+HALF_SETS = ("s1h", "s1hr", "u1h")
+DROP_IDS: tuple = ()
+
+
 class BakeCtx(base.Ctx):
     """The room with nobody and nothing in it: what is drawn must not depend on the furniture."""
 
     def __init__(self, stage, rain=0.0, t=0.0):
         super().__init__(stage, rain)
+        if DROP_IDS:
+            for f in self.layout.get("features", []):
+                if f["id"] in DROP_IDS:
+                    f["stages"] = [s for s in f.get("stages", []) if s != 1]
         self.pieces = []
         self.dogs = []
         self.player = (-999.0, -999.0)
@@ -193,7 +209,96 @@ def blocks():
     return out
 
 
+def _clear_caches():
+    """The modules' own per-stage caches, so a stage drawn off another layout is drawn again."""
+    for m in (damp, life, veg):
+        for name, value in list(vars(m).items()):
+            if name.startswith("_") and not name.startswith("__") and isinstance(value, dict):
+                value.clear()
+
+
+def _mended_mask():
+    """MENDED on the bake region's grid: a (h, w) bool array."""
+    lay = base.load_layout()
+    feat = {f["id"]: f for f in lay["features"]}
+    rects = []
+    for fid in ("f4", "f7"):
+        rects += feat[fid]["boards"]
+    rects.append(feat["m3"]["rect"])
+    rects.append(feat["s2"]["rect"])
+    x0, y0, w, h = REGION
+    m = np.zeros((h, w), bool)
+    for rx, ry, rw, rh in rects:
+        ax = rx + GRID_ORIGIN[0] - x0
+        ay = ry + GRID_ORIGIN[1] - y0
+        m[max(0, ay):ay + rh, max(0, ax):ax + rw] = True
+    return m
+
+
+def _half_blocks(full: dict) -> dict:
+    """Stage 1's blocks less what the half step mends."""
+    lay = base.load_layout()
+    feat = {f["id"]: f for f in lay["features"]}
+    gone = [list(r) for fid in ("h4", "b3") for r in feat[fid]["block"]]
+    cx, cy = feat["p2"]["center"]
+    w, h = feat["p2"]["size"]
+    dry = [cx - w // 2, cy - h // 2, w, h]
+    return {
+        "walk": [r for r in full["1"]["walk"] if r not in gone],
+        "place": [r for r in full["1"]["place"] if r != dry],
+    }
+
+
+def half():
+    """Bake the demo's half step and add it to house.json."""
+    global DROP_IDS
+    data = json.loads((OUT / "house.json").read_text(encoding="utf-8"))
+    _watch_splash()
+    mask = _mended_mask()
+    n = int(LOOP_TRY * FPS)
+    m = int(UP_SECONDS * FPS)
+    # Stage 2 and its stage-up first, off the layout as it is: only the masked pixels kept.
+    _clear_caches()
+    s2_under = []
+    for i in range(n):
+        u, _o = render(2, i / FPS)
+        s2_under.append(u[mask])
+    up_under = []
+    for i in range(m):
+        u, _o = render(2, i / FPS, 0.0, (1, min(1.0, i / (2.0 * FPS))))
+        up_under.append(u[mask])
+    # Stage 1 off the halved layout.
+    _clear_caches()
+    DROP_IDS = HALF_DROP
+    damp.NO_FLUE = True
+    try:
+        for name, rain in (("s1h", 0.0), ("s1hr", 1.0)):
+            U, O, L = frames_of(1, n, rain)
+            for i in range(n):
+                U[i][mask] = s2_under[i]
+            k, d = seam(U, O)
+            print(f"{name}: seam at {k / FPS:.2f} s, {d} px off the first frame")
+            data["sets"][name] = pack(name, U[:k], O[:k], L[:k], True)
+            if name == "s1h":
+                Uu, Ou, Lu = U[:m], O[:m], L[:m]
+                for i in range(m):
+                    Uu[i] = Uu[i].copy()
+                    Uu[i][mask] = up_under[i]
+                data["sets"]["u1h"] = pack("u1h", Uu, Ou, Lu, False)
+            del U, O, L
+    finally:
+        DROP_IDS = ()
+        damp.NO_FLUE = False
+        _clear_caches()
+    data["blocks"]["1h"] = _half_blocks(data["blocks"])
+    (OUT / "house.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+    print("wrote the half step into", OUT / "house.json")
+
+
 def main():
+    if "--half" in sys.argv:
+        half()
+        return
     OUT.mkdir(parents=True, exist_ok=True)
     _watch_splash()
     sets = {}

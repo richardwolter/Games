@@ -391,6 +391,7 @@ func _stage_build() -> void:
 	_check_cues()
 	_check_end_fixes()
 	_check_oct11_fixes()
+	_check_oct15_notes()
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
@@ -3926,7 +3927,7 @@ func _stage_shed() -> void:
 	# Landing one is what keeps it, and it must not reach the pile or a merchant.
 	#
 	# Kept at the pump, not on the shelf (issue #37): a find is washed before the shed will
-	# have it, and the soap is paid for when it comes clean.
+	# have it. Washing is free (2026-10-15).
 	var unlocked: Array = _main.get(&"unlocked")
 	var unwashed: Array = _main.get(&"unwashed")
 	unlocked.clear()
@@ -3940,16 +3941,15 @@ func _stage_shed() -> void:
 		"%d on the shelf" % unlocked.size())
 	var purse_was: float = _main.get(&"sludge")
 	_main.set(&"sludge", 40.0)
-	_main.call(&"_on_find_washed", StringName(find.piece), 15)
+	_main.call(&"_on_find_washed", StringName(find.piece))
 	_check(unwashed.is_empty() and unlocked.size() == 1
 		and String(unlocked[0]) == String(find.piece),
 		"washed, it goes on the shelf and leaves the pump",
 		"%d waiting, %d on the shelf" % [unwashed.size(), unlocked.size()])
-	_check(is_equal_approx(float(_main.get(&"sludge")), 25.0),
-		"and the soap is paid for when it comes clean", "%.0f left of 40" % float(_main.get(&"sludge")))
-	_main.call(&"_on_find_washed", StringName(find.piece), 15)
-	_check(unlocked.size() == 1 and is_equal_approx(float(_main.get(&"sludge")), 25.0),
-		"a find that is not waiting cannot be washed twice", "")
+	_check(is_equal_approx(float(_main.get(&"sludge")), 40.0),
+		"and washing costs nothing (2026-10-15)", "%.0f left of 40" % float(_main.get(&"sludge")))
+	_main.call(&"_on_find_washed", StringName(find.piece))
+	_check(unlocked.size() == 1, "a find that is not waiting cannot be washed twice", "")
 	_main.set(&"sludge", purse_was)
 	_check(_yard.held.is_empty(), "a find never joins the pile to be sold",
 		"%d in the yard" % _yard.held.size())
@@ -3980,7 +3980,7 @@ func _stage_shed() -> void:
 		_main.call(&"_on_net_landed", PackedInt32Array([one_index]))
 		var kept_once := (unlocked + unwashed).count(one)
 		while unwashed.has(one):
-			_main.call(&"_on_find_washed", StringName(one), 0)
+			_main.call(&"_on_find_washed", StringName(one))
 		_check(kept_once == 1, "every find is unique: netted twice, it is kept once",
 			"%s: %d kept" % [one, kept_once])
 	else:
@@ -3996,14 +3996,14 @@ func _stage_shed() -> void:
 			_main.call(&"_on_net_landed", PackedInt32Array([many_index]))
 		# Two of them washed and two still waiting: a copy is a copy on either list.
 		for wash in 2:
-			_main.call(&"_on_find_washed", StringName(many), 0)
+			_main.call(&"_on_find_washed", StringName(many))
 		_main.call(&"_on_net_landed", PackedInt32Array([many_index]))
 		var held := 0
 		for kept: String in unlocked + unwashed:
 			if kept == many:
 				held += 1
 		while unwashed.has(many):
-			_main.call(&"_on_find_washed", StringName(many), 0)
+			_main.call(&"_on_find_washed", StringName(many))
 		_check(held == wanted, "a find that comes in fours is kept four times and no more",
 			"%s: %d kept of %d" % [many, held, wanted])
 
@@ -4022,7 +4022,7 @@ func _stage_shed() -> void:
 		unlocked.clear()
 		unwashed.clear()
 		_main.call(&"_on_net_landed", PackedInt32Array([find_index]))
-		_main.call(&"_on_find_washed", StringName(find.piece), 0)
+		_main.call(&"_on_find_washed", StringName(find.piece))
 
 	# The room.
 	var inside := Vector2i(2, 2)
@@ -8294,6 +8294,11 @@ func _stage_rain() -> void:
 	_check(Weather.MOST == 5, "five showers a run at most", str(Weather.MOST))
 	var money_was: float = _main.sludge
 	var pollution_was: float = _main.pollution
+	# A tornado's storm earlier in the run lingers (`STORM_LINGER`): start this from dry.
+	weather.clear_storm(false)
+	weather.set(&"_rain", 0.0)
+	weather._process(0.0)
+	day._process(0.0)
 	var tint_was := day.tint
 	weather.showers = 0
 	weather.pour(30.0)
@@ -10540,8 +10545,8 @@ func _check_bonus_panel() -> void:
 
 
 ## The pump beside the hut and the wash room it opens (issue #37): a find waits at the pump,
-## is picked off a tray if the purse covers its soap, is washed on the stand, and only then
-## reaches the shed — paid for when it comes clean, and not at all if the player walks away.
+## is picked off a tray, is washed on the stand, and only then reaches the shed. Free since
+## 2026-10-15; a find washed part way keeps its wash for the session.
 ## The shelf's wash plank (2026-09-22): shown only while a find waits at the pump, right
 ## after the last row and scrolling with them, alone under the empty line, pulsing the
 ## first time the shelf opens with more waiting, and swapping the shed for the wash room.
@@ -10931,12 +10936,11 @@ func _stage_wash() -> void:
 	var tray_rows := room.row_boxes()
 	_check(tray_rows.size() == 1 and tray_face.encloses(tray_rows[0].grow(1.0)),
 		"a single find on the tray stands inside its face", "%s in %s" % [tray_rows, tray_face])
-	# A tray row wears the shelf's plate and the shop's price tag (2026-10-09).
-	_check(tray_rows[0].encloses(WashRoom.price_slot(tray_rows[0])),
-		"the tray row's price tag stands inside its row", str(WashRoom.price_slot(tray_rows[0])))
+	# A tray row wears the shelf's plate, and no price since washing is free (2026-10-15).
 	var wash_src := FileAccess.get_file_as_string("res://scripts/wash_room.gd")
-	_check(not wash_src.contains("draw_rect(box, face)") and wash_src.contains("ShopSkin.draw_tag_on(self, tag_slot"),
-		"the tray rows are plates with the shop's tag, not flat boxes", "")
+	_check(not wash_src.contains("draw_rect(box, face)") and not wash_src.contains("soap_of")
+		and not wash_src.contains("can_afford"),
+		"the tray rows are plates with no soap price, not flat boxes", "")
 	# What is behind the stand: the view from the pump, its water the lake's own.
 	var back := room.backdrop()
 	_check(back != null and back.is_painted() and back.get_index() < room.stand().get_index()
@@ -11057,21 +11061,10 @@ func _stage_wash() -> void:
 	_check(WashStand.HISS_OFF_PIECE - WashStand.HISS_ON_PIECE < 0.15
 		and WashStand.HISS_ON_PIECE < 1.0 and WashStand.HISS_OFF_PIECE > 1.0,
 		"duller on the piece and brighter off it, narrowly", "")
-	var soap := room.soap_of(StringName(find))
-	var prices := {}
-	for name: String in sheets.names:
-		# Only a new game's first wash is free (`_free_wash`), and a borrowed lake has spent it.
-		if WashRoom.is_find(sheets, name):
-			prices[room.soap_of(StringName(name))] = true
-	_check(room.free.is_empty() and room.soap_of(StringName(Lake.STARTER_BED)) > 0,
-		"the Small Bed pays its soap like any find (2026-10-14)", "")
-	_check(prices.size() == 3 and prices.has(5) and prices.has(10) and prices.has(15),
-		"soap is 5, 10 or 15, and the catalogue has finds at all three", str(prices.keys()))
-	_check(not room.pick(StringName(find)) and room.on_stand() == &"",
-		"a purse that cannot cover the soap leaves the find on the tray", "")
-	_main.set(&"sludge", 100.0)
+	# Washing is free (2026-10-15): an empty purse still puts a find on the stand.
 	_check(room.pick(StringName(find)) and room.on_stand() == StringName(find),
-		"one that can puts it on the stand", "")
+		"an empty purse still puts a find on the stand: washing is free", "")
+	_main.set(&"sludge", 100.0)
 	_check(is_equal_approx(float(_main.get(&"sludge")), 100.0), "and nothing is charged for picking", "")
 
 	# Walked away from half washed: back on the tray, unpaid for.
@@ -11132,7 +11125,7 @@ func _stage_wash() -> void:
 
 	# Washed right through.
 	room.pick(StringName(find))
-	_check(is_zero_approx(stand.share_clean()), "picked again it wears its whole coat again",
+	_check(stand.share_clean() > 0.0, "picked again it comes back as it was left (2026-10-15)",
 		"%.2f clean" % stand.share_clean())
 	var passes := 0
 	while stand.state == WashStand.State.WASHING and passes < 4000:
@@ -11148,8 +11141,8 @@ func _stage_wash() -> void:
 		stand.call(&"_process", 0.05)
 	_check(unlocked.has(find) and not unwashed.has(find),
 		"clean, it is on the shed's shelf and off the tray", "")
-	_check(is_equal_approx(float(_main.get(&"sludge")), 100.0 - float(soap)),
-		"and the soap was charged then, once", "%.0f left, soap %d" % [float(_main.get(&"sludge")), soap])
+	_check(is_equal_approx(float(_main.get(&"sludge")), 100.0),
+		"and nothing was charged", "%.0f left" % float(_main.get(&"sludge")))
 
 	# Saved as a name, read back as one.
 	unwashed.append(find)
@@ -11160,6 +11153,7 @@ func _stage_wash() -> void:
 	_check(unwashed.size() == 1 and String(unwashed[0]) == find, "still waiting",
 		str(unwashed))
 
+	_check_wash_notes(room)
 	_main.call(&"_set_wash", false)
 	_check_wash_plank()
 	_check_upgrades_pulse()
@@ -11609,7 +11603,6 @@ func _stage_first_steps() -> void:
 		"an empty house opened starts no tour", str(_main.get(&"_decor_tour")))
 	_main.call(&"_set_shed", false)
 	(_main.get(&"unwashed") as Array).append(bed)
-	_main.set(&"_free_wash", true)
 	_main.set(&"_decor_tour", Lake.DecorTour.HINT)
 	_main.call(&"_set_shed", true)
 	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.PLANK,
@@ -11621,12 +11614,10 @@ func _stage_first_steps() -> void:
 	_main.call(&"_decor_tour_next")
 	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.WASHING, "then the stand's, then the washing", "")
 	var washer: WashRoom = _main.get(&"_wash")
-	_check(washer.soap_of(StringName(bed)) == 0, "a new game's first wash is free, whatever the find", "")
 	var purse: float = _main.get(&"sludge")
-	_main.call(&"_on_find_washed", StringName(bed), 0)
-	_check(is_equal_approx(float(_main.get(&"sludge")), purse), "the first wash cost nothing", "")
-	_check(not bool(_main.get(&"_free_wash")) and washer.free.is_empty()
-		and washer.soap_of(StringName(bed)) > 0, "and the next one pays", "")
+	_main.call(&"_on_find_washed", StringName(bed))
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse), "the wash cost nothing", "")
+	_check(not washer.auto_next, "the tour's walk back to the shed puts no next find on the stand", "")
 	_main.call(&"_decor_tour_step", Lake.DECOR_BACK_AFTER + 0.1)
 	_check(bool(_main.get(&"_shed_open")) and not bool(_main.get(&"_wash_open"))
 		and int(_main.get(&"_decor_tour")) == Lake.DecorTour.SHELF,
@@ -13623,3 +13614,207 @@ func _check_crowds(sound: Sfx) -> void:
 		"and the next frog is rolled on the crowded gap", "%.2f s" % wait)
 	sound.set_crowd(&"frog", 0)
 	sound._next_due.erase(&"frog")
+
+
+## A second demo player's notes (2026-10-15): a find washed part way keeps its wash, a click on
+## the find on the stand does nothing, the next find comes on by itself, and the last grime is
+## pointed at.
+func _check_wash_notes(room: WashRoom) -> void:
+	var unwashed: Array = _main.get(&"unwashed")
+	var kept := unwashed.duplicate()
+	var finds: Array[String] = []
+	for name: String in room.sheets.names:
+		if WashRoom.is_find(room.sheets, name):
+			finds.append(name)
+			if finds.size() == 2:
+				break
+	unwashed.clear()
+	unwashed.append_array(finds)
+	var a := StringName(finds[0])
+	var b := StringName(finds[1])
+	var stand := room.stand()
+	room.pick(a)
+	var box := stand.piece_box()
+	for k in 12:
+		stand.spray(box.get_center(), true)
+		stand.call(&"_process", 0.05)
+	stand.spray(box.get_center(), false)
+	var part := stand.share_clean()
+	_check(part > 0.0 and part < 0.9, "a find can be washed part way", "%.3f" % part)
+	room.pick(a)
+	_check(is_equal_approx(stand.share_clean(), part),
+		"a click on the find on the stand does nothing (it used to put the coat back)",
+		"%.3f then %.3f" % [part, stand.share_clean()])
+	room.pick(b)
+	_check(is_equal_approx(stand.kept_share(a), part), "picking another keeps the first one's wash",
+		"%.3f" % stand.kept_share(a))
+	room.pick(a)
+	_check(is_equal_approx(stand.share_clean(), part), "and it comes back as it was left",
+		"%.3f" % stand.share_clean())
+	stand.set(&"_left", float(stand.get(&"_total")) * 0.02)
+	stand.call(&"_drive_last", 1.0)
+	_check(stand.pointing_at_last() > 0, "the last grime is pointed at near the end",
+		str(stand.pointing_at_last()))
+	unwashed.erase(String(a))
+	room.auto_next = true
+	stand.state = WashStand.State.CLEAN
+	room._process(0.016)
+	_check(room.on_stand() == b, "a find coming clean puts the next one on the stand by itself",
+		String(room.on_stand()))
+	room.open(true)
+	unwashed.clear()
+	unwashed.append_array(kept)
+
+
+func _check_oct15_notes() -> void:
+	var room: ShedRoom = _main.get(&"_room")
+	# The door takes no E while the decoration tour is up.
+	room.door_off = true
+	_check(room.door_gap() == INF, "the door is no E target while the tour is up", "")
+	room.door_off = false
+	# The far ferries step in their own lane's pixels.
+	var backdrop_src := FileAccess.get_file_as_string("res://scripts/wash_backdrop.gd")
+	_check(backdrop_src.contains("snappedf(hull.x, grain)") and not backdrop_src.contains("snappedf(hull.x, PIXEL)"),
+		"a ferry behind the stand steps in its lane's own pixels", "")
+	# The demo at its Strength cap says so from the first heavy landing.
+	var level: int = _main.get(&"net_strength_level")
+	Demo.forced = true
+	_main.set(&"net_strength_level", int(_main.call(&"_level_cap", &"net_strength")))
+	_main.set(&"_heavy_landings", 0)
+	_main.set(&"_heavy_level", -1)
+	_main.call(&"_on_net_landed_heavy", Vector2.ZERO)
+	var note: HeavyNote = _main.get(&"_heavy_note")
+	_check(note != null and note.showing() and note.words == Text.DEMO_LOCKED,
+		"the demo's capped net says Not in the demo, on the first landing", "")
+	# The demo's goal: the count of levels left on the meter's line, once its card was up.
+	var cues: Dictionary = _main.get(&"_cues_seen")
+	var had_goal := cues.has(&"demo_goal")
+	cues[&"demo_goal"] = true
+	var left: int = _main.call(&"_demo_levels_left")
+	_check(left > 0 and String(_main.call(&"_last_pieces_line")) == Text.DEMO_LEFT % left,
+		"the demo's line says how many upgrades are left", "%d" % left)
+	if not had_goal:
+		cues.erase(&"demo_goal")
+	Demo.forced = false
+	_main.set(&"net_strength_level", level)
+	_main.set(&"_heavy_level", -1)
+	# The demo's ending shows its doors as the credits start.
+	var farewell := Farewell.new()
+	farewell.wishlist = true
+	farewell.roll_credits()
+	var demo_doors := farewell.doors_up()
+	farewell.wishlist = false
+	_check(demo_doors and not farewell.doors_up(),
+		"the demo's doors are up from the roll's start, the full game's wait", "")
+	farewell.free()
+	# The rain lingers after a tornado.
+	var weather := Weather.new()
+	weather.storm(200.0)
+	weather.clear_storm()
+	_check(is_equal_approx(float(weather.get(&"_left")), Weather.STORM_LINGER),
+		"the rain falls on after a tornado's storm", str(weather.get(&"_left")))
+	weather.free()
+	# Fresh settings: Master full, the rest at half.
+	var prefs_src := FileAccess.get_file_as_string("res://scripts/prefs.gd")
+	_check(prefs_src.contains("var master_level: float = 1.0") and prefs_src.contains("var music_level: float = 0.5")
+		and prefs_src.contains("var sfx_level: float = 0.5") and prefs_src.contains("var ambience_level: float = 0.5"),
+		"a fresh install starts Master full and the rest at half", "")
+	# Start cleaning from the menu's How to play starts the game.
+	var letter := Letter.new()
+	_check(letter.has_signal(&"start_asked")
+		and FileAccess.get_file_as_string("res://scripts/menu.gd").contains("_start_from_letter"),
+		"the letter's last door starts the game from the menu", "")
+	letter.free()
+	# The house's walk prompt goes once the player has walked.
+	var you: Vector2 = room.get(&"_you_at")
+	room.walk_hint = true
+	room.set(&"_walk_from", Vector2.INF)
+	room.call(&"_drive_walk_hint", 0.1)
+	room.set(&"_you_at", you + Vector2(ShedRoom.WALK_HINT_MOVED + 0.5, 0.0))
+	room.call(&"_drive_walk_hint", 0.1)
+	_check(not room.walk_hint, "the house's walk prompt goes once the player walks", "")
+	room.set(&"_you_at", you)
+	# Bases may not overlap; small pieces and rugs may.
+	var decor: Array = _main.get(&"decor")
+	var decor_was := decor.duplicate(true)
+	decor.clear()
+	var stand_piece := &""
+	var small := &""
+	var rug := &""
+	for name: String in room.sheets.names:
+		if not WashRoom.is_find(room.sheets, name):
+			continue
+		var piece := StringName(name)
+		if room.sheets.lies_flat(piece):
+			if rug == &"":
+				rug = piece
+		elif room.sheets.is_small(piece):
+			if small == &"":
+				small = piece
+		elif room.stands(piece) and stand_piece == &"" and room.span_of(piece, 0).x < 40:
+			stand_piece = piece
+	var at := Vector2i(ShedRoom.PLACE_COLS / 2, ShedRoom.PLACE_ROWS / 2)
+	var placed := room.place(stand_piece, at)
+	_check(placed and not room.can_place(stand_piece, at) and room.overlap_at(stand_piece, at) == 0,
+		"a standing piece may not be put down over another's base", String(stand_piece))
+	_check(room.overlap_at(rug, at) == -1 and room.overlap_at(small, at) == -1,
+		"a rug and a small piece may", "%s %s" % [rug, small])
+	decor.append((decor[0] as Dictionary).duplicate(true))
+	_main.call(&"_settle_house")
+	_check(decor.size() == 1, "a load sends the later of two crossing pieces back to the shelf",
+		str(decor.size()))
+	# Shift snaps the drop to the walkers' grid.
+	room.force_snap = true
+	var origin: Vector2 = room.call(&"_floor_origin")
+	room.set(&"_pointer", origin + Vector2(101.0, 77.0) * float(room.call(&"_zoom")))
+	var snapped: Vector2i = room.call(&"_drop_cell", stand_piece, 0)
+	var span := room.span_of(stand_piece, 0)
+	_check(snapped.x % ShedRoom.CELL == 0 and (snapped.y + span.y) % ShedRoom.CELL == 0,
+		"Shift snaps a piece's edge and foot to the grid", str(snapped))
+	room.force_snap = false
+	decor.clear()
+	decor.append_array(decor_was)
+	# Leaving the house shows the lake once the meter has moved.
+	var pollution: float = _main.get(&"pollution")
+	_main.set(&"pollution", 0.5)
+	_main.set(&"_reveal_from", 0.4)
+	var owed: bool = _main.call(&"_reveal_owed")
+	_main.set(&"_reveal_from", 0.49)
+	_check(owed and not bool(_main.call(&"_reveal_owed")), "the reveal waits for the meter to move", "")
+	# The demo's half-mended room.
+	_check(HouseInside.has_set("s1h") and HouseInside.has_set("s1hr") and HouseInside.has_set("u1h"),
+		"the half step's sets are baked", "")
+	HouseInside.half = false
+	var full_walk := HouseInside.walk_blocks(1).size()
+	HouseInside.half = true
+	var half_walk := HouseInside.walk_blocks(1).size()
+	_check(half_walk < full_walk and HouseInside.loop_of(1, false) == "s1h",
+		"stage 1 at the half step has fewer holes and its own loop", "%d of %d" % [half_walk, full_walk])
+	var half_was: bool = _main.get(&"house_half")
+	var stage_was: int = room.house_stage
+	var seen_was: int = room.house_seen
+	_main.set(&"house_half", false)
+	Demo.forced = true
+	_main.set(&"pollution", 1.0 - Lake.DEMO_HALF_AT - 0.01)
+	_main.call(&"_latch_house")
+	_check(bool(_main.get(&"house_half")) and HouseInside.half and not room.half_seen,
+		"the demo earns the half step at its mark", "")
+	room.house_stage = 1
+	room.house_seen = 1
+	var played := [false]
+	var on_played := func() -> void: played[0] = true
+	room.half_played.connect(on_played)
+	room.call(&"_house_shown")
+	room.half_played.disconnect(on_played)
+	_check(played[0] and room.half_seen and (room.get(&"_house_playing") as Array).has("u1h"),
+		"the next visit plays the half step in, with its card", "")
+	Demo.forced = false
+	_main.set(&"house_half", half_was)
+	_main.set(&"pollution", pollution)
+	_main.call(&"_latch_house")
+	room.house_stage = stage_was
+	room.house_seen = seen_was
+	room.half_seen = true
+	(room.get(&"_house_playing") as Array).clear()
+	var hints: Array = _main.get(&"_hints")
+	hints.erase(&"demo_house")

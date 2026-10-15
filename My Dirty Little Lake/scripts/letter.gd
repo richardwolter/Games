@@ -207,6 +207,9 @@ const SNAP_TILT := 1.6
 const SNAPS_MOST := 3
 
 signal close_asked
+## The last card's "Start cleaning" door: on the lake it closes the letter, from the menu's
+## How to play it starts the game (2026-10-15, a player's notes: it put them back on the menu).
+signal start_asked
 
 ## Which card is up.
 var page: int = 0
@@ -282,7 +285,7 @@ func _ready() -> void:
 	Pad.family_changed.connect(_lay_out)
 	_door.accent = true
 	_door.size = DOOR
-	_door.pressed.connect(func() -> void: close_asked.emit())
+	_door.pressed.connect(func() -> void: start_asked.emit())
 	_door.mouse_entered.connect(_pond.kick)
 	add_child(_door)
 	resized.connect(_lay_out)

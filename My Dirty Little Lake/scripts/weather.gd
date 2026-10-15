@@ -218,9 +218,14 @@ func storm(lasting: float) -> void:
 	_flash_in = minf(_flash_in, _rng.randf_range(1.0, 4.0))
 
 
-## The tornado's storm is over: the rain eases off over `CLEAR` as a shower's end does.
-func clear_storm() -> void:
-	_left = 0.0
+## The tornado's storm is over: the rain keeps falling `STORM_LINGER` seconds more, then eases
+## off over `CLEAR` as a shower's end does (2026-10-15, Richard: it stopped the moment the
+## funnel went, demo and full game). `linger` false stops it at once (the harness).
+const STORM_LINGER := 30.0
+
+
+func clear_storm(linger: bool = true) -> void:
+	_left = minf(_left, STORM_LINGER) if linger else 0.0
 
 
 ## A flash now, for the harness and the probe.

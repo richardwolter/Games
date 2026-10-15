@@ -1103,10 +1103,13 @@ func hull_box(hull: Hull) -> Rect2:
 	var region: Rect2 = art["region"]
 	var anchor: Vector2 = art["anchor"]
 	var line := snappedf(y_at(float(BOAT_LANES[hull.lane][0])), PIXEL)
-	var corner := Vector2(snappedf(hull.x, PIXEL), line) - Vector2(anchor.x, region.size.y) * grain
+	var corner := Vector2(snappedf(hull.x, grain), line) - Vector2(anchor.x, region.size.y) * grain
 	return Rect2(corner, region.size * grain)
 
 
+## A hull steps across in its own lane's pixels (2026-10-15, a player's notes: the far ferries
+## moved "way choppier" than the near ones). Snapped to `PIXEL` the far lane, one canvas px a
+## painted one, jumped two of its own pixels at a time, half as often as the near lane.
 func _draw_hull(hull: Hull, line: float) -> void:
 	var art := hull_art(hull.way)
 	if art.is_empty():
@@ -1114,7 +1117,7 @@ func _draw_hull(hull: Hull, line: float) -> void:
 	var grain := float(BOAT_LANES[hull.lane][1])
 	var region: Rect2 = art["region"]
 	var anchor: Vector2 = art["anchor"]
-	var corner := Vector2(snappedf(hull.x, PIXEL), line) - Vector2(anchor.x, region.size.y) * grain
+	var corner := Vector2(snappedf(hull.x, grain), line) - Vector2(anchor.x, region.size.y) * grain
 	draw_texture_rect_region(art["sheet"], Rect2(corner, region.size * grain), region)
 	# Along the hull, not the whole picture: the cut's own ends where the json has them.
 	var from := corner.x

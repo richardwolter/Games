@@ -99,6 +99,41 @@ func note_hit(at: Vector2) -> bool:
 	return step == Step.NOTE and _note_box.has_point(at)
 
 
+## The walk keys alone, in their cross (the stick, blinking, on the pad), centred over `at`
+## on any canvas item: the house's walk prompt (2026-10-15). `keys` up/left/down/right as
+## this keyboard prints them; `px` canvas pixels to one of the pack's.
+static var _shared := {}
+
+
+static func draw_walk_keys(item: CanvasItem, at: Vector2, px: float, pad: bool, keys: Array,
+		clock: float, alpha: float = 1.0) -> void:
+	var cell := 16.0 * px
+	var tint := Color(1.0, 1.0, 1.0, alpha)
+	if pad:
+		var stick: Texture2D = _shared_tile("stick" if fmod(clock, BLINK * 2.0) < BLINK else "stick_dirs")
+		if stick != null:
+			var size := stick.get_size() * px
+			item.draw_texture_rect(stick, Rect2((at - size * 0.5).round(), size), false, tint)
+		return
+	var fall: Array[String] = ["key_w", "key_a", "key_s", "key_d"]
+	var spots := [Vector2(0.0, -1.0), Vector2(-1.0, 0.0), Vector2(0.0, 0.0), Vector2(1.0, 0.0)]
+	for i in 4:
+		var tile := key_tile(String(keys[i])) if i < keys.size() else ""
+		var tex: Texture2D = _shared_tile(tile if tile != "" else fall[i])
+		if tex == null:
+			continue
+		var size := tex.get_size() * px
+		var middle: Vector2 = at + (spots[i] as Vector2) * cell + Vector2(0.0, -cell * 0.5)
+		item.draw_texture_rect(tex, Rect2((middle - size * 0.5).round(), size), false, tint)
+
+
+static func _shared_tile(tile: String) -> Texture2D:
+	if not _shared.has(tile):
+		var path := PROMPTS % tile
+		_shared[tile] = load(path) if ResourceLoader.exists(path) else null
+	return _shared[tile]
+
+
 ## The prompt tile for a key label, or "" where the pack has none (a layout past these six).
 static func key_tile(label: String) -> String:
 	var tile := "key_" + label.to_lower()

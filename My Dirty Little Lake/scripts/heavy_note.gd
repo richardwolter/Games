@@ -20,6 +20,10 @@ const FADE_FROM := 0.6
 ## The full net's pale red (`HaulCount.FULL_INK`): this is the net saying no.
 const INK := Color(1.0, 0.55, 0.45)
 
+## What the line says: `Text.NEED_STRENGTH`, or in the demo at its Strength cap
+## `Text.DEMO_LOCKED` (2026-10-15, `/grill-me` with Richard, a second player's notes: maxed out,
+## told to buy more Strength that the demo does not sell). Set by the lake with each line.
+var words := ""
 var _at := Vector2.INF
 var _age := -1.0
 
@@ -65,6 +69,6 @@ func _draw() -> void:
 	at.y -= RISE * t
 	var alpha := 1.0 if t < FADE_FROM else 1.0 - (t - FADE_FROM) / (1.0 - FADE_FROM)
 	Style.write(
-		self, Text.NEED_STRENGTH, Style.TEXT_BODY, at, INK, HORIZONTAL_ALIGNMENT_CENTER,
+		self, words if not words.is_empty() else Text.NEED_STRENGTH, Style.TEXT_BODY, at, INK, HORIZONTAL_ALIGNMENT_CENTER,
 		Rect2(at.x - 200.0, at.y - Style.TEXT_BODY, 400.0, Style.TEXT_BODY), alpha
 	)

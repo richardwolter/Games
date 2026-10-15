@@ -143,7 +143,7 @@ var music_on: bool = true:
 	set(v):
 		music_on = v
 		queue_redraw()
-var music_level: float = 0.75:
+var music_level: float = 0.5:
 	set(v):
 		music_level = clampf(v, 0.0, 1.0)
 		queue_redraw()
@@ -151,7 +151,7 @@ var sfx_on: bool = true:
 	set(v):
 		sfx_on = v
 		queue_redraw()
-var sfx_level: float = 0.8:
+var sfx_level: float = 0.5:
 	set(v):
 		sfx_level = clampf(v, 0.0, 1.0)
 		queue_redraw()
@@ -159,7 +159,7 @@ var ambience_on: bool = true:
 	set(v):
 		ambience_on = v
 		queue_redraw()
-var ambience_level: float = 0.7:
+var ambience_level: float = 0.5:
 	set(v):
 		ambience_level = clampf(v, 0.0, 1.0)
 		queue_redraw()

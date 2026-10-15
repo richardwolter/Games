@@ -449,6 +449,7 @@ func share_clean() -> float:
 ## Take whatever is on the stand off it, washed or not. The stand, the nozzle and the water
 ## stay: an empty stand can still be sprayed, it just has nothing on it.
 func clear() -> void:
+	_stash()
 	piece = &""
 	state = State.EMPTY
 	_runs.clear()
@@ -471,9 +472,32 @@ func _stand_bare() -> void:
 	_fit()
 
 
-## Stand a piece up under a fresh coat. The same piece gets the same coat every time: the
-## roll is off its name, so walking away and coming back is the same job, not a new one.
+## What is left of each find washed part way, for the session (2026-10-15, `/grill-me` with
+## Richard, a player's notes: switching finds threw the work away). Keyed by piece, holding
+## the grime cells and the two totals; the coat image is painted back from the cells. Nothing
+## is saved: a load starts every find under its whole coat again.
+var _kept := {}
+
+
+## Keep the find on the stand as it stands, if it is part way washed.
+func _stash() -> void:
+	if piece == &"" or state != State.WASHING or _total <= 0.0:
+		return
+	_kept[piece] = {"grime": _grime.duplicate(), "left": _left, "total": _total}
+
+
+## Whether a find has part of a wash kept, and how much of it is clean.
+func kept_share(what: StringName) -> float:
+	var held: Dictionary = _kept.get(what, {})
+	if held.is_empty() or float(held["total"]) <= 0.0:
+		return 0.0
+	return clampf(1.0 - float(held["left"]) / float(held["total"]), 0.0, 1.0)
+
+
+## Stand a piece up under its coat. The same piece gets the same coat every time: the roll is
+## off its name. A find washed part way earlier in the session comes back as it was left.
 func put(what: StringName) -> void:
+	_stash()
 	piece = what
 	state = State.EMPTY
 	_runs.clear()
@@ -494,6 +518,7 @@ func put(what: StringName) -> void:
 	_roll.seed = hash(String(what))
 	_read_solid()
 	_roll_coat()
+	_take_kept(what)
 	_fit()
 	state = State.WASHING
 	# Parked on the find, and deaf to the player until the press that chose it is let go and
@@ -562,6 +587,29 @@ func _roll_coat() -> void:
 			_total += amount
 			_coat.set_pixel(cx, cy, _ink_of(amount, cx, cy))
 	_left = _total
+	_coat_tex = ImageTexture.create_from_image(_coat)
+	_coat_stale = false
+
+
+## Lay a kept wash back over the fresh coat: the cells, the totals, and the coat painted off
+## the cells. A kept wash whose size no longer matches the piece is dropped.
+func _take_kept(what: StringName) -> void:
+	var held: Dictionary = _kept.get(what, {})
+	_kept.erase(what)
+	if held.is_empty():
+		return
+	var grime: PackedFloat32Array = held["grime"]
+	if grime.size() != _cols * _rows:
+		return
+	_grime = grime
+	_total = float(held["total"])
+	_left = float(held["left"])
+	_coat.fill(Color(0.0, 0.0, 0.0, 0.0))
+	for cy in _rows:
+		for cx in _cols:
+			var amount := _grime[cy * _cols + cx]
+			if amount > 0.0:
+				_coat.set_pixel(cx, cy, _ink_of(amount, cx, cy))
 	_coat_tex = ImageTexture.create_from_image(_coat)
 	_coat_stale = false
 
@@ -833,6 +881,7 @@ func _process(delta: float) -> void:
 	_drive_finish(delta)
 	_drive_nozzle(delta)
 	_drive_hiss(delta)
+	_drive_last(delta)
 	if _coat_stale:
 		_coat_tex.update(_coat)
 		_coat_stale = false
@@ -1127,6 +1176,7 @@ func _drive_finish(delta: float) -> void:
 			state = State.SHINING
 			_phase = 0.0
 			_left = 0.0
+			_kept.erase(piece)
 			washed.emit(piece)
 			_glint = 0.0
 			var sound := Sfx.main()
@@ -1169,6 +1219,7 @@ func _draw() -> void:
 	_draw_runs()
 	_draw_bubbles()
 	_draw_gleams()
+	_draw_last()
 	_draw_impact()
 	_draw_flecks()
 	_draw_stars()
@@ -1177,6 +1228,67 @@ func _draw() -> void:
 	# Over the nozzle, not under it (2026-10-02, Richard: the water came from underneath the
 	# tip): drawn first, the brass hid the stream's start and it showed below the bore.
 	_draw_stream()
+
+
+## **The last grime is pointed at** (2026-10-15, `/grill-me` with Richard, a player's notes:
+## "hard to find the last smidge of dirt"). Once the wash is `LAST_FROM` of the way to
+## `DONE_AT`, every patch of grime left (cells grouped in `LAST_BLOCK` squares) wears a gold
+## corner frame pulsing in whole cells, worked out again every `LAST_EVERY` rather than every
+## frame. First guesses.
+const LAST_FROM := 0.95
+const LAST_BLOCK := 6
+const LAST_EVERY := 0.2
+const LAST_PULSE := 2.2
+const LAST_MOST := 24
+var _last: Array[Rect2i] = []
+var _last_wait := 0.0
+
+
+func _drive_last(delta: float) -> void:
+	if state != State.WASHING or share_clean() < DONE_AT * LAST_FROM:
+		_last.clear()
+		return
+	_last_wait -= delta
+	if _last_wait > 0.0:
+		return
+	_last_wait = LAST_EVERY
+	var blocks := {}
+	for cy in _rows:
+		for cx in _cols:
+			if _grime[cy * _cols + cx] <= 0.0:
+				continue
+			var key := Vector2i(cx / LAST_BLOCK, cy / LAST_BLOCK)
+			var cell := Rect2i(cx, cy, 1, 1)
+			blocks[key] = (blocks[key] as Rect2i).merge(cell) if blocks.has(key) else cell
+	_last.clear()
+	for box: Rect2i in blocks.values():
+		_last.append(box)
+		if _last.size() >= LAST_MOST:
+			break
+
+
+## Whether the stand is pointing at what is left, for the harness.
+func pointing_at_last() -> int:
+	return _last.size()
+
+
+func _draw_last() -> void:
+	if _last.is_empty():
+		return
+	# Two whole cells of breathing room, in and out on the clock: no smooth scaling.
+	var out := 1 + int(floor(fmod(_clock * LAST_PULSE, 2.0)))
+	var gold := Color(GLEAM_GOLD, 0.9)
+	for box: Rect2i in _last:
+		var x0 := box.position.x - out
+		var y0 := box.position.y - out
+		var x1 := box.end.x - 1 + out
+		var y1 := box.end.y - 1 + out
+		for corner: Vector2i in [Vector2i(x0, y0), Vector2i(x1, y0), Vector2i(x0, y1), Vector2i(x1, y1)]:
+			var sx := 1 if corner.x == x0 else -1
+			var sy := 1 if corner.y == y0 else -1
+			draw_rect(_cell_box(corner.x, corner.y), gold)
+			draw_rect(_cell_box(corner.x + sx, corner.y), gold)
+			draw_rect(_cell_box(corner.x, corner.y + sy), gold)
 
 
 ## How clean the find on the stand is, as a whole percent (2026-10-15, issue #41: a demo

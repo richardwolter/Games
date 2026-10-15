@@ -78,15 +78,17 @@ static func volume_db(level: float, on: bool, loudest: float, silent: float) -> 
 	return maxf(loudest + SLIDER_LAW * (log(level) / log(10.0)), silent)
 
 
+## Fresh-install levels (2026-10-15, Richard): Master full, the three under it at half. A
+## settings.cfg already written keeps what the player set.
 var master_on: bool = true
 var master_level: float = 1.0
 var music_on: bool = true
-var music_level: float = 0.75
+var music_level: float = 0.5
 var sfx_on: bool = true
-var sfx_level: float = 0.8
+var sfx_level: float = 0.5
 ## The lake's own sound under everything, on a slider of its own (2026-09-15).
 var ambience_on: bool = true
-var ambience_level: float = 0.7
+var ambience_level: float = 0.5
 
 var window_mode: int = WindowMode.WINDOWED
 ## The size the window goes back to when it leaves fullscreen. In fullscreen the board shows
