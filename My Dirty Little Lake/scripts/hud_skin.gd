@@ -135,6 +135,17 @@ var money: float = 0.0
 ## How much is waiting in the yard for the ferry.
 var stock: int = 0
 
+## The ferry bar under the Waiting plate (2026-10-15, issue #41): how far through its run the
+## hull that comes home first is, 0 to 1, or -1 for no run; and with none out, how full the
+## docked hull's next load is, 0 to 1, or -1. The lake sets both every frame.
+var ferry_trip: float = -1.0
+var ferry_fill: float = -1.0
+## The bar's height, in the gap between the Waiting and money plates, and its two fills: the
+## recycle mark's blue for a run, a warm amber for a hold filling at the berth.
+const FERRY_BAR_TALL := 6.0
+const FERRY_TRIP_INK := Style.BOX_BLUE_LIT
+const FERRY_FILL_INK := Color(0.93, 0.74, 0.40)
+
 ## How many upgrades can be paid for right now. Drawn as a tag under the upgrades button:
 ## the money plate says what the player has and the shop says what things cost, and this is
 ## the one line that puts those two together without the shop being open.
@@ -519,7 +530,8 @@ func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
-		stock, available, hint, _hovered, plates_only
+		stock, available, hint, _hovered, plates_only,
+		roundi(ferry_trip * 200.0), roundi(ferry_fill * 200.0)
 	])
 
 
@@ -538,6 +550,7 @@ func _draw() -> void:
 			1.0 + SHINE_SWELL * _ease_shine()
 		)
 		_draw_stock()
+		_draw_ferry_bar()
 		return
 	# The coin swells a little while the plate is lit, about its own middle and inside the
 	# wood — the plate itself does not move. See `HudButtons.draw_money`.
@@ -563,6 +576,7 @@ func _draw() -> void:
 	for name: StringName in _motes:
 		(_motes[name] as HudButtons.Motes).draw(self)
 	_draw_stock()
+	_draw_ferry_bar()
 	# The hint is its own node over the meter's sheets. See `HintLine`.
 	_place_hint()
 
@@ -944,6 +958,31 @@ func _stock_count_size() -> int:
 
 func _stock_label_size() -> int:
 	return Style.step(_stock_face_tall() * STOCK_TEXT * STOCK_LABEL_SHARE)
+
+
+## Where the ferry bar is drawn: in the gap under the Waiting plate, inset by the plate's
+## side walls so it reads as hanging off the plate rather than off the screen's edge.
+func ferry_bar_box() -> Rect2:
+	var y := _stock_box.end.y + (GAP - FERRY_BAR_TALL) * 0.5
+	return Rect2(
+		_stock_box.position.x + float(Style.BORDER_WALL), y,
+		_stock_box.size.x - float(Style.BORDER_WALL * 2), FERRY_BAR_TALL
+	)
+
+
+## The bar: a groove sunk the way the count's panel is, filled from the left.
+func _draw_ferry_bar() -> void:
+	var share := ferry_trip if ferry_trip >= 0.0 else ferry_fill
+	if share < 0.0:
+		return
+	var box := ferry_bar_box()
+	draw_rect(box.grow(1.0), Style.SEAM, true)
+	draw_rect(box, Style.BOX_HOLLOW, true)
+	var ink := FERRY_TRIP_INK if ferry_trip >= 0.0 else FERRY_FILL_INK
+	var filled := Rect2(box.position, Vector2(roundf(box.size.x * clampf(share, 0.0, 1.0)), box.size.y))
+	if filled.size.x > 0.0:
+		draw_rect(filled, ink, true)
+		draw_rect(Rect2(filled.position, Vector2(filled.size.x, 1.0)), ink.lightened(0.3), true)
 
 
 func _draw_stock() -> void:

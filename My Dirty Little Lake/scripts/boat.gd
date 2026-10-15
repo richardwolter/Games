@@ -330,6 +330,11 @@ var _rng := RandomNumberGenerator.new()
 ## Whether the load it just tipped ashore is still in the air. Both halves of unloading are
 ## State.UNLOADING with a dwell running down, and this is what tells them apart.
 var _landing := false
+## The trip out and home (2026-10-15, issue #41: the Waiting plate's ferry bar). How long this
+## run was reckoned to take when it set off, from the berth's last piece landing aboard to
+## tying up again, and how long it has been out. -1 when not on a run.
+var _trip_total := -1.0
+var _trip_age := 0.0
 
 ## The hull's drawn shape and its place on the sheet, kept from the frame just drawn so the
 ## sail can be laid over the load with the same polygon rather than a second measurement.
@@ -390,6 +395,7 @@ func moor_now() -> PackedInt32Array:
 	_landing = false
 	_dwell = 0.0
 	target = -1
+	_trip_total = -1.0
 	state = State.DOCKED
 	tile_pos = dock
 	_place()
@@ -532,6 +538,8 @@ func _place() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _trip_total > 0.0:
+		_trip_age += delta
 
 	match state:
 		State.DOCKED:
@@ -576,6 +584,7 @@ func _process(delta: float) -> void:
 				state = State.DOCKED
 				target = -1
 				runs_done += 1
+				_trip_total = -1.0
 				# Coming alongside is heard, the way setting off is — the water first, the
 				# bell now and then. The berth is on the island the player stands on.
 				if sfx != null:
@@ -711,10 +720,55 @@ func _begin_route() -> void:
 	if sfx != null:
 		sfx.play_bell()
 	_route = plan_route()
+	_trip_total = _reckon_trip()
+	_trip_age = 0.0
 	if _route.is_empty():
 		_head_home()
 		return
 	_next_stop()
+
+
+## How long the run about to start will take, in seconds: the path round every stop on the
+## route and home, at this hull's speed, plus each stop's berthing and the volley ashore.
+## Reckoned once, on setting off; the bar reads the time out against it.
+func _reckon_trip() -> float:
+	if _route.is_empty() or speed <= 0.0 or grid == null:
+		return -1.0
+	var length := 0.0
+	var from := tile_pos
+	var stops: Array[Vector2] = []
+	for index: int in _route:
+		stops.append(dropoffs[index].berth)
+	stops.append(dock)
+	for to: Vector2 in stops:
+		var at := from
+		for point: Vector2 in _plan_legs(from, to):
+			length += at.distance_to(point)
+			at = point
+		from = to
+	var waits := 0.0
+	for index: int in _route:
+		var landing := 0
+		for piece in cargo:
+			if grid.defs[piece].material == dropoffs[index].kind:
+				landing += 1
+		waits += DWELL * 2.0 + Haul.volley_time(landing, volley_gap)
+	return length / speed + waits
+
+
+## How far through its run this hull is, 0 to 1, or -1 when it is not on one. Held short of
+## 1 until it has tied up: the reckoning is the plan, and a run can take a moment longer.
+func trip_share() -> float:
+	if _trip_total <= 0.0:
+		return -1.0
+	return minf(_trip_age / _trip_total, 0.99)
+
+
+## Seconds until it is home by the reckoning, or INF when it is not on a run.
+func trip_left() -> float:
+	if _trip_total <= 0.0:
+		return INF
+	return maxf(_trip_total - _trip_age, 0.0)
 
 
 func _next_stop() -> void:

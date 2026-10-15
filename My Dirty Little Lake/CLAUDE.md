@@ -1571,7 +1571,7 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
 ### Demo Playtest Feedback (2026-10-15, `/grill-me` with Richard, issue #41)
 A friend's notes on the demo, for both builds. Ten points grilled; rotation (9) left alone
 (the chairs already turn 90 degrees; he most likely tried a piece with no side view). Done so
-far, the four small ones:
+far, all but the rotation:
 - **The meter counts up** (`HudSkin.cleaned_figure`): it writes the share **cleaned**, 0% on
   a new lake, 100% only when nothing is left (the dirty share is still rounded up before it is
   taken off, so the last half percent reads 99%). Supersedes "0% is the finished lake". The
@@ -1608,12 +1608,26 @@ far, the four small ones:
   affordable row (`_cheapest_affordable`): everything else dimmed, only its tag buys, a short
   card beside it (`FIRST_BUY_ROW`); the cross, Escape and the table still close the shop, and
   the card returns on the lake until something is bought. Hints and the camera tip wait for it.
-- **Still to build** (decided, see the issue): one ferry bar under Waiting (next hull home,
-  or the docked hold filling) and a fixed horizontal wash fan replacing the round jet.
+- **The ferry bar under Waiting** (`HudSkin.ferry_trip`/`ferry_fill`, `ferry_bar_box`,
+  `Lake._push_ferry_bar`, `Boat.trip_share`/`trip_left`/`_reckon_trip`): a 6 px groove in the
+  gap between the Waiting and money plates. A run is reckoned once on setting off (the path
+  round every stop and home at the hull's speed, plus each berthing and volley ashore) and
+  the bar shows the hull home first, in the recycle mark's blue, held under full until it ties
+  up. With none out it shows the docked hull's next load filling (`held / capacity`), in
+  amber. One bar for the fleet, by decision.
+- **The wash jet is a flat fan** (`WashStand.FAN_WIDE` 2.6, `FAN_TALL` 0.6 of `JET_RADIUS`,
+  `FAN_POWER` 0.65, `fan_half`, `_fan_spot`): `_wash_at` wears a wide, low ellipse, strongest
+  along its middle row and even most of the way across, so a sweep down the piece cleans it;
+  the stream draws as `FAN_RAYS` dashed rays opening from the tip to the fan's ends, the froth
+  along the fan's line, and drips start along it. Fixed horizontal, by decision (no switch to
+  vertical); the hose's levels widen it (`jet_radius` unchanged). **Supersedes the round jet**
+  in The Pump and the Wash Room. Numbers are first guesses for Richard's hand.
 - `test_lake` guards the meter's figure, the badge, the gap and both walks down the strip,
   the stand's figure part way and at the finish, the Strength line's third landing and reset
   (`_check_heavy_note`), the presses on the hut and the pump and the hive's refusal
-  (`_check_place_presses`), and the forced card, the one row and its end (`_check_first_buy`).
+  (`_check_place_presses`), the forced card, the one row and its end (`_check_first_buy`), the
+  bar's place, a reckoned run, the run and the fill (`_check_ferry_bar`), and the fan wearing a
+  strip much wider than tall (`_stage_wash`).
 
 ### Bed, Sync, Tooltip, English (2026-10-14, `/grill-me` with Richard)
 - **The Small Bed is a catch, not a gift** (`Lake.STARTER_BED`, name kept): `_seed_starter_bed`

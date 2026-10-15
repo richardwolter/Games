@@ -10733,9 +10733,64 @@ func _check_first_buy() -> void:
 	_main.set(&"_shop_tour_done", tour_done)
 
 
+## The ferry bar under Waiting (2026-10-15, issue #41): a run is reckoned on setting off, the
+## bar shows the hull home first, and with none out it shows the docked hold filling.
+func _check_ferry_bar() -> void:
+	var boats: Array = _main.get(&"_boats")
+	var yard: Yard = _main.get(&"_yard")
+	var hud: HudSkin = _main.get(&"_skin")
+	if boats.is_empty():
+		_check(false, "there is a ferry for the bar", "")
+		return
+	var hull: Boat = boats[0]
+	var gap_top: float = (hud.get(&"_stock_box") as Rect2).end.y
+	var gap_foot: float = (hud.get(&"_money_box") as Rect2).position.y
+	var bar := hud.ferry_bar_box()
+	_check(bar.position.y > gap_top and bar.end.y < gap_foot, "the bar hangs in the gap under Waiting",
+		"%s between %.0f and %.0f" % [bar, gap_top, gap_foot])
+	# A run reckoned from a real hold.
+	var cargo_was := hull.cargo
+	var piece := -1
+	var defs: Array = _grid.defs
+	for i in defs.size():
+		if not (defs[i] as TrashDef).keepsake:
+			piece = i
+			break
+	hull.cargo = PackedInt32Array([piece, piece, piece])
+	hull.set(&"_route", hull.plan_route())
+	var total: float = hull.call(&"_reckon_trip")
+	_check(total > 1.0, "a run is reckoned on setting off", "%.1f s" % total)
+	hull.set(&"_route", [] as Array[int])
+	hull.cargo = cargo_was
+	# Out: the bar is the run.
+	var states := []
+	for b: Boat in boats:
+		states.append(b.state)
+		b.state = Boat.State.DOCKED
+	hull.set(&"_trip_total", 10.0)
+	hull.set(&"_trip_age", 4.0)
+	_main.call(&"_push_ferry_bar")
+	_check(is_equal_approx(hud.ferry_trip, 0.4) and hud.ferry_fill < 0.0,
+		"a hull out shows how far through its run it is", "%.2f / %.2f" % [hud.ferry_trip, hud.ferry_fill])
+	hull.set(&"_trip_total", -1.0)
+	# Home: the bar is the next load filling.
+	var held_was := yard.held.duplicate()
+	yard.held.clear()
+	for k in maxi(hull.capacity / 2, 1):
+		yard.held.append(piece)
+	_main.call(&"_push_ferry_bar")
+	_check(hud.ferry_trip < 0.0 and is_equal_approx(hud.ferry_fill, float(yard.held.size()) / float(hull.capacity)),
+		"with every hull home it shows the hold filling", "%.2f" % hud.ferry_fill)
+	yard.held = held_was
+	for i in boats.size():
+		(boats[i] as Boat).state = states[i]
+	_main.call(&"_push_ferry_bar")
+
+
 func _check_upgrades_pulse() -> void:
 	_check_meter_and_shed_button()
 	_check_first_buy()
+	_check_ferry_bar()
 	var skin := _main.get(&"_skin") as HudSkin
 	skin.hush_pulse(&"upgrades")
 	var now := skin.available
@@ -11038,6 +11093,32 @@ func _stage_wash() -> void:
 			tops_same = tops_same and float(stand.call(&"_stand_pad")) >= 1.0
 	stand.clear()
 	_check(tops_same, "the table is the same size under a sofa, a lamp and nothing", str(bare_top))
+
+	# The jet is a flat fan (2026-10-15, issue #41): held still on the middle of a find, it
+	# wears away a strip much wider than it is tall.
+	room.pick(StringName(find))
+	var before: PackedFloat32Array = (stand.get(&"_grime") as PackedFloat32Array).duplicate()
+	var middle := stand.piece_box().get_center()
+	for k in 6:
+		stand.spray(middle, true)
+		stand.call(&"_process", 0.05)
+	stand.spray(middle, false)
+	var after: PackedFloat32Array = stand.get(&"_grime")
+	var cols: int = stand.get(&"_cols")
+	var worn := Rect2i()
+	var first := true
+	for i in after.size():
+		if after[i] < before[i] - 0.001:
+			var cell := Vector2i(i % cols, i / cols)
+			worn = Rect2i(cell, Vector2i.ONE) if first else worn.expand(cell + Vector2i.ONE).expand(cell)
+			first = false
+	# Measured above the aim only: what is loosened runs down the piece and wears its own
+	# streaks below.
+	var aim_row := int((stand.call(&"_aim_cell") as Vector2).y)
+	var above := aim_row - worn.position.y + 1
+	_check(not first and worn.size.x >= above * 3, "the jet is a fan, much wider than tall",
+		"worn %s, %d rows above the aim, fan %s" % [str(worn), above, str(stand.fan_half())])
+	stand.clear()
 
 	# Washed right through.
 	room.pick(StringName(find))

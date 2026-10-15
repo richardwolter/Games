@@ -6028,6 +6028,27 @@ func _camera_tip_step(delta: float) -> void:
 	_camera_tip.show_card(_free_camera.get_global_rect(), Text.CAMERA_TIP)
 
 
+## The ferry bar under the Waiting plate (2026-10-15, issue #41): the run of the hull that is
+## home first, or with none out, the next load filling at the berth.
+func _push_ferry_bar() -> void:
+	var trip := -1.0
+	var soonest := INF
+	var docked: Boat = null
+	for hull: Boat in _boats:
+		if not is_instance_valid(hull) or not hull.visible:
+			continue
+		if hull.trip_share() >= 0.0 and hull.trip_left() < soonest:
+			soonest = hull.trip_left()
+			trip = hull.trip_share()
+		elif hull.state == Boat.State.DOCKED and docked == null:
+			docked = hull
+	_skin.ferry_trip = trip
+	_skin.ferry_fill = (
+		clampf(float(_yard.held.size()) / float(maxi(docked.capacity, 1)), 0.0, 1.0)
+		if trip < 0.0 and docked != null else -1.0
+	)
+
+
 ## The first upgrade, one frame (see `_first_buy_done`). On the lake: the forced card over the
 ## Upgrades button while anything can be bought and nothing else is talking to the player. In
 ## the shop: once its tour is over, only the cheapest affordable row buys.
@@ -7468,6 +7489,7 @@ func _update_hud() -> void:
 	_push_pad_light()
 	_skin.money = sludge
 	_skin.stock = _yard.held.size()
+	_push_ferry_bar()
 	var affordable := _affordable()
 	_skin.available = affordable
 	_skin.waiting = unwashed.size()

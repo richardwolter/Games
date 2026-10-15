@@ -53,6 +53,17 @@ const ZOOM_MOST := 14
 const JET_RADIUS := 3.2
 const JET_POWER := 2.6
 
+## The jet is a flat fan (2026-10-15, issue #41: a demo player wanted to drag it down a piece,
+## top to bottom, rather than paint the whole piece in): it washes an ellipse `FAN_WIDE` of
+## `JET_RADIUS` across either side and `FAN_TALL` of it up and down, at `FAN_POWER` of the
+## round jet's strength, so a sweep takes about as long as the round jet did. Fixed level,
+## by decision; the hose's levels widen it. The stream is drawn as `FAN_RAYS` dashed rays
+## opening from the tip to the fan's ends. All first guesses.
+const FAN_WIDE := 2.6
+const FAN_TALL := 0.6
+const FAN_POWER := 0.65
+const FAN_RAYS := 5
+
 ## The hose upgrade (2026-10-01, `/grill-me` with Richard): bought in the wash room, levels 1
 ## to 3, each a share of the jet's width and power over level 1 — gentle, by decision, so
 ## washing stays a job done by hand. The stream draws a pixel wider a level and the spray,
@@ -844,16 +855,16 @@ func _drive_jet(delta: float) -> void:
 	_hitting = false
 	if not landing:
 		return
-	var removed := _wash_at(_aim_cell(), jet_radius() * FINE, jet_power() * delta)
+	var removed := _wash_at(_aim_cell(), fan_half() * FINE, jet_power() * FAN_POWER * delta)
 	_loosened += removed
 	while _loosened >= RUN_PER:
 		_loosened -= RUN_PER
-		_let_run(_aim_cell(), jet_radius() * FINE * 0.8, 1.0)
+		_let_run(_fan_spot(0.8), jet_radius() * FINE * FAN_TALL, 1.0)
 	if _hitting:
 		_clear_bank += RUN_CLEAR * _grow_of() * delta
 		while _clear_bank >= 1.0:
 			_clear_bank -= 1.0
-			_let_run(_aim_cell(), jet_radius() * FINE * 0.6, 0.0)
+			_let_run(_fan_spot(0.6), jet_radius() * FINE * FAN_TALL, 0.0)
 	_spray_bank += (SPRAY_ON if _hitting else SPRAY_OFF) * _grow_of() * delta
 	while _spray_bank >= 1.0:
 		_spray_bank -= 1.0
@@ -865,25 +876,30 @@ func _drive_jet(delta: float) -> void:
 ## Wear the coat inside the jet. Also answers two things about the spot on the way: whether
 ## any of the piece is under the middle of the jet (`_hitting`), and how grimy that middle
 ## still is (`_under`), which is what colours the spray.
-func _wash_at(centre: Vector2, radius: float, strength: float) -> float:
+## `half` is the jet's half-extents in cells: the fan's, wide and low. Strongest along its
+## middle row and even most of the way across, so a sweep down the piece leaves no stripes.
+func _wash_at(centre: Vector2, half: Vector2, strength: float) -> float:
 	var removed := 0.0
 	var touched := 0
 	var grime_seen := 0.0
-	var x0 := maxi(int(floor(centre.x - radius)), 0)
-	var x1 := mini(int(ceil(centre.x + radius)), _cols - 1)
-	var y0 := maxi(int(floor(centre.y - radius)), 0)
-	var y1 := mini(int(ceil(centre.y + radius)), _rows - 1)
+	half = Vector2(maxf(half.x, 0.5), maxf(half.y, 0.5))
+	var x0 := maxi(int(floor(centre.x - half.x)), 0)
+	var x1 := mini(int(ceil(centre.x + half.x)), _cols - 1)
+	var y0 := maxi(int(floor(centre.y - half.y)), 0)
+	var y1 := mini(int(ceil(centre.y + half.y)), _rows - 1)
 	for cy in range(y0, y1 + 1):
 		for cx in range(x0, x1 + 1):
 			if _solid[cy * _cols + cx] == 0:
 				continue
-			var far := Vector2(cx + 0.5, cy + 0.5).distance_to(centre) / radius
+			var off := (Vector2(cx + 0.5, cy + 0.5) - centre) / half
+			var far := off.length()
 			if far >= 1.0:
 				continue
 			if far < 0.55:
 				touched += 1
 				grime_seen += _grime[cy * _cols + cx]
-			removed += _wear(cx, cy, strength * (1.0 - far * far))
+			var across := off.x * off.x
+			removed += _wear(cx, cy, strength * (1.0 - off.y * off.y) * (1.0 - across * across))
 	_hitting = touched > 0
 	_under = grime_seen / float(touched) if touched > 0 else 0.0
 	return removed
@@ -1329,6 +1345,16 @@ func _draw_gleams() -> void:
 		draw_rect(_cell_box(at.x, at.y), Color(1.0, 1.0, 1.0, share))
 
 
+## The fan's half-extents at the hose's level, in art px: wide and low.
+func fan_half() -> Vector2:
+	return Vector2(FAN_WIDE, FAN_TALL) * jet_radius()
+
+
+## A spot somewhere along the fan's middle row, `share` of the way out at most, in cells.
+func _fan_spot(share: float) -> Vector2:
+	return _aim_cell() + Vector2((_roll.randf() * 2.0 - 1.0) * fan_half().x * FINE * share, 0.0)
+
+
 ## The jet at the hose's level: how wide it washes, in art px, and how hard, a second.
 func jet_radius() -> float:
 	return JET_RADIUS * _grow_of()
@@ -1348,13 +1374,14 @@ func _draw_impact() -> void:
 		return
 	var centre := _aim_cell()
 	var inks := _ink_dirty if (_hitting and _under > SPRAY_DIRTY_OVER) else _ink_water
-	var reach := jet_radius() * FINE * (0.7 if _hitting else 0.4)
-	for k in 14:
-		var turn := _hash(k, _tick, 1) * TAU
-		var out := sqrt(_hash(k, _tick, 2)) * reach
-		var at := centre + Vector2.from_angle(turn) * out
+	# Along the fan's line, not round a point.
+	var reach := fan_half() * FINE * (0.85 if _hitting else 0.5)
+	for k in 26:
+		var across := (_hash(k, _tick, 1) * 2.0 - 1.0) * reach.x
+		var up := (_hash(k, _tick, 2) * 2.0 - 1.0) * reach.y
+		var at := centre + Vector2(across, up)
 		var ink: Color = inks[k % inks.size()]
-		draw_rect(_cell_box(at.x, at.y), Color(ink, 0.9 if out < reach * 0.6 else 0.55))
+		draw_rect(_cell_box(at.x, at.y), Color(ink, 0.9 if absf(across) < reach.x * 0.7 else 0.55))
 
 
 func _draw_flecks() -> void:
@@ -1499,28 +1526,36 @@ func _draw_stream() -> void:
 	if _reach <= 0.0 or _tail >= 1.0:
 		return
 	var tip := _nozzle_tip()
-	var to := _aim
-	# Half a cell out of the bore, so the first dash stands just past the lip, not on the brass.
-	var from := tip + (to - tip).normalized() * _cell * 0.5
-	var along := to - from
-	var count := int(along.length() / _cell)
-	if count <= 0:
-		return
-	var across := along.orthogonal().normalized()
-	for i in count:
-		var t := float(i) / float(count)
-		if t < _tail or t > _reach:
+	# The fan: rays from the tip to points spread across the fan's width at the aim, the middle
+	# one the widest, so the water opens out flat as it goes.
+	var half_px := fan_half().x * FINE * _cell
+	for ray in FAN_RAYS:
+		var side := lerpf(-1.0, 1.0, float(ray) / float(maxi(FAN_RAYS - 1, 1)))
+		var to := _aim + Vector2(side * half_px, 0.0)
+		# Half a cell out of the bore, so the first dash stands just past the lip, not on the brass.
+		var from := tip + (to - tip).normalized() * _cell * 0.5
+		var along := to - from
+		var count := int(along.length() / _cell)
+		if count <= 0:
 			continue
-		if _hash(i - _tick * 3, 9, 0) < JET_GAPS:
-			continue
-		var spread := lerpf(0.2, 1.7, t) * _cell
-		var at := from + along * t + across * (_hash(i, _tick, 4) - 0.5) * 2.0 * spread
-		var ink: Color = _ink_water[int(_hash(i, _tick, 6) * 3.0) % 3]
-		# A cell wider a hose level, the far half of the stream wider still.
-		var cells := (2.0 if t > 0.55 else 1.0) + float(clampi(hose_level, 1, 3) - 1)
-		var middle := from + ((at - from) / _cell).round() * _cell
-		var corner := middle - Vector2.ONE * floorf(cells * 0.5) * _cell
-		draw_rect(Rect2(corner, Vector2.ONE * cells * _cell), ink)
+		var across := along.orthogonal().normalized()
+		var middle_ray := absf(side) < 0.01
+		for i in count:
+			var t := float(i) / float(count)
+			if t < _tail or t > _reach:
+				continue
+			if _hash(i - _tick * 3, 9 + ray, 0) < JET_GAPS * (1.0 if middle_ray else 2.5):
+				continue
+			var spread := lerpf(0.2, 0.9, t) * _cell
+			var at := from + along * t + across * (_hash(i, _tick, 4 + ray) - 0.5) * 2.0 * spread
+			var ink: Color = _ink_water[int(_hash(i, _tick, 6 + ray) * 3.0) % 3]
+			# A cell wider a hose level on the middle ray's far half.
+			var cells := 1.0
+			if middle_ray:
+				cells = (2.0 if t > 0.55 else 1.0) + float(clampi(hose_level, 1, 3) - 1)
+			var middle := from + ((at - from) / _cell).round() * _cell
+			var corner := middle - Vector2.ONE * floorf(cells * 0.5) * _cell
+			draw_rect(Rect2(corner, Vector2.ONE * cells * _cell), ink)
 
 
 func _draw_nozzle() -> void:
