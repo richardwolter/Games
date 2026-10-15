@@ -86,8 +86,8 @@ const COAT_GRAIN := 0.12
 ## percent, and nobody is to be sent looking for a pixel.
 const DONE_AT := 0.99
 
-## The clean figure under the pallet (`clean_figure`): its size and its gap below the
-## pallet's foot, in canvas px. First guesses.
+## The clean figure beside the pallet (`clean_figure`): its size and its gap off the
+## pallet's right end, in canvas px. First guesses.
 const CLEAN_FIGURE_PX := Style.TEXT_TITLE
 const CLEAN_FIGURE_GAP := 10.0
 const RINSE_TIME := 0.7
@@ -1169,17 +1169,16 @@ func clean_figure() -> int:
 	return mini(floori(share_clean() / DONE_AT * 100.0), 99)
 
 
-## The figure, centred under the pallet's foot.
+## The figure, beside the pallet's right end and level with it. It stood under the pallet's
+## foot first and the hose, which comes up from below, ran over it (Richard, 2026-10-15).
 func _draw_clean_figure() -> void:
 	if state == State.EMPTY or _pallet_tex == null:
 		return
-	var foot := _pallet_at.y + _pallet_size.y * _zoom
-	var tall := float(CLEAN_FIGURE_PX)
+	var right := _pallet_at.x + _pallet_size.x * _zoom
+	var middle := _pallet_at.y + _pallet_size.y * _zoom * 0.5
 	Style.write(
 		self, "%d%%" % clean_figure(), CLEAN_FIGURE_PX,
-		Vector2(0.0, foot + CLEAN_FIGURE_GAP + tall),
-		Style.INK, HORIZONTAL_ALIGNMENT_CENTER,
-		Rect2(_mid() - 100.0, foot + CLEAN_FIGURE_GAP, 200.0, tall)
+		Vector2(right + CLEAN_FIGURE_GAP, middle + float(CLEAN_FIGURE_PX) * 0.36)
 	)
 
 

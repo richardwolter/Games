@@ -1586,7 +1586,7 @@ far, the four small ones:
   the face it hit off `Iso.ISLAND_CENTRE`, two thirds of a tile from the hut's middle, so in
   that strip it slid the wrong way, into the pump, and stuck. Now `Iso.shed_centre()`.
 - **The wash stand says how clean** (`WashStand.clean_figure`, `CLEAN_FIGURE_PX`/`_GAP`): a
-  figure under the pallet's foot, counted against `DONE_AT` so it reaches 100 when the stand
+  figure beside the pallet's right end (under its foot the hose covered it), counted against `DONE_AT` so it reaches 100 when the stand
   finishes and holds at 99 before. First guesses for size and place.
 - **Still to build** (decided, see the issue): the forced first upgrade (dim, only the button
   takes clicks, then only the cheapest affordable row buys until bought), one ferry bar under
