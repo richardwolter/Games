@@ -988,3 +988,12 @@ static var CUE_FERRY: String:
 
 static var CUE_METER: String:
 	get: return TranslationServer.translate(&"CUE_METER")
+
+static var NEED_STRENGTH: String:
+	get: return TranslationServer.translate(&"NEED_STRENGTH")
+
+static var FIRST_BUY: String:
+	get: return TranslationServer.translate(&"FIRST_BUY")
+
+static var FIRST_BUY_ROW: String:
+	get: return TranslationServer.translate(&"FIRST_BUY_ROW")

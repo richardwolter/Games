@@ -42,6 +42,10 @@ var through := false
 ## A hint the player can close by clicking its paper (2026-10-03, the camera tip): the card
 ## takes that click and says so with `next_asked`, everything else passes straight through.
 var closable := false
+## A card the player cannot get past (2026-10-15, issue #41: the first upgrade): the screen
+## dimmed, the lit target the only thing that takes a click, the card's paper with no count,
+## no "Skip" and no "Continue". Clicks anywhere else are eaten.
+var forced := false
 var _card := Rect2()
 var _skip := Rect2()
 var _clock := 0.0
@@ -68,7 +72,7 @@ func show_card(at: Rect2, words: String = "", place: int = 0, of: int = 0,
 	text = words
 	count = place
 	total = of
-	var blocking := at.size.x > 0.0 and (count > 0 or closable)
+	var blocking := at.size.x > 0.0 and (count > 0 or closable or forced)
 	mouse_filter = Control.MOUSE_FILTER_STOP if blocking else Control.MOUSE_FILTER_IGNORE
 	visible = at.size.x > 0.0
 	queue_redraw()
@@ -91,6 +95,8 @@ func _process(delta: float) -> void:
 
 ## Not here over the lit target of a pass-through card, so the GUI picks what is under it.
 func _has_point(point: Vector2) -> bool:
+	if forced:
+		return not target.has_point(point)
 	if closable and count <= 0:
 		return _card.has_point(point)
 	if through and is_card() and target.has_point(point) and not _card.has_point(point):
@@ -99,6 +105,10 @@ func _has_point(point: Vector2) -> bool:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if forced and visible:
+		if event is InputEventMouseButton:
+			accept_event()
+		return
 	if not is_card() and not (closable and visible):
 		return
 	var click := event as InputEventMouseButton
@@ -122,7 +132,7 @@ func _draw() -> void:
 	if target.size.x <= 0.0:
 		return
 	var view := Rect2(Vector2.ZERO, size)
-	if count > 0:
+	if count > 0 or forced:
 		draw_rect(Rect2(0.0, 0.0, size.x, target.position.y), DIM, true)
 		draw_rect(Rect2(0.0, target.end.y, size.x, size.y - target.end.y), DIM, true)
 		draw_rect(Rect2(0.0, target.position.y, target.position.x, target.size.y), DIM, true)

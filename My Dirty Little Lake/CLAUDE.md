@@ -1588,13 +1588,32 @@ far, the four small ones:
 - **The wash stand says how clean** (`WashStand.clean_figure`, `CLEAN_FIGURE_PX`/`_GAP`): a
   figure beside the pallet's right end (under its foot the hose covered it), counted against `DONE_AT` so it reaches 100 when the stand
   finishes and holds at 99 before. First guesses for size and place.
-- **Still to build** (decided, see the issue): the forced first upgrade (dim, only the button
-  takes clicks, then only the cheapest affordable row buys until bought), one ferry bar under
-  Waiting (next hull home, or the docked hold filling), click the house, pump or hive to walk
-  there and open it, "need more Strength" over the net from the third empty heavy landing, and
-  a fixed horizontal wash fan replacing the round jet.
-- `test_lake` guards the meter's figure, the badge, the gap and both walks down the strip, and
-  the stand's figure part way and at the finish.
+- **"Need more Strength"** (`CastNet.landed_heavy`, `HeavyNote`, `Lake.HEAVY_NOTE_FROM` 3,
+  `Text.NEED_STRENGTH`): a landing that lifts nothing while a piece under the mouth is too
+  heavy (`_reach` refused) is counted; from the third, a pale red line rises over the net and
+  fades (`HeavyNote.LIFE` 1.8 s). The count starts again at each Strength level. The angler's
+  net only, session only.
+- **A press on the hut, the pump or the hive walks there and opens it** (`Lake._place_at`,
+  `_walk_to_place`, `_led_open`, the led cast's walk): hit on the picture's own opaque pixels
+  (`_on_picture`), the box alone took presses on the water behind the eaves. The hut's door
+  (`_before_the_door`), the nearest standable spot `PLACE_STAND` round the pump or the hive;
+  opened on arrival, at once when already there. The hive only while E would open it.
+  **Supersedes "a press on the hut is nothing"** (The Led Cast). The pointer over one lights
+  it (`PLACE_HOVER` 1.15, `_light_place`), mouse only: a brightening, not the outline grilled,
+  by the session's call (cheaper on three pictures drawn three ways).
+- **The first upgrade is forced** (`Lake._first_buy_step`, saved as `first_buy`, absent reads
+  as done, a new game sets it false): once anything is affordable and nothing else is talking
+  to the player, a `TourCard` with `forced` dims the lake and only the Upgrades button takes a
+  click (`FIRST_BUY`). In the shop, once its tour is over, `ShopSkin.only` holds the cheapest
+  affordable row (`_cheapest_affordable`): everything else dimmed, only its tag buys, a short
+  card beside it (`FIRST_BUY_ROW`); the cross, Escape and the table still close the shop, and
+  the card returns on the lake until something is bought. Hints and the camera tip wait for it.
+- **Still to build** (decided, see the issue): one ferry bar under Waiting (next hull home,
+  or the docked hold filling) and a fixed horizontal wash fan replacing the round jet.
+- `test_lake` guards the meter's figure, the badge, the gap and both walks down the strip,
+  the stand's figure part way and at the finish, the Strength line's third landing and reset
+  (`_check_heavy_note`), the presses on the hut and the pump and the hive's refusal
+  (`_check_place_presses`), and the forced card, the one row and its end (`_check_first_buy`).
 
 ### Bed, Sync, Tooltip, English (2026-10-14, `/grill-me` with Richard)
 - **The Small Bed is a catch, not a gift** (`Lake.STARTER_BED`, name kept): `_seed_starter_bed`

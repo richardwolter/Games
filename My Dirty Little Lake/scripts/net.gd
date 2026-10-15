@@ -42,6 +42,10 @@ signal caught_bird(at: Vector2)
 ## The net has just come down on the water, after its landing sweep: where, and how wide its
 ## mouth is. What the tornado listens for (a landing on its foot is a hit).
 signal touched_down(at: Vector2, mouth: float)
+## The net came down, lifted nothing, and something under its mouth was too heavy for it:
+## where. What the "need more Strength" line listens for (2026-10-15, issue #41). The angler's
+## net only; the double cast's is thrown at a spot it can lift.
+signal landed_heavy(at: Vector2)
 
 enum State { IDLE, FLYING, SETTLED, REELING }
 
@@ -1117,6 +1121,9 @@ func _process(delta: float) -> void:
 				if sfx != null:
 					sfx.play_landing(caught)
 				touched_down.emit(world_pos(), mouth_extent())
+				if not caught and not helper \
+						and not _reach(world_pos(), mouth_extent(), strength(), 1, true, false).is_empty():
+					landed_heavy.emit(world_pos())
 				# A lucky net's burst starts on the splash (`LuckStars`, the shader's rim).
 				_lucky_age = 0.0 if lucky() else -1.0
 		State.REELING:

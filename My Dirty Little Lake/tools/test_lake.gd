@@ -1026,6 +1026,7 @@ func _stage_net_ring() -> void:
 			"%.1f px" % _grid.shove[heavy].length())
 		_check(_grid.top_slot(heavy) >= 0, "and is still in the lake", "")
 		_grid.shove[heavy] = Vector2.ZERO
+		_check_heavy_note(heavy)
 
 	# The lean falls back out once nothing is pulling.
 	_net.state = CastNet.State.REELING
@@ -10639,6 +10640,33 @@ func _check_wash_plank() -> void:
 
 ## The upgrades button's pulse (2026-09-22): fires when the affordable count rises, never
 ## on a hold or a fall, breathes, fades out on its own, and is cut by a hover or the shop.
+## "Need more Strength" (2026-10-15, issue #41): a net over a piece it cannot lift sees it
+## as refused, which is what the landing asks; the lake shows the line from the third such
+## landing, and starts counting again at the next Strength level.
+func _check_heavy_note(heavy: int) -> void:
+	var over := _grid.surface_pos(heavy)
+	var refused: Array = _net.call(&"_reach", over, _net.mouth_extent(), 0, 1, true, false)
+	_check(not refused.is_empty(), "a net of no Strength over a heavy piece finds it refused", "")
+	_main.set(&"_heavy_landings", 0)
+	_main.set(&"_heavy_level", -1)
+	var level: int = _main.get(&"net_strength_level")
+	_main.call(&"_on_net_landed_heavy", over)
+	_main.call(&"_on_net_landed_heavy", over)
+	var note: HeavyNote = _main.get(&"_heavy_note")
+	_check(note == null or not note.showing(), "two heavy landings say nothing", "")
+	_main.call(&"_on_net_landed_heavy", over)
+	note = _main.get(&"_heavy_note")
+	_check(note != null and note.showing(), "the third says the net needs more Strength", "")
+	note.call(&"_process", HeavyNote.LIFE + 0.1)
+	_check(not note.showing(), "and the line goes by itself", "")
+	_main.set(&"net_strength_level", level + 1)
+	_main.call(&"_on_net_landed_heavy", over)
+	_check(not note.showing(), "a new Strength level starts the count again", "")
+	_main.set(&"net_strength_level", level)
+	_main.set(&"_heavy_landings", 0)
+	_main.set(&"_heavy_level", -1)
+
+
 ## The meter counts up and the shed's upgrades button wears its name (2026-10-15, issue #41).
 func _check_meter_and_shed_button() -> void:
 	_check(HudSkin.cleaned_figure(1.0) == 0 and HudSkin.cleaned_figure(0.5) == 50
@@ -10657,8 +10685,57 @@ func _check_meter_and_shed_button() -> void:
 		str(button.count))
 
 
+## The first upgrade is forced (2026-10-15, issue #41): the card over the Upgrades button takes
+## every click but the button's, and in the shop only the cheapest affordable row is offered
+## until something is bought.
+func _check_first_buy() -> void:
+	var purse: float = _main.get(&"sludge")
+	var steps: bool = _main.get(&"_steps_done")
+	var tour_done: bool = _main.get(&"_shop_tour_done")
+	_main.set(&"_steps_done", true)
+	_main.set(&"_shop_tour_done", true)
+	_main.set(&"sludge", 0.0)
+	_main.set(&"_first_buy_done", false)
+	_main.call(&"_first_buy_step")
+	var card: TourCard = _main.get(&"_first_buy_card")
+	_check(card == null or not card.visible, "with nothing affordable the first-upgrade card waits", "")
+	_main.set(&"sludge", 1000000.0)
+	var cheapest: StringName = _main.call(&"_cheapest_affordable")
+	_main.set(&"sludge", float(_main.call(&"cost_of", cheapest)))
+	_main.call(&"_first_buy_step")
+	card = _main.get(&"_first_buy_card")
+	var hud: HudSkin = _main.get(&"_skin")
+	var box: Rect2 = hud.get(&"_upgrades_box")
+	box.position += hud.global_position
+	_check(card != null and card.visible and card.forced and card.target.is_equal_approx(box),
+		"once something is affordable the card dims the lake over the Upgrades button", "")
+	_check(not card.call(&"_has_point", box.get_center()) and card.call(&"_has_point", Vector2(5.0, 400.0)),
+		"only the button takes a click under it", "")
+	_main.call(&"_set_menu", true)
+	_main.call(&"_first_buy_step")
+	var shop: ShopSkin = _main.get(&"_shop_skin")
+	_check(not card.visible and shop.only == cheapest,
+		"in the shop only the cheapest affordable row is offered", "%s, %s" % [shop.only, cheapest])
+	# Bought on the net's Width, put back after: the cheapest may be a hull or a dog, and a
+	# purchase of either builds one.
+	var width: int = _main.get(&"net_width_level")
+	_main.set(&"sludge", float(_main.call(&"cost_of", &"net_width")))
+	_main.call(&"_buy", &"net_width")
+	_main.set(&"net_width_level", width)
+	_main.call(&"_first_buy_step")
+	_check(bool(_main.get(&"_first_buy_done")) and shop.only == &"",
+		"buying it ends the forced first upgrade", str(shop.only))
+	_main.call(&"_set_menu", false)
+	_main.call(&"_first_buy_step")
+	_check(not card.visible, "and the card does not come back", "")
+	_main.set(&"sludge", purse)
+	_main.set(&"_steps_done", steps)
+	_main.set(&"_shop_tour_done", tour_done)
+
+
 func _check_upgrades_pulse() -> void:
 	_check_meter_and_shed_button()
+	_check_first_buy()
 	var skin := _main.get(&"_skin") as HudSkin
 	skin.hush_pulse(&"upgrades")
 	var now := skin.available
@@ -11178,6 +11255,53 @@ func _water_out(out: float) -> Vector2:
 	return Iso.tile_to_world(_angler.tile_pos.x + dir.x * out, _angler.tile_pos.y + dir.y * out)
 
 
+## A press on the hut, the pump or the beehive walks there and opens it (2026-10-15, issue
+## #41). Was "a press on the hut is nothing".
+func _check_place_presses() -> void:
+	var stood := _angler.tile_pos
+	var hut := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
+	_check(_main.call(&"_place_at", hut) == &"shed", "the hut's picture is the hut", "")
+	var corner: Rect2 = _main.call(&"_shed_picture")
+	_check(_main.call(&"_place_at", corner.position + Vector2(1.0, 1.0)) == &"",
+		"the empty corner of its picture is not", "")
+	_angler.tile_pos = Iso.ISLAND_CENTRE + Vector2(0.0, 3.5)
+	_main.call(&"_cast_or_walk", hut)
+	_check(_main.get(&"_led_open") == &"shed" and _angler.walk_to == _main.call(&"_before_the_door")
+		and not bool(_main.get(&"_led_throw")),
+		"a press on the hut walks to its door with nothing thrown", str(_angler.walk_to))
+	_angler.tile_pos = _main.call(&"_before_the_door")
+	_main.call(&"_led_step", 1.0 / 60.0)
+	_check(bool(_main.get(&"_shed_open")) and _main.get(&"_led_cast") == Vector2.INF,
+		"and opens the house on arrival", "")
+	_main.call(&"_set_shed", false)
+	var pump: Pump = _main.get(&"_pump")
+	var at := (pump.roof()["rect"] as Rect2).get_center()
+	_check(_main.call(&"_place_at", at) == &"pump", "the pump's picture is the pump", str(at))
+	_angler.tile_pos = Iso.ISLAND_CENTRE + Vector2(0.0, 3.5)
+	_main.call(&"_cast_or_walk", at)
+	var stand: Vector2 = _angler.walk_to
+	_check(_main.get(&"_led_open") == &"pump" and stand != Vector2.INF
+		and bool(_angler.call(&"_can_stand", stand)) and stand.distance_to(Pump.tile) < Lake.PUMP_RANGE,
+		"a press on the pump walks to somewhere beside it", str(stand))
+	_angler.tile_pos = stand
+	_main.call(&"_led_step", 1.0 / 60.0)
+	_check(bool(_main.get(&"_wash_open")), "and opens the wash room on arrival", "")
+	_main.call(&"_set_wash", false)
+	# Standing there already, a press opens at once.
+	_main.call(&"_cast_or_walk", at)
+	_check(bool(_main.get(&"_wash_open")) and _angler.walk_to == Vector2.INF,
+		"a press on the pump from beside it opens it at once", "")
+	_main.call(&"_set_wash", false)
+	# A hive with nothing to do is scenery to a press as it is to E.
+	var hive: Hive = _main.get(&"_hive")
+	if hive != null and not hive.actionable() and not bool(_main.call(&"_hive_tease")):
+		var roof: Dictionary = hive.roof()
+		if not roof.is_empty():
+			_check(_main.call(&"_place_at", (roof["rect"] as Rect2).get_center()) != &"hive",
+				"a hive with nothing to do takes no press", "")
+	_angler.tile_pos = stood
+
+
 func _stage_led_cast() -> void:
 	match _led_step_n:
 		0:
@@ -11279,9 +11403,7 @@ func _stage_led_cast() -> void:
 			_check(_angler.walk_to == lawn and not bool(_main.get(&"_led_throw")),
 				"a press on the isle walks there with no throw", str(_angler.walk_to))
 			_main.call(&"_stop_led_cast")
-			_main.call(&"_cast_or_walk", Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y))
-			_check(_main.get(&"_led_cast") == Vector2.INF and _angler.walk_to == Vector2.INF,
-				"a press on the hut is nothing", "")
+			_check_place_presses()
 			# The ring: solid over water a walk reaches, dashed over water none does and over
 			# the bank, none at all on the island (the source is read for the island's return).
 			_check(_net.castable_after_walk(a) and not _net.in_reach(a),

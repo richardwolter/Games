@@ -358,6 +358,17 @@ static var TOUR_SKIP: String:
 
 ## The card showing, or -1 for no tour.
 var tour: int = -1
+## The one row that buys, or empty for every row (2026-10-15, issue #41: the first upgrade).
+## Everything but it is dimmed and its price tag is the only one that answers; the cross,
+## Escape and a click off the boards still close the shop.
+var only: StringName = &"":
+	set(value):
+		if value == only:
+			return
+		only = value
+		queue_redraw()
+		if _tour_layer != null:
+			_tour_layer.queue_redraw()
 ## Whether the prompt on the card is the pad's A rather than the mouse.
 var tour_pad := false
 ## The tour is over: `skipped` if "Skip" ended it.
@@ -675,6 +686,8 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	accept_event()
 	var row: Dictionary = rows[index]
+	if only != &"" and StringName(row["key"]) != only:
+		return
 	if bool(row.get("afford", false)):
 		bought.emit(StringName(row["key"]))
 
@@ -737,7 +750,7 @@ func _draw() -> void:
 		_draw_legend(_legend_box)
 	_ensure_blurb_layer()
 	_blurb_layer.queue_redraw()
-	if tour >= 0:
+	if tour >= 0 or only != &"":
 		_ensure_tour_layer()
 	if _tour_layer != null:
 		_tour_layer.queue_redraw()
@@ -1573,7 +1586,59 @@ func _ensure_tour_layer() -> void:
 	_tour_layer.draw.connect(func() -> void:
 		if tour >= 0 and tour < TOUR.size():
 			_draw_tour()
+		elif only != &"":
+			_draw_only()
 	)
+
+
+## The row that must be bought, in this control's pixels, or an empty rect.
+func only_box() -> Rect2:
+	for i in _row_boxes.size():
+		var index: int = _row_index[i]
+		if index < rows.size() and StringName(rows[index]["key"]) == only:
+			return _row_boxes[i].grow(4.0)
+	return Rect2()
+
+
+## The first upgrade's spotlight: everything but the row dimmed, its outline, the arrow and a
+## short card beside it. The tour's own drawing, with no count and no foot.
+func _draw_only() -> void:
+	var target := only_box()
+	if target.size.x <= 0.0:
+		return
+	_tour_layer.draw_rect(Rect2(0.0, 0.0, size.x, target.position.y), TOUR_DIM, true)
+	_tour_layer.draw_rect(Rect2(0.0, target.end.y, size.x, size.y - target.end.y), TOUR_DIM, true)
+	_tour_layer.draw_rect(Rect2(0.0, target.position.y, target.position.x, target.size.y), TOUR_DIM, true)
+	_tour_layer.draw_rect(Rect2(target.end.x, target.position.y, size.x - target.end.x, target.size.y), TOUR_DIM, true)
+	_tour_layer.draw_rect(target, TOUR_OUTLINE, false, 2.0)
+	var px := _prompt_px()
+	if _prompt_arrow != null:
+		var a := _prompt_arrow.get_size() * px
+		var corner := Vector2(target.get_center().x - a.x * 0.5, target.position.y - a.y - 2.0).round()
+		_tour_layer.draw_set_transform(corner + Vector2(0.0, a.y), 0.0, Vector2(1.0, -1.0))
+		_tour_layer.draw_texture_rect(_prompt_arrow, Rect2(Vector2.ZERO, a), false)
+		_tour_layer.draw_set_transform(Vector2.ZERO)
+	var face := Style.font()
+	var size_px := FirstSteps.NOTE_SIZE
+	var wide := FirstSteps.NOTE_WIDE
+	var pad := FirstSteps.NOTE_PAD
+	var lines := FirstSteps._wrap(Text.FIRST_BUY_ROW, face, size_px, wide - pad.x * 2.0)
+	var line_tall := face.get_height(size_px) + 1.0
+	var tall := pad.y * 2.0 + line_tall * float(lines.size())
+	var card := Rect2(Vector2.ZERO, Vector2(wide, tall).round())
+	if target.end.x + TOUR_GAP + wide <= size.x - 4.0 and target.get_center().x < size.x * 0.5:
+		card.position = Vector2(target.end.x + TOUR_GAP, target.position.y)
+	else:
+		card.position = Vector2(target.position.x - TOUR_GAP - wide, target.position.y)
+	card.position.x = clampf(card.position.x, 4.0, size.x - card.size.x - 4.0)
+	card.position.y = clampf(card.position.y, 4.0, size.y - card.size.y - 4.0)
+	card.position = card.position.round()
+	_tour_layer.draw_rect(card.grow(FirstSteps.NOTE_RIM + 1.0), FirstSteps.NOTE_OUTER, true)
+	_tour_layer.draw_rect(card, Style.PAPER, true)
+	_tour_layer.draw_rect(card.grow(-1.0), Style.PAPER_EDGE, false, FirstSteps.NOTE_RIM)
+	var inner := card.grow_individual(-pad.x, -pad.y, -pad.x, -pad.y)
+	Wrap.draw_marked(_tour_layer, face, lines, size_px, card, inner.position.y + face.get_ascent(size_px),
+		line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
 
 
 ## The rows for the pad's stick (scripts/pad.gd): one stop a row, the pointer on its price
@@ -1589,9 +1654,11 @@ func pad_focus() -> Array:
 		]
 	var out: Array = []
 	for i in _row_boxes.size():
+		if only != &"" and StringName(rows[_row_index[i]]["key"]) != only:
+			continue
 		out.append({
 			"box": _row_boxes[i], "key": _row_index[i], "at": _tag_boxes[i].get_center(),
-			"first": i == 0,
+			"first": i == 0 or only != &"",
 		})
 	if _close != null and _close.visible:
 		out.append({"box": _close.get_rect(), "key": &"close"})

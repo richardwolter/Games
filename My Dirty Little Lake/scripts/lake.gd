@@ -846,6 +846,14 @@ const DOUBLE_APART := 1.5
 var _net2: CastNet
 ## The haul's running count over the angler (`HaulCount`).
 var _haul_count: HaulCount
+
+## "Need more Strength" over the net (2026-10-15, issue #41): landings that lifted nothing for
+## being too heavy, counted per Strength level, and the line shown from `HEAVY_NOTE_FROM` on.
+## Session only.
+const HEAVY_NOTE_FROM := 3
+var _heavy_note: HeavyNote
+var _heavy_landings := 0
+var _heavy_level := -1
 ## This cast, for the count: whether a net is out, what the nets that are home already
 ## landed, and the room of both nets taken at the throw (the lucky extra is cleared at home).
 var _haul_out := false
@@ -867,6 +875,12 @@ var _wildlife_seen: bool = true
 const CAMERA_TIP_AT := 600.0
 const CAMERA_TIP_HOLD := 8.0
 var _camera_tip_seen: bool = false
+## The first upgrade is forced (2026-10-15, issue #41, mobile games' way): the first time
+## something can be bought, the screen dims and only the Upgrades button takes a click; in
+## the shop, once its tour is over, only the cheapest affordable row buys until it is bought.
+## Saved as `first_buy`; absent reads as done, so only a new game gets it.
+var _first_buy_done: bool = true
+var _first_buy_card: TourCard
 var _camera_tip_left: float = -1.0
 var _camera_tip: TourCard
 var _moment: float = -1.0
@@ -1023,6 +1037,14 @@ var _led_throw: bool = false
 ## `LED_STALL` it is given up rather than left pushing at a wall for ever.
 var _led_stall: float = 0.0
 var _led_was := Vector2.INF
+## A press on the hut, the pump or the beehive walks there and opens it (2026-10-15, issue
+## #41): which of the three the walk ends at, or empty for a plain walk or cast.
+var _led_open: StringName = &""
+## Which of the three the pointer is over, lit while it is; and how much lighter it draws.
+var _place_hovered: StringName = &""
+const PLACE_HOVER := Color(1.15, 1.15, 1.15)
+## How far out round the pump and the hive the walk looks for somewhere to stand, in tiles.
+const PLACE_STAND := 0.7
 const LED_STALL := 0.6
 
 # The first steps (2026-09-22, `/grill-me` with Richard, issue #24; `scripts/first_steps.gd`):
@@ -1482,6 +1504,7 @@ func _ready() -> void:
 	_net.landed.connect(_bank_haul)
 	_net.caught.connect(_on_net_caught)
 	_net.swept.connect(_on_net_swept.bind(_net))
+	_net.landed_heavy.connect(_on_net_landed_heavy)
 	_net.caught_bird.connect(_on_bird_caught)
 
 	# The double cast's net: the first one over again, on the same signals, but a helper —
@@ -2734,6 +2757,10 @@ func _cast_or_walk(where: Vector2) -> void:
 	if _steps != null and _steps.step == FirstSteps.Step.MOVE:
 		_walk_not_cast(where)
 		return
+	var place := _place_at(where)
+	if place != &"":
+		_walk_to_place(place, where)
+		return
 	if _net.in_reach(where):
 		_stop_led_cast()
 		_cast_at(where)
@@ -2778,7 +2805,109 @@ func _walk_not_cast(where: Vector2) -> void:
 	_pan_yielded = true
 
 
+## The hut, the pump or the beehive under a point on the lake, by the drawn pixels of its
+## picture (its box alone took presses on the water behind its eaves), or empty. The hive only
+## while it has something to do, as E beside it asks (`_at_hive`).
+func _place_at(where: Vector2) -> StringName:
+	# Nearest the camera first: the pump and the hive stand in front of the hut's picture.
+	if _hive != null and (_hive.actionable() or _hive_tease()) and _on_picture(_hive.roof(), where):
+		return &"hive"
+	if _pump != null and _on_picture(_pump.roof(), where):
+		return &"pump"
+	if _shed_art != null and _on_picture({"rect": _shed_picture(), "image": _shed_image()}, where):
+		return &"shed"
+	return &""
+
+
+## Is `where` on an opaque pixel of a picture laid over `roof["rect"]`?
+static func _on_picture(roof: Dictionary, where: Vector2) -> bool:
+	if roof.is_empty():
+		return false
+	var box: Rect2 = roof["rect"]
+	var image: Image = roof.get("image")
+	if not box.has_point(where) or image == null or box.size.x <= 0.0 or box.size.y <= 0.0:
+		return false
+	var share := (where - box.position) / box.size
+	var px := Vector2i(
+		clampi(int(share.x * image.get_width()), 0, image.get_width() - 1),
+		clampi(int(share.y * image.get_height()), 0, image.get_height() - 1)
+	)
+	return image.get_pixelv(px).a > 0.5
+
+
+## Where the angler stands to work one of the three: before the hut's door, or the nearest
+## spot round the pump or the hive that can be stood on.
+func _place_stand(place: StringName) -> Vector2:
+	if place == &"shed":
+		return _before_the_door()
+	var mid := Pump.tile if place == &"pump" else Hive.tile + Hive.centre
+	var best := Vector2.INF
+	for k in 8:
+		var turn := TAU * float(k) / 8.0
+		var at := mid + Vector2(cos(turn), sin(turn)) * PLACE_STAND
+		if not bool(_angler.call(&"_can_stand", at)):
+			continue
+		if best == Vector2.INF or at.distance_to(_angler.tile_pos) < best.distance_to(_angler.tile_pos):
+			best = at
+	return best
+
+
+func _at_place(place: StringName) -> bool:
+	match place:
+		&"shed":
+			return _at_shed()
+		&"pump":
+			return _at_pump()
+		&"hive":
+			return _at_hive()
+	return false
+
+
+func _open_place(place: StringName) -> void:
+	match place:
+		&"shed":
+			_set_shed(true)
+		&"pump":
+			_open_wash()
+		&"hive":
+			_open_hive_room()
+
+
+## Walk to one of the three and open it on arrival, or at once when already there.
+func _walk_to_place(place: StringName, where: Vector2) -> void:
+	_stop_led_cast()
+	if _at_place(place):
+		_open_place(place)
+		return
+	var stand := _place_stand(place)
+	if stand == Vector2.INF:
+		return
+	_led_cast = where
+	_led_throw = false
+	_led_open = place
+	_led_stall = 0.0
+	_led_was = _angler.tile_pos
+	_angler.walk_to = stand
+	_pan_yielded = true
+
+
+## The pointer over the hut, the pump or the hive lights it: a click there does something.
+## Mouse only, and only on the bare lake.
+func _light_place() -> void:
+	var over: StringName = &""
+	if not (_in_menu or _panelled() or _farewell != null or Pad.is_pad() or _arrive != Arrive.OFF):
+		over = _place_at(get_global_mouse_position())
+	if over == _place_hovered:
+		return
+	_place_hovered = over
+	if _pump != null:
+		_pump.modulate = PLACE_HOVER if over == &"pump" else Color.WHITE
+	if _hive != null:
+		_hive.modulate = PLACE_HOVER if over == &"hive" else Color.WHITE
+
+
 func _stop_led_cast() -> void:
+	_led_open = &""
 	if _led_cast == Vector2.INF:
 		return
 	_led_cast = Vector2.INF
@@ -2793,6 +2922,11 @@ func _led_step(delta: float) -> void:
 	var pushed := Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down")
 	if _panelled() or _in_menu or _arrive != Arrive.OFF or _farewell != null 			or _net.state != CastNet.State.IDLE or pushed != Vector2.ZERO:
 		_stop_led_cast()
+		return
+	if _led_open != &"" and _at_place(_led_open):
+		var place := _led_open
+		_stop_led_cast()
+		_open_place(place)
 		return
 	if _led_throw and _net.in_reach(_led_cast):
 		var at := _led_cast
@@ -3815,6 +3949,7 @@ func _start_arrival() -> void:
 		return
 	_steps_done = false
 	_shop_tour_done = false
+	_first_buy_done = false
 	_decor_tour_done = false
 	_wildlife_seen = false
 	# The first find washed in a new game costs nothing, whichever it is (2026-10-14): the
@@ -5313,6 +5448,7 @@ func _buy(what: StringName) -> void:
 	if sludge < price:
 		return
 	sludge -= price
+	_first_buy_done = true
 	match what:
 		&"net_width":
 			net_width_level += 1
@@ -5892,6 +6028,59 @@ func _camera_tip_step(delta: float) -> void:
 	_camera_tip.show_card(_free_camera.get_global_rect(), Text.CAMERA_TIP)
 
 
+## The first upgrade, one frame (see `_first_buy_done`). On the lake: the forced card over the
+## Upgrades button while anything can be bought and nothing else is talking to the player. In
+## the shop: once its tour is over, only the cheapest affordable row buys.
+func _first_buy_step() -> void:
+	if _first_buy_done:
+		if _shop_skin.only != &"":
+			_shop_skin.only = &""
+		if _first_buy_card != null and _first_buy_card.visible:
+			_first_buy_card.show_card(Rect2())
+		return
+	if _menu_open:
+		if _first_buy_card != null:
+			_first_buy_card.show_card(Rect2())
+		_shop_skin.only = _cheapest_affordable() if _shop_skin.tour < 0 else &""
+		return
+	_shop_skin.only = &""
+	var held := (
+		_affordable() <= 0 or _panelled() or _fronted() or _farewell != null or _moment >= 0.0
+		or not _moments.is_empty() or _arrive != Arrive.OFF or _letter_open or not _steps_done
+		or _glide >= 0.0 or (_tour_card != null and _tour_card.visible) or _hint_up != &""
+		or _camera_tip_left >= 0.0 or _skin == null or not _skin.visible
+	)
+	if _first_buy_card == null:
+		if _settings == null:
+			return
+		_first_buy_card = TourCard.new()
+		_first_buy_card.name = &"FirstBuy"
+		_first_buy_card.forced = true
+		_settings.get_parent().add_child(_first_buy_card)
+	_settings.get_parent().move_child(_first_buy_card, _settings.get_parent().get_child_count() - 1)
+	if held:
+		_first_buy_card.show_card(Rect2())
+		return
+	var box: Rect2 = _skin.get(&"_upgrades_box")
+	_first_buy_card.show_card(Rect2(_skin.global_position + box.position, box.size), Text.FIRST_BUY)
+
+
+## Whether the forced card is up: hints and the camera tip wait for it.
+func _first_buy_up() -> bool:
+	return _first_buy_card != null and _first_buy_card.visible
+
+
+## The row the first purchase is steered to: the cheapest that can be paid for now.
+func _cheapest_affordable() -> StringName:
+	var best: StringName = &""
+	for key: StringName in TRACKS:
+		if is_maxed(key) or sludge < cost_of(key):
+			continue
+		if best == &"" or cost_of(key) < cost_of(best):
+			best = key
+	return best
+
+
 ## A first-time hint is owed (see `HINT_HOLD`): queued once, shown when nothing holds it.
 func _owe_hint(kind: StringName) -> void:
 	if _cues_seen.has(kind) or kind in _hints or _hint_up == kind:
@@ -5906,6 +6095,7 @@ func _hint_held() -> bool:
 		_panelled() or _fronted() or _farewell != null or _moment >= 0.0 or not _moments.is_empty()
 		or _arrive != Arrive.OFF or _letter_open or not _steps_done or _glide >= 0.0
 		or (_tour_card != null and _tour_card.visible) or _camera_tip_left >= 0.0
+		or _first_buy_up()
 	)
 
 
@@ -6071,6 +6261,25 @@ func _moment_step(delta: float) -> void:
 	_hold_the_angler()
 
 
+## The net came down on rubbish too heavy for it and lifted nothing. The count starts over at
+## each Strength level, so the line comes back only once the new level meets heavier rubbish
+## three times.
+func _on_net_landed_heavy(at: Vector2) -> void:
+	if _heavy_level != net_strength_level:
+		_heavy_level = net_strength_level
+		_heavy_landings = 0
+	_heavy_landings += 1
+	if _heavy_landings < HEAVY_NOTE_FROM or _settings == null:
+		return
+	if _heavy_note == null:
+		_heavy_note = HeavyNote.new()
+		_heavy_note.name = &"HeavyNote"
+		var hud := _settings.get_parent()
+		hud.add_child(_heavy_note)
+		hud.move_child(_heavy_note, 0)
+	_heavy_note.show_at(at)
+
+
 ## A net of this cast is home: keep its catch in the count until the other is home too.
 func _bank_haul(cargo: PackedInt32Array) -> void:
 	_haul_banked += cargo.size()
@@ -6087,6 +6296,8 @@ func _haul_count_step() -> void:
 		hud.add_child(_haul_count)
 		hud.move_child(_haul_count, 0)
 	_haul_count.visible = not (_in_menu or _panelled() or _farewell != null)
+	if _heavy_note != null:
+		_heavy_note.visible = _haul_count.visible
 	if _last_arrows != null:
 		_last_arrows.visible = _haul_count.visible
 	# One cast is both nets: the count is what both hold plus what either has already
@@ -6121,9 +6332,11 @@ func _process(delta: float) -> void:
 		_tick_bonus(delta)
 		_arrival_step()
 		_led_step(delta)
+		_light_place()
 		_first_steps_step(delta)
 		_decor_tour_step(delta)
 		_camera_tip_step(delta)
+		_first_buy_step()
 		_hint_step(delta)
 		_hive_step(delta)
 	_haul_count_step()
@@ -7370,6 +7583,7 @@ func save_game() -> bool:
 		"decor_tour": _decor_tour_done,
 		"wildlife_seen": _wildlife_seen,
 		"camera_tip": _camera_tip_seen,
+		"first_buy": _first_buy_done,
 		"cues_seen": _cues_seen.keys().map(func(k: StringName) -> String: return String(k)),
 		# The beehive, all under one key (2026-09-30). Absent reads as the empty hive.
 		"hive": _hive.to_save() if _hive != null else {},
@@ -7587,6 +7801,7 @@ func load_game() -> bool:
 	# enough, and a load would otherwise fire the moment the stock refills the lake.
 	_wildlife_seen = bool(save.get("wildlife_seen", true))
 	_camera_tip_seen = bool(save.get("camera_tip", false))
+	_first_buy_done = bool(save.get("first_buy", true))
 	# Absent means none seen (the camera tip's rule, 2026-10-07).
 	_cues_seen.clear()
 	for k: Variant in save.get("cues_seen", []):
@@ -7897,7 +8112,10 @@ func _draw_shed() -> void:
 				_shed_image(), picture, _day.lean, _day.stretch,
 				Iso.SHED_ART_GROUND, _day.ink
 			)
-		_island.draw_texture_rect(_shed_art, picture, false, _shed_wet_tint())
+		var tint := _shed_wet_tint()
+		if _place_hovered == &"shed":
+			tint *= PLACE_HOVER
+		_island.draw_texture_rect(_shed_art, picture, false, tint)
 		if _shed_glow != null:
 			_island.draw_texture_rect(_shed_glow, picture, false, Color(SHED_GLOW, _shed_glow_alpha()))
 		# And the grass over the bottom line, which is the whole point of it: the last row
