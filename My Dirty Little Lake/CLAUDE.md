@@ -7531,6 +7531,23 @@ M3 Nov 1, M4 (release candidate up for Valve's review) **Nov 6**, M5 Nov 16.
   upload (2026-10-10) went up without the licence**; its next upload carries it, by Richard's
   call.
 
+### The Store Re-shoot, Second Pass (2026-10-16, `/grill-me` with Richard)
+Every store and press-kit asset redone on the current build, one at a time with Richard.
+- **Stills**: `tools/shot_store.tscn` (`FILM_ONLY=st01..st10`, HUD on), plus
+  `play_decor` (`PLAY_DECOR_SHOT=1`: six finds back on the shelf as copies, the lake 90%
+  cleaned behind, never saved) and `shot_house` (`HOUSE_STORE=1`, the stage-1 room laid out
+  for the store). Picked set: `Marketing/My Dirty Little Lake/screenshots/store_v2/`.
+- **Clips** (HUD off but the count over the angler): `shot_store` `c1_cast`, `c3_beauty`
+  (capybaras swimming in, songbirds on the roof), `c4_tornado` (held at size 1.9, two
+  catches, not tamed), `shot_wash_place` (hose 2), `shot_house` `HOUSE_FILM=1` (the room
+  mending). Cut with ffmpeg `-t`, never `-frames:v`.
+- **Key art**: `tools/shot_keyart.tscn` back (deleted 2026-10-03): plants grown, life staged on
+  the clean side, no find beams. `source/capsules_v3.py`: main from the zoom-3 render, logo
+  as big as the empty top allows. **Trailer v4**: v3's edit re-filmed (`shots4.json`).
+- **Game changes made on the way**: the net's body over the floating rubbish
+  (`Lake.NET_LEAST`, The Net Sorts With The Angler), the wash jet as a cone of water
+  (`_draw_cone`, Demo Playtest Feedback). The letter's stills re-shot after both.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.
@@ -8118,8 +8135,8 @@ catalogue (the shed's tests still use them) and are no longer dealt (`Lake.FIND_
 - `SAVE_VERSION` 20; the v19 save is `_builds/lake_cleanup_v19_20261001.save`. **21** since the
   diner chair went from four copies to one (Richard: finds are unique); the v20 save is
   `_builds/lake_cleanup_v20_20261001.save`.
-- **Open**: the letter's decoration stills still show the old finds (re-run
-  `shot_letter_art`); dog seats and rest heights are first guesses; 1146 and 1172 are named
+- **Closed 2026-10-16**: the letter's stills re-shot (`shot_letter_art`), the house and the
+  wash on Richard's current room; dog seats and rest heights are first guesses; 1146 and 1172 are named
   "Sculpture" and "Blue Rug" until Richard says otherwise. `tools/play_decor.tscn` opens a
   shed holding all of them.
 
@@ -8927,9 +8944,8 @@ The trailer's logo read soft and its shadow looked cut out. **Both were the pixe
 `shots3.json` laid `logo/v1/mdll_logo_stacked_pixel.png`, which `make_logo.py`'s `pixelate`
 shrinks to 640 px, cuts to 64 colours and thresholds to on/off alpha (the soft shadow became
 a hard dark band), then the trailer resized that 1280 px picture to 1190 by nearest.
-**The trailer fix is owed** (Richard, to do with his other trailer fixes): point it at the
-hi-res `logo/v3/mdll_logo_stacked.png` and keep it smooth, like the HD captions. The
-vertical cut is out of scope.
+**Done** (`shots3.json` and `shots4.json` read the hi-res `logo/v3/mdll_logo_stacked.png`).
+The vertical cut still carries the old logo; it is not being re-cut for now.
 - **v3 is the hi-res logo with a new shadow**, picked off a mock (`logo/mock_shadows.py`,
   `tools/logo_check/shadow_sheet.png`; three styles, two directions, over the end card, the
   loading lake and two capsules): option **C, halo, down-left**: the sticker's outline swept
