@@ -51,6 +51,9 @@ func _plan() -> void:
 		["st06", 30.0, _pose_st06, _run_st06],
 		["st09", 40.0, _pose_st09, _run_st09],
 		["st10", 30.0, _pose_st10, _run_st10],
+		["c1_cast", 8.0, _pose_west, _run_c1],
+		["c3_beauty", 14.0, _pose_c3, _run_c3],
+		["c4_tornado", 40.0, _pose_c4, _run_c4],
 	]
 	var only := OS.get_environment("FILM_ONLY")
 	if only != "":
@@ -59,7 +62,9 @@ func _plan() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(STORE_DIR))
 
 
-func _settle_of(_name: String) -> int:
+func _settle_of(name: String) -> int:
+	if name == "c3_beauty":
+		return SETTLE + BEAUTY_LEAD
 	return SETTLE + 60
 
 
@@ -649,4 +654,199 @@ func _run_st10(f: int) -> void:
 	if _st10_thrown >= 0 and _snapped < ST10_SNAPS and (k - _st10_thrown) % ST10_EVERY == 1:
 		_snap_now("st10", "net %d" % _net.state)
 	if _snapped >= ST10_SNAPS:
+		_end_at = _kept
+
+
+# --- the clips: HUD off, every kept frame a JPEG in tools/film/<name>/ ------------------------
+
+## The store's cast clip: one gold net thrown far off the west beach and hauled home, the
+## line hanging in loops; the store's own `s_west` pose with only the count over the angler.
+const C1_LEAN := 0.42
+
+
+func _run_c1(f: int) -> void:
+	_run_west(f)
+	# One camera the whole clip (2026-10-16, Richard): it eased out with the net and back,
+	# and the loop snapped from where it ended to where it started.
+	_hold = _west_from.lerp(_west_land, C1_LEAN) + Vector2(0.0, 20.0)
+	_count_only()
+	var haul: Node = _main.get(&"_haul")
+	if haul != null and _kept > 60 and _kept % 5 == 0:
+		_say("  c1 kept %d net %d flying to crate %d" % [_kept, _net.state, int(haul.call(&"flying_to", null))])
+
+
+## Grime to beauty with pigeons landing on the hut's roof and a capybara pair swimming in to
+## the island (2026-10-16, Richard). The roof spots are offsets from the hut's footprint
+## middle (world px); a roof bird keeps a far tile as its perch so it is never sent off.
+const C3_ROOF := [Vector2(-34.0, -100.0), Vector2(-6.0, -112.0), Vector2(26.0, -101.0)]
+const C3_ROOF_AT := [120, 200, 280]
+const C3_CAPY_AT := -20
+const C3_CAPY_OUT := 130.0
+const C3_CAPY_SPEED := 30.0
+var _c3_roof: Array = []
+var _c3_capy := false
+var _c3_lead: Dictionary = {}
+var _c3_pair: Array = []
+
+
+func _pose_c3() -> void:
+	_c3_roof = []
+	_c3_capy = false
+	_c3_lead = {}
+	_c3_pair = []
+	_pose_beauty()
+
+
+func _run_c3(f: int) -> void:
+	_run_beauty(f)
+	var k := f - SETTLE - BEAUTY_LEAD
+	var wild: Wildlife = _main.get(&"_wildlife")
+	# The animals on the ground drawn over the hut for this clip, or the roof birds stand
+	# behind the picture they are standing on (both are on layer 6).
+	(wild.get(&"_ground") as CanvasItem).z_index = Lake.SHED_LAYER + 1
+	# The pair kept together: the beauty's crowd thinning parts anything closer than 80 px.
+	if not _c3_lead.is_empty():
+		var list: Array = wild.get(&"_critters_on_land")
+		for c: Dictionary in _c3_pair:
+			if not list.has(c):
+				list.append(c)
+	var hut := Iso.tile_to_world(Iso.shed_centre().x, Iso.shed_centre().y)
+	for n in C3_ROOF.size():
+		if k == int(C3_ROOF_AT[n]):
+			var b: Dictionary = wild.call(&"_new_bird")
+			if b.is_empty():
+				continue
+			var roof: Vector2 = C3_ROOF[n]
+			b["at"] = hut + Vector2(roof.x, 0.0) + Vector2(480.0 * (1.0 if n % 2 == 0 else -1.0), -200.0)
+			b["alt"] = 160.0
+			wild.call(&"_bird_fly", b, hut + Vector2(roof.x, 0.0), 160.0, -roof.y, 30.0)
+			(wild.get(&"_birds") as Array).append(b)
+			_c3_roof.append(b)
+	for b: Dictionary in _c3_roof:
+		var roof: Vector2 = C3_ROOF[_c3_roof.find(b)]
+		if int(b["state"]) == Wildlife.Bird.GROUND:
+			b["at"] = hut + Vector2(roof.x, 0.0)
+			b["alt"] = -roof.y
+			b["pose"] = 0
+			b["timer"] = 1.0e6
+			b.erase("cue")
+	if not _c3_capy and k >= C3_CAPY_AT:
+		_c3_capy = _send_capy()
+	if _c3_capy and k % 60 == 0:
+		for c: Dictionary in wild.get(&"_critters_on_land"):
+			if c == _c3_lead or c.get("lead") == _c3_lead:
+				_say("  c3 k %d capy at %s wet %s state %s fade %.1f" % [k, str(c["at"]), str(c.get("wet")), str(c["state"]), float(c["fade"])])
+	if k == 0:
+		_say("  c3 hold %s island %s" % [str(_hold), str(Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y))])
+
+
+## A capybara pair made here (the lake brings them only past half cleaned) and put in the
+## water off the island's east shore from the first frame, swimming in from the right.
+func _send_capy() -> bool:
+	var wild: Wildlife = _main.get(&"_wildlife")
+	var isle: Dictionary = wild.call(&"_isle_spot_for", {"land": Iso.tile_to_world(Iso.ISLAND_CENTRE.x + 10.0, Iso.ISLAND_CENTRE.y - 10.0)})
+	var bank: Dictionary = {}
+	var best := INF
+	for sp: Dictionary in wild.get(&"_shore"):
+		if sp["side"] == "island":
+			continue
+		var d := (sp["land"] as Vector2).distance_to(isle["land"])
+		if d < best:
+			best = d
+			bank = sp
+	if isle.is_empty() or bank.is_empty():
+		return false
+	var out: Vector2 = isle["normal"]
+	var start: Vector2 = (isle["water"] as Vector2) + out * C3_CAPY_OUT
+	var lead: Dictionary = wild.call(&"_new_land", &"capy", bank)
+	var follower: Dictionary = wild.call(&"_new_land", &"capy", bank)
+	for c: Dictionary in [lead, follower]:
+		c["wet"] = true
+		c["arriving"] = false
+		c["fade"] = 1.0
+		c["state"] = Wildlife.Land.MOVE
+		c["speed"] = C3_CAPY_SPEED
+	lead["at"] = start
+	lead["to"] = isle["water"]
+	lead["path"] = [isle["land"]]
+	lead["trip"] = true
+	lead["trip_to"] = "isle"
+	follower["at"] = start + out * 30.0 + Vector2(out.y, -out.x) * 24.0
+	follower["lead"] = lead
+	(wild.get(&"_critters_on_land") as Array).append(lead)
+	(wild.get(&"_critters_on_land") as Array).append(follower)
+	_c3_lead = lead
+	_c3_pair = [lead, follower]
+	_say("  c3: capybaras in the water at %s, heading for %s" % [str(start), str(isle["land"])])
+	return true
+
+
+## The tornado tamed: the trailer's event (three throws at the foot, the collapse) at the
+## still's framing, the count over the angler only.
+## The tornado, bigger and wilder, caught twice and left (2026-10-16, Richard): it roams and
+## flings on its own (the trailer pinned it), drawn at `C4_SIZE` whatever the hits say, its
+## whirl topped up; two throws at its foot, the clip ending `C4_AFTER` frames after the
+## second catch. The camera eases after the middle of the angler and the foot.
+const C4_SIZE := 1.9
+const C4_FIRST := 9.0
+const C4_GAP := 1.6
+const C4_AFTER := 70
+const C4_EASE := 1.6
+var _c4_hold := Vector2.ZERO
+var _c4_casts := 0
+var _c4_last := -100.0
+var _c4_done := -1
+
+
+func _pose_c4() -> void:
+	_pose_tornado()
+	_pack()
+	_place_pack(Vector2(1.0, -1.0))
+	_zoom(2)
+	var t: Node = _main.get(&"_tornado")
+	t.set(&"_need", 12)
+	_c4_casts = 0
+	_c4_last = -100.0
+	_c4_done = -1
+	_c4_hold = _angler.position.lerp(t.call(&"base"), 0.5) - Vector2(0.0, 150.0)
+	_hold = _c4_hold
+
+
+func _run_c4(f: int) -> void:
+	_count_only()
+	_dress_island()
+	var k := f - SETTLE
+	if k == -29:
+		_flora_grown()
+	if k >= -29:
+		_hold_still()
+	var t: Node = _main.get(&"_tornado")
+	if not bool(t.call(&"active")):
+		return
+	t.set(&"_size", C4_SIZE)
+	var since: float = t.get(&"_t")
+	var foot: Vector2 = t.call(&"base")
+	if since >= 1.5 and since - _torn_fed >= TORN_FEED_EVERY:
+		_torn_fed = since
+		_feed_tornado(t)
+	_spread_whirl(t)
+	var want := _angler.position.lerp(foot, 0.5) - Vector2(0.0, 170.0)
+	_c4_hold = _c4_hold.lerp(want, 1.0 - exp(-C4_EASE / _fps))
+	_hold = _c4_hold
+	if _net.state == CastNet.State.IDLE:
+		_angler.call(&"_turn_to", Iso.world_to_tile(foot))
+	# A landed net is called home a beat after it lands, for the next throw.
+	if (_net.state == CastNet.State.SETTLED or _net.state == CastNet.State.REELING) and since - _c4_last > 0.9:
+		_net.call(&"_come_home")
+	if _c4_casts < 2 and since >= C4_FIRST + C4_GAP * _c4_casts and _net.state == CastNet.State.IDLE:
+		var v: Vector2 = t.get(&"_velocity")
+		_main.call(&"_cast_at", foot + v * 0.35)
+		if _net.state != CastNet.State.IDLE:
+			_c4_casts += 1
+			_c4_last = since
+			_say("  c4: throw %d on kept frame %d, hits %d" % [_c4_casts, _kept, int(t.call(&"hits"))])
+	if _c4_done < 0 and int(t.call(&"hits")) >= 2:
+		_c4_done = _kept
+		_say("  c4: second catch on kept frame %d" % _kept)
+	if _c4_done >= 0 and _kept >= _c4_done + C4_AFTER:
 		_end_at = _kept

@@ -208,7 +208,7 @@ func _open_wash() -> void:
 			break
 		if name.begins_with("decor_pk_") and name != String(PIECE) and name != "decor_pk_bed":
 			waiting.append(name)
-	_main.set(&"hose_level", 3)
+	_main.set(&"hose_level", 2)
 	_main.set(&"sludge", maxf(float(_main.get(&"sludge")), 4210.0))
 	while int(_main.get(&"dog_count_level")) < 3:
 		_main.set(&"dog_count_level", int(_main.get(&"dog_count_level")) + 1)
