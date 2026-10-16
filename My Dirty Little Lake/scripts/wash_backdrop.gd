@@ -1099,25 +1099,55 @@ func hull_box(hull: Hull) -> Rect2:
 	var art := hull_art(hull.way)
 	if art.is_empty() or hull.wait > 0.0:
 		return Rect2()
-	var grain := float(BOAT_LANES[hull.lane][1])
+	var grain := lane_grain(hull.lane)
 	var region: Rect2 = art["region"]
 	var anchor: Vector2 = art["anchor"]
 	var line := snappedf(y_at(float(BOAT_LANES[hull.lane][0])), PIXEL)
-	var corner := Vector2(snappedf(hull.x, grain), line) - Vector2(anchor.x, region.size.y) * grain
-	return Rect2(corner, region.size * grain)
+	return Rect2(_hull_corner(hull, line, grain, region, anchor), region.size * grain)
 
 
-## A hull steps across in its own lane's pixels (2026-10-15, a player's notes: the far ferries
-## moved "way choppier" than the near ones). Snapped to `PIXEL` the far lane, one canvas px a
-## painted one, jumped two of its own pixels at a time, half as often as the near lane.
+## A hull's painted pixel in canvas px: its lane's grain, put on a whole number of **screen**
+## pixels (2026-10-15, Richard: the far ferries were still jittery). At 1080p a canvas px is
+## 1.5 screen px, so the far lane's one-canvas-px art pixels drew one and two screen px wide
+## by turns and the pattern crawled as the hull moved, wherever it was snapped. Rounded to
+## whole screen px each art pixel is the same width (the far lane two screen px at 1080p, a
+## third bigger than it was there; unchanged at 720p and 1440p).
+func lane_grain(lane: int) -> float:
+	var grain := float(BOAT_LANES[lane][1])
+	var screen := _screen_scale()
+	if screen <= 0.0:
+		return grain
+	return maxf(roundf(grain * screen), 1.0) / screen
+
+
+func _screen_scale() -> float:
+	return get_viewport().get_final_transform().get_scale().x if is_inside_tree() else 0.0
+
+
+## A canvas length on whole screen pixels.
+func _on_screen(v: float) -> float:
+	var screen := _screen_scale()
+	return roundf(v * screen) / screen if screen > 0.0 else roundf(v)
+
+
+## The hull's top-left corner: its place on whole screen pixels, so it slides one screen px at
+## a time rather than a lane's pixel at a time.
+func _hull_corner(hull: Hull, line: float, grain: float, region: Rect2, anchor: Vector2) -> Vector2:
+	var corner := Vector2(hull.x, line) - Vector2(anchor.x, region.size.y) * grain
+	return Vector2(_on_screen(corner.x), _on_screen(corner.y))
+
+
+## A hull slides on whole screen pixels at its lane's screen-whole grain (`lane_grain`,
+## 2026-10-15, two passes on a player's notes: the far ferries were "way choppier" than the
+## near ones, then still jittery).
 func _draw_hull(hull: Hull, line: float) -> void:
 	var art := hull_art(hull.way)
 	if art.is_empty():
 		return
-	var grain := float(BOAT_LANES[hull.lane][1])
+	var grain := lane_grain(hull.lane)
 	var region: Rect2 = art["region"]
 	var anchor: Vector2 = art["anchor"]
-	var corner := Vector2(snappedf(hull.x, grain), line) - Vector2(anchor.x, region.size.y) * grain
+	var corner := _hull_corner(hull, line, grain, region, anchor)
 	draw_texture_rect_region(art["sheet"], Rect2(corner, region.size * grain), region)
 	# Along the hull, not the whole picture: the cut's own ends where the json has them.
 	var from := corner.x

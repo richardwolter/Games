@@ -1232,15 +1232,24 @@ func _draw() -> void:
 
 ## **The last grime is pointed at** (2026-10-15, `/grill-me` with Richard, a player's notes:
 ## "hard to find the last smidge of dirt"). Once the wash is `LAST_FROM` of the way to
-## `DONE_AT`, every patch of grime left (cells grouped in `LAST_BLOCK` squares) wears a gold
-## corner frame pulsing in whole cells, worked out again every `LAST_EVERY` rather than every
-## frame. First guesses.
+## `DONE_AT`, every patch of grime left (cells grouped in `LAST_BLOCK` squares) catches the
+## light now and then: one of its own cells glints, the clean cells' gleam in miniature, a
+## pale pixel with faint arms at its peak, each patch on its own beat and stepped on the
+## stand's clock. **Subtle by decision** (Richard, same day: gold corner frames round every
+## patch were "very ugly and big"). Worked out every `LAST_EVERY`, not every frame.
 const LAST_FROM := 0.95
 const LAST_BLOCK := 6
 const LAST_EVERY := 0.2
-const LAST_PULSE := 2.2
 const LAST_MOST := 24
-var _last: Array[Rect2i] = []
+## One glint's cycle, seconds, and the share of it the glint is up; its strength at the peak
+## and in its tail; the faint arms' strength at the peak.
+const LAST_CYCLE := 1.6
+const LAST_UP := 0.3
+const LAST_PEAK := 0.55
+const LAST_TAIL := 0.25
+const LAST_ARMS := 0.22
+## One grime cell of each patch left, the one the glint sits on.
+var _last: Array[Vector2i] = []
 var _last_wait := 0.0
 
 
@@ -1258,11 +1267,13 @@ func _drive_last(delta: float) -> void:
 			if _grime[cy * _cols + cx] <= 0.0:
 				continue
 			var key := Vector2i(cx / LAST_BLOCK, cy / LAST_BLOCK)
-			var cell := Rect2i(cx, cy, 1, 1)
-			blocks[key] = (blocks[key] as Rect2i).merge(cell) if blocks.has(key) else cell
+			if not blocks.has(key):
+				blocks[key] = []
+			(blocks[key] as Array).append(Vector2i(cx, cy))
 	_last.clear()
-	for box: Rect2i in blocks.values():
-		_last.append(box)
+	for cells: Array in blocks.values():
+		# The patch's middle cell, so the glint stays put while the patch is worn round it.
+		_last.append(cells[cells.size() / 2])
 		if _last.size() >= LAST_MOST:
 			break
 
@@ -1275,20 +1286,18 @@ func pointing_at_last() -> int:
 func _draw_last() -> void:
 	if _last.is_empty():
 		return
-	# Two whole cells of breathing room, in and out on the clock: no smooth scaling.
-	var out := 1 + int(floor(fmod(_clock * LAST_PULSE, 2.0)))
-	var gold := Color(GLEAM_GOLD, 0.9)
-	for box: Rect2i in _last:
-		var x0 := box.position.x - out
-		var y0 := box.position.y - out
-		var x1 := box.end.x - 1 + out
-		var y1 := box.end.y - 1 + out
-		for corner: Vector2i in [Vector2i(x0, y0), Vector2i(x1, y0), Vector2i(x0, y1), Vector2i(x1, y1)]:
-			var sx := 1 if corner.x == x0 else -1
-			var sy := 1 if corner.y == y0 else -1
-			draw_rect(_cell_box(corner.x, corner.y), gold)
-			draw_rect(_cell_box(corner.x + sx, corner.y), gold)
-			draw_rect(_cell_box(corner.x, corner.y + sy), gold)
+	var tick := float(int(_clock * PIXEL_FPS)) / PIXEL_FPS
+	for cell: Vector2i in _last:
+		var at := fmod(tick / LAST_CYCLE + _hash(cell.x, cell.y, 41), 1.0)
+		if at >= LAST_UP:
+			continue
+		var peak := at < LAST_UP * 0.5
+		draw_rect(_cell_box(cell.x, cell.y), Color(1.0, 1.0, 1.0, LAST_PEAK if peak else LAST_TAIL))
+		if not peak:
+			continue
+		var arm := Color(GLEAM_GOLD.lerp(Color.WHITE, 0.5), LAST_ARMS)
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			draw_rect(_cell_box(cell.x + step.x, cell.y + step.y), arm)
 
 
 ## How clean the find on the stand is, as a whole percent (2026-10-15, issue #41: a demo

@@ -1650,12 +1650,18 @@ silent crate in, the #41 fixes above not yet). Both builds unless it says demo.
   (`WashRoom.auto_next`, off while the decoration tour walks the player back to the shed).
 - **The last grime is pointed at** (`WashStand.LAST_*`, `_drive_last`, `_draw_last`): from
   `LAST_FROM` (0.95) of the way to `DONE_AT`, every patch left (cells in `LAST_BLOCK` squares,
-  at most `LAST_MOST`) wears gold corner marks pulsing a whole cell out and back.
+  at most `LAST_MOST`) now and then glints on one of its own cells: the gleam in miniature, a
+  pale pixel with faint arms at its peak, each on its own beat (`LAST_CYCLE`, `LAST_UP`).
+  Gold corner frames round each patch were the first cut and were "very ugly and big".
+  `LAST_PEAK`/`LAST_TAIL`/`LAST_ARMS` are first guesses.
 - **The door takes no E while the decoration tour is up** (`ShedRoom.door_off`, set in
   `Lake._decor_tour_step` from the plank's card on): told by the room's card to press E on a
   lit piece, he stood by the door and was put out on the lake.
-- **The wash room's ferries step in their own lane's pixels** (`snappedf(hull.x, grain)`): the
-  far lane jumped two of its art pixels at a time and read as lag.
+- **The wash room's ferries slide on whole screen pixels** (`WashBackdrop.lane_grain`,
+  `_hull_corner`): a lane's art pixel is rounded to whole screen pixels and the hull's place
+  snapped to them. At 1080p the far lane's one-canvas-px pixel was 1.5 screen px, drawn one
+  and two wide by turns and crawling as it moved, however its place was snapped; it now draws
+  two screen px a pixel there, a third bigger (unchanged at 720p and 1440p).
 - **Demo: the capped Strength line says "Not in the demo"** (`HeavyNote.words`,
   `Text.DEMO_LOCKED`), from the first empty landing once Strength is at the demo's cap. The
   heavy pieces stay.

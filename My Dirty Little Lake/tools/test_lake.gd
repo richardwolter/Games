@@ -13674,8 +13674,9 @@ func _check_oct15_notes() -> void:
 	room.door_off = false
 	# The far ferries step in their own lane's pixels.
 	var backdrop_src := FileAccess.get_file_as_string("res://scripts/wash_backdrop.gd")
-	_check(backdrop_src.contains("snappedf(hull.x, grain)") and not backdrop_src.contains("snappedf(hull.x, PIXEL)"),
-		"a ferry behind the stand steps in its lane's own pixels", "")
+	_check(backdrop_src.contains("func lane_grain(") and backdrop_src.contains("_hull_corner(hull, line, grain")
+		and not backdrop_src.contains("snappedf(hull.x"),
+		"a ferry behind the stand slides on whole screen pixels at a screen-whole grain", "")
 	# The demo at its Strength cap says so from the first heavy landing.
 	var level: int = _main.get(&"net_strength_level")
 	Demo.forced = true
