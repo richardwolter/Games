@@ -5422,11 +5422,13 @@ func _stage_net_behind() -> void:
 		_angler.position = where[name]
 		_main.call(&"_sort_walkers")
 		bands[name] = _angler.z_index
-		if _net.z_index >= _angler.z_index:
-			over.append("%s (net %d, angler %d)" % [name, _net.z_index, _angler.z_index])
-		if helper != null and helper.z_index != _net.z_index:
+		if _net.walker_z >= _angler.z_index:
+			over.append("%s (rope from %d, angler %d)" % [name, _net.walker_z, _angler.z_index])
+		if _net.z_index <= _grid.z_index:
+			over.append("%s (net body %d, not over the floating rubbish %d)" % [name, _net.z_index, _grid.z_index])
+		if helper != null and (helper.z_index != _net.z_index or helper.walker_z != _net.walker_z):
 			over.append("%s (the double cast's net is on its own layer)" % name)
-	_check(over.is_empty(), "the net stays behind the angler wherever they stand",
+	_check(over.is_empty(), "the rope stays behind the angler and the net over the floating rubbish wherever they stand",
 		"over: %s" % str(over))
 	# The three bands really are three, or the check above proves nothing.
 	_check(int(bands["in the open"]) > int(bands["beside the crate"])

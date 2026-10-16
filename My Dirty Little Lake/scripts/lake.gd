@@ -1951,6 +1951,9 @@ const SHED_LAYER := 6
 const BEHIND_CRATE := 7
 const CRATE_LAYER := 8
 const IN_FRONT := 9
+## The least a net's body is drawn at: one over the floating rubbish (the grid, 5), whatever
+## band the angler is on. Its rope and loops follow the angler instead (`CastNet.walker_z`).
+const NET_LEAST := 6
 
 ## The flock, above the lot of it — hulls (12), the haul (8), the piers, the walkers, and
 ## the net and the finds' beams at 20. A pigeon is the only thing on this lake that is
@@ -6535,13 +6538,14 @@ func _sort_walkers() -> void:
 		# crate on 7, so the net and the whole rope with it were drawn over the player.
 		# Following the walker rule is what makes "behind the angler" mean it everywhere.
 		#
-		# The cost, behind the hut only: the net goes to 4, under the floating rubbish at 5,
-		# so the rope passes behind junk on its way out. The angler is already tied with the
-		# soup on that band; a two-pixel line going under a bottle is the lesser wrong.
-		if _net != null:
-			_net.z_index = stood - 1
-		if _net2 != null:
-			_net2.z_index = stood - 1
+		# Only the rope and the loops follow the angler (`walker_z`): the net's body never goes
+		# under `NET_LEAST`, one over the floating rubbish (2026-10-16, Richard: behind the
+		# hut the net went to 4, under the soup at 5, and the pile it was hauling was drawn
+		# over the mesh). It used to be one number for both, "the lesser wrong".
+		for net: CastNet in [_net, _net2]:
+			if net != null:
+				net.walker_z = stood - 1
+				net.z_index = maxi(stood - 1, NET_LEAST)
 	for dog in _dogs:
 		dog.z_index = _walker_layer(dog.position)
 	_order_walkers()

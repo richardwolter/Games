@@ -12,6 +12,7 @@ extends Node
 const OUT := "res://tools/"
 const QUIT_AFTER_MS := 90000
 const LAYERS := preload("res://tools/shot_house_layers.gd")
+const Style := preload("res://scripts/style.gd")
 
 var _main: Node
 var _room: ShedRoom
@@ -65,6 +66,9 @@ func _stage(stage: int, seen: int) -> void:
 
 func _run() -> void:
 	_room = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+	if OS.get_environment("HOUSE_STORE") != "":
+		await _store_still()
+		return
 	var placed: Array = []
 	for stage in [1, 2, 3]:
 		placed.append_array([LAYERS.STAGE_1, LAYERS.STAGE_2, LAYERS.STAGE_3][stage - 1])
@@ -86,6 +90,86 @@ func _run() -> void:
 	await _wait(12)
 	await _shot("last_house_up23.png")
 	_finish("done")
+
+
+## The store's still (2026-10-16): stage 1 furnished as the probe's first stage, a few early
+## finds waiting on the shelf, no pointing hands; tools/last_house_store.png.
+const STORE_SHELF := ["decor_pk_coffee_table", "decor_vynil_player", "decor_pk_flower_vase"]
+
+
+func _store_still() -> void:
+	TranslationServer.set_locale("en")
+	Style.set_locale("en")
+	var unlocked: Array[String] = _main.get(&"unlocked")
+	for name: String in STORE_SHELF:
+		unlocked.append(name)
+	await _stage(1, 1)
+	_furnish_store()
+	var tried: Array[String] = _main.get(&"switch_tried")
+	for row: Dictionary in _main.get(&"decor"):
+		if not tried.has(String(row["piece"])):
+			tried.append(String(row["piece"]))
+	_room.pack_size = func() -> int: return 1
+	for _try in 200:
+		if not _room.dogs().is_empty():
+			break
+		_room.call(&"_room_shown")
+	for _f in 90:
+		_hold_store()
+		await get_tree().process_frame
+	await _shot("last_house_store.png")
+	_finish("store still")
+
+
+## Stage 1 laid out for the store (2026-10-16, Richard): the bed against the left wall below
+## the hole, the nightstand at its head with the record player centred on it, the coat rack
+## beside the door. Cells, as the layouts are.
+const STORE_ROWS := [[&"decor_pk_sofa", 22, 8], [&"decor_pk_wood_chair", 14, 10],
+	[&"decor_pk_coat_stand", 24, -3]]
+## The bed turned side on (view 1), its cell; where the player stands (cells) facing left.
+const STORE_BED := Vector2i(1, 21)
+const STORE_BED_VIEW := 1
+const STORE_YOU := Vector2(36.0, 15.0)
+
+
+const SIT_IN := 3
+
+
+func _furnish_store() -> void:
+	_furnish(STORE_ROWS)
+	var bed := _room.span_of(&"decor_pk_bed", STORE_BED_VIEW)
+	if not _room.place(&"decor_pk_bed", STORE_BED * ShedRoom.CELL, STORE_BED_VIEW):
+		_say("refused: bed side on")
+	var stand := _room.span_of(&"decor_pk_nightstand", 0)
+	var player := _room.span_of(&"decor_vynil_player", 0)
+	var at := Vector2i(STORE_BED.x * ShedRoom.CELL + bed.x + 3, STORE_BED.y * ShedRoom.CELL)
+	if not _room.place(&"decor_pk_nightstand", at):
+		_say("refused: nightstand at %s" % str(at))
+	# Two cells up the stand, as the probe's own layout had it, less `SIT_IN` so it sits down
+	# into the stand's top rather than on its edge.
+	var on := Vector2i(at.x + (stand.x - player.x) / 2, at.y - 2 * ShedRoom.CELL + SIT_IN)
+	if not _room.place(&"decor_vynil_player", on):
+		_say("refused: record player at %s" % str(on))
+
+
+## The player on the right facing left, and the one dog asleep on the sofa: held every
+## frame, the room's own clocks running on.
+func _hold_store() -> void:
+	_room.set(&"_you_at", STORE_YOU)
+	_room.set(&"_you_facing", Vector2(-1.0, 0.0))
+	_room.set(&"_you_age", 0.0)
+	_room.set(&"_you_step", 0.0)
+	if _room.dogs().is_empty():
+		return
+	var dog: ShedRoom.ShedDog = _room.dogs()[0]
+	for seat: Dictionary in _room.call(&"_seats"):
+		if String(seat["key"]).begins_with("decor_pk_sofa@"):
+			dog.seat = String(seat["key"])
+			dog.over = seat["over"]
+			dog.at = seat["feet"]
+			dog.target = seat["feet"]
+	dog.state = &"sleep"
+	dog.mood = 1.0e9
 
 
 func _furnish(rows: Array) -> void:

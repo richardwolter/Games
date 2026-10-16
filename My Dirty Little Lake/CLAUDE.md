@@ -1622,9 +1622,12 @@ far, all but the rotation:
   `FAN_POWER` 0.5, `fan_half`, `_fan_spot`): `_wash_at` wears a wide, low box with soft ends,
   even across nearly all of it (second pass the same day, Richard: the first cut, an ellipse
   strongest along its middle, was too concentrated in the centre), so a sweep down the piece
-  cleans the whole width; the stream draws as `FAN_RAYS` (7) dashed rays of one weight
-  opening from the tip to the fan's ends, the froth spread evenly along the fan's line, and
-  drips start anywhere along it. Fixed horizontal, by decision (no switch to
+  cleans the whole width; the stream draws as a cone of water (`_draw_cone`, 2026-10-16,
+  Richard: "less stream, more water cone", picked off the three hose levels; it was
+  `FAN_RAYS` dashed rays that read as streams turning into a white mass): one sheet of whole
+  cells from the tip to the fan's ends, `CONE_LANES` streaks with `CONE_GAP` left out, sides
+  eaten `CONE_RAGGED`, `CONE_TIP` cells at the bore; the froth spread evenly along the fan's
+  line, and drips start anywhere along it. Fixed horizontal, by decision (no switch to
   vertical); the hose's levels widen it (`jet_radius` unchanged). **Supersedes the round jet**
   in The Pump and the Wash Room. Numbers are first guesses for Richard's hand.
 - `test_lake` guards the meter's figure, the badge, the gap and both walks down the strip,
@@ -3805,9 +3808,11 @@ rather than a fixed z 8.
   the net and the whole rope were drawn **over** the player — casting up the screen off solid
   ground, the end of the rope showed against the figure (Richard). Following the walker rule
   is what makes "behind the angler" mean it wherever they stand.
-- **The cost, behind the hut only**: the net lands on 4, under the floating rubbish at 5, so
-  the rope passes behind junk on its way out. The angler is already tied with the soup on
-  that band, and a two-pixel line going under a bottle is the lesser wrong.
+- **Superseded 2026-10-16 for the net's body** (Richard: behind the hut the net went to 4,
+  under the floating rubbish at 5, and the pile it hauled was drawn over the mesh): only the
+  rope and the loops follow the angler now (`CastNet.walker_z`, one under the angler's
+  layer); the net's body never goes under `Lake.NET_LEAST` (6), one over the soup. Behind
+  the hut a net reeled right home may draw over the angler's feet for a moment; accepted.
 - Both nets, so the double cast's helper does not sort on its own. `test_lake` walks the
   angler through all three bands and guards it.
 

@@ -58,12 +58,20 @@ const JET_POWER := 2.6
 ## `FAN_WIDE` of `JET_RADIUS` across either side and `FAN_TALL` of it up and down, even across
 ## nearly all of it (second pass the same day, Richard: not so strong in the middle), at
 ## `FAN_POWER` of the round jet's strength. Fixed level, by decision; the hose's levels widen
-## it. The stream is drawn as `FAN_RAYS` dashed rays of one weight opening from the tip to the
-## fan's ends. All first guesses.
+## it. All first guesses.
 const FAN_WIDE := 2.6
 const FAN_TALL := 0.6
 const FAN_POWER := 0.5
-const FAN_RAYS := 7
+## The stream is a cone of water (2026-10-16, Richard: "less stream, more water cone"; it was
+## `FAN_RAYS` dashed rays that read as streams turning into a white mass where they landed):
+## one sheet opening from the tip to the fan's width at the aim, in whole cells, streaked
+## along its length and ragged at its sides, so it is the same water as the froth it lands
+## in. `CONE_LANES` streaks across it, `CONE_GAP` of each streak's cells left out (flowing),
+## `CONE_RAGGED` of its half-width eaten off the sides, `CONE_TIP` cells across at the bore.
+const CONE_LANES := 9
+const CONE_GAP := 0.22
+const CONE_RAGGED := 0.18
+const CONE_TIP := 1.5
 
 ## The hose upgrade (2026-10-01, `/grill-me` with Richard): bought in the wash room, levels 1
 ## to 3, each a share of the jet's width and power over level 1 — gentle, by decision, so
@@ -210,8 +218,6 @@ const PIXEL_FPS := 14.0
 const NOZZLE_ART := "res://assets/nozzle.png"
 const NOZZLE_CONTRACT := "res://assets/nozzle.json"
 const NOZZLE_SCALE := 4.0
-## The share of the stream's dashes left out, so it reads as a jet and not a bar.
-const JET_GAPS := 0.08
 const NOZZLE_RISE := 17.0
 ## **One drawing, the straight one, and it glides** (Richard, 2026-09-19, second look: a
 ## picture that changed with every move read as a different nozzle each time, and the
@@ -1642,44 +1648,54 @@ func _drive_nozzle(delta: float) -> void:
 			bead[0] = _nozzle_point(frame, "bead")
 
 
-## Dashes of water from the nozzle to the aim, flowing forwards, spreading as they go. From
-## `_tail` to `_reach` of the way, so it grows out of the nozzle and lets go of it.
-##
-## Every dash is centred on the line and put on a grid counted from the tip itself (Richard,
-## 2026-10-02): on the screen's grid the first dash could sit up to half a cell beside the
-## bore. The first dash is the tip's own cell, never behind it, so nothing is drawn over the
-## brass. `JET_GAPS` of the dashes are left out (it was a fifth, which read thin).
+## The water from the nozzle to the aim, from `_tail` to `_reach` of the way, so it grows out
+## of the nozzle and lets go of it. Drawn on a grid counted from the tip itself (Richard,
+## 2026-10-02): on the screen's grid the first cell could sit up to half a cell beside the bore.
 func _draw_stream() -> void:
 	if _reach <= 0.0 or _tail >= 1.0:
 		return
+	_draw_cone()
+
+
+## The jet as a cone of water: every cell of the tip's grid inside the triangle from the tip
+## to the fan's two ends at the aim, from `_tail` to `_reach` of the way.
+func _draw_cone() -> void:
 	var tip := _nozzle_tip()
-	# The fan: rays from the tip to points spread evenly across the fan's width at the aim, all
-	# of one weight, so the water opens out flat as it goes.
-	var half_px := fan_half().x * FINE * _cell
-	for ray in FAN_RAYS:
-		var side := lerpf(-1.0, 1.0, float(ray) / float(maxi(FAN_RAYS - 1, 1)))
-		var to := _aim + Vector2(side * half_px, 0.0)
-		# Half a cell out of the bore, so the first dash stands just past the lip, not on the brass.
-		var from := tip + (to - tip).normalized() * _cell * 0.5
-		var along := to - from
-		var count := int(along.length() / _cell)
-		if count <= 0:
-			continue
-		var across := along.orthogonal().normalized()
-		for i in count:
-			var t := float(i) / float(count)
-			if t < _tail or t > _reach:
+	var axis := _aim - tip
+	var length := axis.length()
+	if length < _cell:
+		return
+	var half := maxf(fan_half().x * FINE * _cell, CONE_TIP * _cell)
+	var tip_half := CONE_TIP * 0.5 * _cell
+	# d = t * axis + u * across, with |u| no more than the half-width at t.
+	var across := Vector2(1.0, 0.0)
+	var det := axis.x * across.y - axis.y * across.x
+	if absf(det) < 0.001:
+		return
+	var lo := Vector2(minf(tip.x, _aim.x - half), minf(tip.y, _aim.y)) - Vector2.ONE * _cell
+	var hi := Vector2(maxf(tip.x, _aim.x + half), maxf(tip.y, _aim.y)) + Vector2.ONE * _cell
+	var from := ((lo - tip) / _cell).floor()
+	var to := ((hi - tip) / _cell).ceil()
+	var steps := maxf(length / _cell, 1.0)
+	for iy in range(int(from.y), int(to.y) + 1):
+		for ix in range(int(from.x), int(to.x) + 1):
+			var at := tip + Vector2(ix, iy) * _cell
+			var d := at - tip
+			var t := (d.x * across.y - d.y * across.x) / det
+			var u := (axis.x * d.y - axis.y * d.x) / det
+			if t < maxf(_tail, 0.02) or t > _reach:
 				continue
-			if _hash(i - _tick * 3, 9 + ray, 0) < JET_GAPS * 1.5:
+			var width := lerpf(tip_half, half, t)
+			var side := absf(u) / width
+			var lane := int(round((u / width) * float(CONE_LANES) * 0.5))
+			var row := int(t * steps)
+			if side > 1.0 - CONE_RAGGED * _hash(row, lane, _tick):
 				continue
-			var spread := lerpf(0.2, 0.9, t) * _cell
-			var at := from + along * t + across * (_hash(i, _tick, 4 + ray) - 0.5) * 2.0 * spread
-			var ink: Color = _ink_water[int(_hash(i, _tick, 6 + ray) * 3.0) % 3]
-			# A cell wider on every ray's far half from the second hose level.
-			var cells := 1.0 + (float(clampi(hose_level, 1, 3) - 1) if t > 0.55 else 0.0)
-			var middle := from + ((at - from) / _cell).round() * _cell
-			var corner := middle - Vector2.ONE * floorf(cells * 0.5) * _cell
-			draw_rect(Rect2(corner, Vector2.ONE * cells * _cell), ink)
+			if _hash(row - _tick * 3, lane + 40, 0) < CONE_GAP:
+				continue
+			var ink: Color = _ink_water[int(_hash(row, lane - _tick, 5) * 3.0) % 3]
+			var alpha := 0.9 if side < 0.7 else 0.65
+			draw_rect(Rect2(at - Vector2.ONE * 0.5 * _cell, Vector2.ONE * _cell), Color(ink, alpha))
 
 
 func _draw_nozzle() -> void:

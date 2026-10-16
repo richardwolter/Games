@@ -24,6 +24,11 @@ const SHOTS := 6
 ## How far in front of the fireplace's foot the sleeping dog lies, in cells.
 const FIRE_FRONT := 0.9
 const SHOT_GAP := 90
+## The shot's shelf: these finds put on it a second time, and the share of the lake's wet
+## tiles emptied behind the room.
+const SHELF_COPIES := ["decor_pk_armchair", "decor_pk_globe", "decor_pk_flower_vase",
+	"decor_pk_bonsai", "decor_pk_table_lamp", "decor_pk_coat_stand"]
+const SHOT_CLEAN := 0.9
 
 var _main: Node
 var _frames := 0
@@ -78,6 +83,12 @@ func _open() -> void:
 	while int(_main.get(&"dog_count_level")) < 3:
 		_main.set(&"dog_count_level", int(_main.get(&"dog_count_level")) + 1)
 		_main.call(&"_add_dog")
+	if _shot:
+		# The store's still (2026-10-16, Richard): a few finds waiting on the shelf, as copies
+		# so nothing in the room moves, and the lake behind mostly cleaned. Never saved.
+		for name: String in SHELF_COPIES:
+			unlocked.append(name)
+		_clean_lake()
 	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
 	room.pack_size = func() -> int: return ShedRoom.DOGS_MOST
 	_main.call(&"_set_shed", true)
@@ -88,6 +99,20 @@ func _open() -> void:
 				break
 			room.call(&"_room_shown")
 		_by_the_fire(room)
+
+
+## `SHOT_CLEAN` of the wet tiles emptied the way the net takes, off a fixed roll.
+func _clean_lake() -> void:
+	var grid: LakeGrid = _main.get_node(^"Grid")
+	var roll := RandomNumberGenerator.new()
+	roll.seed = 5
+	for index in grid.stacks.size():
+		if grid.dry[index] == 1 or grid.stacks[index].is_empty() or roll.randf() >= SHOT_CLEAN:
+			continue
+		while not grid.stacks[index].is_empty():
+			var def_index := grid.take(index, grid.stacks[index].size() - 1)
+			if not grid.defs[def_index].keepsake:
+				_main.call(&"_on_net_caught", def_index)
 
 
 ## The shot's poses (2026-10-02, Richard): the player on the first frame of the idle row,

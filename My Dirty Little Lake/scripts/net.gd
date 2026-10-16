@@ -386,6 +386,10 @@ var luck_hold: int = 0
 ## A helper net — the double cast's second net. It never plays the angler's throw or ends
 ## it: that gesture belongs to the first net, which is still out when this one lands.
 var helper: bool = false
+## The layer the rope and the loops are drawn from: one under the angler's own, set by the
+## lake each frame. The net's body (this node) may sit higher, never under the floating
+## rubbish (`Lake.NET_LEAST`).
+var walker_z: int = 8
 
 ## Wired up by lake.gd. The net reads the tile field directly rather than asking the lake
 ## to fetch for it — it is the thing doing the catching.
@@ -2067,7 +2071,7 @@ func _drive_coils(delta: float) -> void:
 	_coils.hand = angler.position + _coil_hand
 	# In front of the figure, but behind it facing away: the hands are in front of the body
 	# there, and the loops must not hang over the back (Richard, 2026-10-11).
-	_coils.z_index = z_index + (0 if angler.call(&"_view") == &"north" else 2)
+	_coils.z_index = walker_z + (0 if angler.call(&"_view") == &"north" else 2)
 	_coils.queue_redraw()
 
 
@@ -2106,7 +2110,7 @@ func _lay_rope(
 	# hauling it (Richard, 2026-10-11). Facing away the hands are in front of the body and the
 	# rope goes behind it. The helper net's rope still ends inside the figure (`rod_tip`) and
 	# stays level with this node, so the body hides its cut end.
-	_rope.z_index = z_index + (2 if not helper and angler != null and angler.call(&"_view") != &"north" else 0)
+	_rope.z_index = walker_z + (2 if not helper and angler != null and angler.call(&"_view") != &"north" else 0)
 	_rope.line = line
 	_rope.queue_redraw()
 
