@@ -7684,7 +7684,8 @@ sheet Richard enters on Steamworks.
   `Lake` class and its code names. "Lake Cleanup" in a note older than this one is the game.
 
 ### The Steam Demo (2026-10-09, `/grill-me` with Richard)
-A separate Steam demo app (no festival), about 25 minutes. `scripts/demo.gd` (`Demo`), the
+A separate Steam demo app, about 25 minutes, in Steam Next Fest (Oct 19-26, 2026; this line
+said "no festival" until 2026-10-20). `scripts/demo.gd` (`Demo`), the
 lake's "demo's finale" block, and the **Windows Demo** export preset.
 - **One codebase**: the preset's `demo` feature tag is the demo (`Demo.on()`; `Demo.forced`
   for tests). Its own save, `user://my_dirty_little_lake_demo.save`; nothing carries into the
@@ -7772,7 +7773,9 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   songs and their radio copies only, nothing from `tools/`, `docs/` or `addons/godot_ai/`) and a
   900-frame windowed run of the exported exe with no errors and the user folder untouched. The
   gate is Richard's: upload, set live on default, install through Steam, play to the finale,
-  then Release in Steamworks.
+  then Release in Steamworks. **Uploaded, played through by Richard and released on
+  2026-10-20** (commit `6ac179a`). The bat's first run failed: a second Godot (test_lake) was
+  using the project and the export quit while loading it. Export with nothing else running.
 - **The Demo's Four Songs, the piers and the hive** (2026-10-13, `/grill-me` with Richard):
   - **Four songs play** (`Demo.SONGS`, Richard's pick): Movimento Tranquilo, House by the
     Lake, Hello World, This is Nice. `MusicStation.songs()` is what plays, `shown()` all
@@ -9322,6 +9325,16 @@ song, beats, captions and 37.2 s, **re-filmed in portrait, not cropped**.
   1.7x onto the stand (Richard: "more focused on washing and less on the menu"). Captions sit
   at 128 px (`caption_px`, up to 76% of the width) inside the feeds' safe area (clear of the top 14%, bottom 25%, right 12%) and off the action,
   checked frame by frame; `vertical/review_sheet.py` makes the stills sheet.
+
+### The Next Fest Clip (2026-10-20, `/grill-me` with Richard)
+A 15 s vertical clip for the demo in Next Fest: `trailer/shots_nextfest_vertical.json` through
+`build_trailer2.py` into `trailer/vertical/Next Fest Demo Vertical.mp4`. **No new filming**: the
+vertical v3 frames in `tools/film/v_*` (Oct 8, so the wash jet is the old stream). Hook "FREE
+DEMO / ON STEAM" over the open's push (captions `wishlist` and the new `steam` style, Steam's
+light blue), then gold cast, wash, placing, tornado, grime to beauty, and the end card: logo,
+WISHLIST NOW and the badge `steam_nextfest_white.png` (the Steam lockup with NEXT FEST set
+after it in Bahnschrift Bold, its registered mark dropped; `make_nextfest_badge.py`). Habibs 3
+on the trailer's grid, the cut to the gold cast on the drop. No dates, so it holds all week.
 
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 **Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.
