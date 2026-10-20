@@ -13801,6 +13801,11 @@ func _check_pad_focus(pad: Node) -> void:
 		if door.get("first", false):
 			accent = door["key"]
 	_check(doors.size() >= 6 and accent == &"continue", "the menu offers its doors, Continue first", "%d %s" % [doors.size(), accent])
+	var stamp := MainMenu.version_line()
+	var version := String(ProjectSettings.get_setting("application/config/version", ""))
+	_check(not version.is_empty() and version != "0.1.0" and stamp.begins_with("v" + version)
+		and stamp.ends_with("-demo") == Demo.on(),
+		"the menu carries the build's version, marked in the demo", stamp)
 	_check(pad.call(&"focus_owner") == menu, "the menu is the board the stick picks on", "")
 	var confirm: MenuConfirm = menu.get_node(^"Confirm")
 	confirm.visible = true

@@ -7751,14 +7751,28 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   `DEMO_BACK_LAKE`): back to lake closes the words, so the player can finish washing and
   decorating. The menu is reached from the settings board.
 - **Uploading** (2026-10-10, `/grill-me` with Richard): demo app **5426290**, depot **5426291**
-  (Windows, 64-bit, all languages), launch option `MyDirtyLittleLakeDemo.exe`. Export the
-  "Windows Demo" preset from the editor, then run `tools/steampipe/upload_demo.bat` (or
-  `upload_demo.bat preview` to list the files and upload nothing): steamcmd from the SDK on the
-  Desktop, account `fxknox`, password and Steam Guard typed into steamcmd itself, the vdf reading
-  `build/windows_demo/` in place, logs in `build/steampipe/`, the description the date and
-  commit. **No SetLive, by decision**: Richard sets the build live on default in Steamworks.
+  (Windows, 64-bit, all languages), launch option `MyDirtyLittleLakeDemo.exe`. Run
+  `tools/steampipe/upload_demo.bat` (or `preview_demo.bat` to export and list the files and
+  upload nothing): **it exports the demo itself since 2026-10-20**, like `upload_game.bat`
+  (empties `build/windows_demo/`, Desktop Godot `--headless --export-release "Windows Demo"`,
+  log `build/steampipe/export_demo.log`, checks exe and pck, copies GodotSteam's licence,
+  refuses `steam_appid.txt`); steamcmd from the SDK on the Desktop, account `fxknox`, password
+  and Steam Guard typed into steamcmd itself, the vdf reading `build/windows_demo/` in place,
+  logs in `build/steampipe/`, the description the date and commit. **No SetLive, by
+  decision**: Richard sets the build live on default in Steamworks.
   First build uploaded, installed through Steam and played through by Richard, and submitted
-  for Valve's review on 2026-10-10.
+  for Valve's review on 2026-10-10. A second went up 2026-10-15 (build 25974645).
+- **The release build** (2026-10-20, `/grill-me` with Richard; Valve approved the demo):
+  the current tree, the Oct 16-19 work committed first (`efd915d`), the full game left on its
+  own build. **Version 1.0.0** (`application/config/version`; the presets' `file_version` and
+  `product_version` stay empty and fall back to it, so the exe reads 1.0.0.0), drawn faint in
+  the main menu's bottom right as `v1.0.0-demo` (`v1.0.0` in the full game;
+  `MainMenu.version_line`, `VERSION_INSET`, `VERSION_ALPHA`), an identifier, not a translation
+  key. Checked before upload: the pack's file table (1480 files, `demo.flag` in, the four demo
+  songs and their radio copies only, nothing from `tools/`, `docs/` or `addons/godot_ai/`) and a
+  900-frame windowed run of the exported exe with no errors and the user folder untouched. The
+  gate is Richard's: upload, set live on default, install through Steam, play to the finale,
+  then Release in Steamworks.
 - **The Demo's Four Songs, the piers and the hive** (2026-10-13, `/grill-me` with Richard):
   - **Four songs play** (`Demo.SONGS`, Richard's pick): Movimento Tranquilo, House by the
     Lake, Hello World, This is Nice. `MusicStation.songs()` is what plays, `shown()` all

@@ -77,6 +77,12 @@ const SCRIM_TO := 0.58
 ## How long the menu takes to come and go. Going is the first stretch of the lake's glide.
 const FADE := 0.45
 
+## The build's version, faint in the bottom right corner (2026-10-20, `/grill-me` with Richard,
+## for the demo's release), so a bug report can say which build it came from. Read off
+## `application/config/version`; see `version_line`.
+const VERSION_INSET := Vector2(16.0, 12.0)
+const VERSION_ALPHA := 0.55
+
 ## Whether the lake behind holds a run that was loaded. Decides Continue, the accent, and
 ## whether New game has anything to ask about. Set by the lake before the menu is shown.
 var has_run: bool = false:
@@ -238,6 +244,30 @@ func _fill() -> void:
 		over.position = Vector2.ZERO
 		over.size = size
 	_lay_out()
+	queue_redraw()
+
+
+## "v1.0.0", or "v1.0.0-demo" in the demo. An identifier, not a word, so not a translation
+## key. Empty when the project carries no version.
+static func version_line() -> String:
+	var version := String(ProjectSettings.get_setting("application/config/version", ""))
+	if version.is_empty():
+		return ""
+	return "v" + version + ("-demo" if Demo.on() else "")
+
+
+## Only the version is drawn by the menu itself: everything else is a child. The boards that
+## open over the doors cover it, which is right.
+func _draw() -> void:
+	var line := version_line()
+	if line.is_empty():
+		return
+	var span := Style.measure(line, Style.TEXT_TINY)
+	Style.write(
+		self, line, Style.TEXT_TINY,
+		Vector2(size.x - VERSION_INSET.x - span.x, size.y - VERSION_INSET.y),
+		Style.BOARD_INK, HORIZONTAL_ALIGNMENT_LEFT, Rect2(), VERSION_ALPHA
+	)
 
 
 ## Which doors are open, and where they stand. Continue comes and goes with the run, and
