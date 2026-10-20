@@ -41,6 +41,25 @@ PACK = "assets/Forest Isometric Pack Free/"
 TREES = ["Trees/Tree_1.png", "Trees/Tree_2.png", "Trees/Tree_3.png"]
 DEAD = ["Trees/death_Tree_2.png"]
 DEAD_ODDS = 0.08
+# No dead trees on the far bank (2026-10-18, the hive room's backdrop; CLAUDE.md, The Wood and
+# the Pack Plants: no dead trees in the wood). A roll that would have stood a dead tree still
+# rolls, so every other tree, the lawn and the clouds come out exactly where they were, and a
+# living one off `REPLACE_SEED` stands in its place.
+DEAD_GONE = True
+REPLACE_SEED = 1913
+# The trunks are bark, not rust (2026-10-18, Richard on the hive room's mockup: "the treetrunks
+# are green on the back ground, fix that"; the mockup had painted the pack's rust trunk band
+# green). The Forest trees' five rust tones are remapped, dark to light, onto a bark ramp read
+# off the round trees' own trunks (assets/trees, 36,29,22 / 52,37,21 / 64,50,37 / 92,71,50)
+# and carried one step past their lightest for the pack's highlight. Every rank behind is the
+# same trunk multiplied down, as before.
+BARK = {
+    (88, 28, 35): (40, 31, 22),
+    (103, 35, 27): (58, 44, 30),
+    (138, 60, 36): (84, 64, 45),
+    (158, 83, 51): (108, 84, 58),
+    (212, 141, 87): (146, 118, 84),
+}
 LAWN_TILES = [1, 2, 19]
 ROUGH_TILES = [18, 20, 21]
 SAND_TILE = 67
@@ -398,19 +417,39 @@ def stamp(canvas, art, x, y):
         canvas.alpha_composite(art.crop((cut_l, 0, cut_r, art.height)), (left + cut_l, y))
 
 
+def barked(im):
+    """`im` with its rust trunk pixels on the bark ramp (`BARK`): an exact tone takes its
+    partner, any other reddish pixel the partner of the nearest tone by brightness."""
+    out = im.copy()
+    px = out.load()
+    lum = lambda c: 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+    keys = list(BARK)
+    for y in range(out.height):
+        for x in range(out.width):
+            c = px[x, y]
+            if c[3] == 0 or not (c[0] > c[1] + 15 and c[0] > c[2]):
+                continue
+            key = c[:3] if c[:3] in BARK else min(keys, key=lambda k: abs(lum(k) - lum(c)))
+            px[x, y] = BARK[key] + (c[3],)
+    return out
+
+
 def build_bank(roll):
     bank = Image.new("RGBA", (WIDE, BANK_TALL))
     grass_top = BANK_TALL - BANK_SAND - BANK_GRASS
     sand_top = BANK_TALL - BANK_SAND
     draw_lawn(bank, grass_top, sand_top, lawn_shades(GRASS_BANK), lambda y: 0.0, 400, tone=3)
     draw_beach(bank, sand_top, BANK_SAND, sand_texel(), 500, near_first=False)
-    trees = [Image.open(PACK + p).convert("RGBA") for p in TREES]
+    trees = [barked(Image.open(PACK + p).convert("RGBA")) for p in TREES]
     dead = [Image.open(PACK + p).convert("RGBA") for p in DEAD]
+    living = random.Random(REPLACE_SEED)
     feet_base = BANK_TALL - BANK_SAND
     for up, gap, tone in RANKS:
         x = roll.randrange(gap)
         while x < WIDE:
             art = roll.choice(dead if roll.random() < DEAD_ODDS else trees)
+            if DEAD_GONE and any(art is d for d in dead):
+                art = living.choice(trees)
             if roll.random() < 0.5:
                 art = art.transpose(Image.FLIP_LEFT_RIGHT)
             art = toned(art.crop(art.getbbox()), tone)

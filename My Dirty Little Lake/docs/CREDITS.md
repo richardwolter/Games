@@ -181,6 +181,12 @@ license/agreement in place with the artist (confirmed 2026-09-06).
 - **Sound effects**, `assets/sfx/`, cut from the recordings in `art_source/SFX` by
   `tools/build_sfx.py`. The few sounds still built in code (`scripts/sfx.gd`) are
   arithmetic, not recordings.
+- **The hive knife's sizzle** (`assets/sfx/hive_sizzle.wav`): "Hot Knife in Butter" by
+  Clearwavsound, https://freesound.org/people/Clearwavsound/sounds/541034/, licensed CC BY 3.0
+  (https://creativecommons.org/licenses/by/3.0/). Cut to a 1.7 s loop and levelled by
+  `tools/build_sfx.py` from `art_source/SFX/Hot_Knife_In_Butter.wav` (downloaded by Richard,
+  2026-10-19). ✅ Cleared with credit: "Clearwavsound" on the credits board under Music.
+  Not by Nuven, so "every recorded sound" above has this exception.
 
 - **The Spotify mark** beside Nuven on the credits board (`assets/ui/spotify_icon.png`) —
   Spotify's own icon, downloaded from their design guidelines

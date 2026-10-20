@@ -11,11 +11,12 @@ extends Node
 ## locale) shoots the cards in that language, set by hand on `TranslationServer` and `Style`
 ## and never through `Prefs`, so `settings.cfg` is not written; files then end `_<locale>`.
 
-const KINDS: Array[StringName] = [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry", &"meter"]
+const KINDS: Array[StringName] = [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry", &"meter", &"honey_jar"]
 const KEYS := {
 	&"tornado": "TORNADO_FIRST", &"wildlife": "WILDLIFE_BACK", &"swarm": "HIVE_SWARM",
 	&"honey": "HIVE_READY", &"lucky": "CUE_LUCKY", &"double": "CUE_DOUBLE",
 	&"pigeon": "CUE_PIGEON", &"ferry": "CUE_FERRY", &"meter": "CUE_METER",
+	&"honey_jar": "CUE_HONEY",
 }
 ## Seconds into the entrance each frame of a row is taken at; the last is the card settled.
 const AGES: Array[float] = [0.05, 0.15, 0.3, 0.55, 2.0]
@@ -26,6 +27,9 @@ const TARGETS := {
 	&"pigeon": Rect2(14.0, 76.0, 150.0, 56.0),
 	&"ferry": Rect2(14.0, 14.0, 150.0, 54.0),
 	&"meter": Rect2(14.0, 600.0, 280.0, 90.0),
+	# The jar plate, under the money plate (2026-10-16): the medallion slab since 2026-10-18,
+	# `HudSkin._honey_wide()` by `HONEY_TALL` (MONEY_TALL).
+	&"honey_jar": Rect2(20.0, 148.0, 139.0, 56.0),
 }
 const CELL := Vector2i(440, 230)
 

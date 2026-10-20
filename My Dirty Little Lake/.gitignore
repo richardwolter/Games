@@ -82,6 +82,12 @@ art_source/packs_local/
 !/tools/film/
 !/tools/steampipe/
 /tools/film/*.log
+# The hive's mockup modules (2026-10-18): the game's hive builders import them (build_hive,
+# build_bees, build_hive_island, build_hive_kitchen, build_honey_pot), so the .py are source.
+# Their sheets, critique crops and scratch folders stay out.
+!/tools/hive_look/
+/tools/hive_look/*
+!/tools/hive_look/*.py
 
 # Zip leftovers from macOS-made packs
 __MACOSX/

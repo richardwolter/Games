@@ -37,6 +37,8 @@ static var TITLE: String:
 ##
 ## Loobas under Nuven, by name only (2026-10-12, `/grill-me` with Richard). The demo carries
 ## one of his songs since 2026-10-13, so he is credited there too.
+## Clearwavsound under them (2026-10-19): the hive knife's sizzle, CC-BY 3.0, so credited by
+## licence. Rainloaf and Pixeline share a row to pay for it, the board being full at 720.
 static var LINES: Array:
 	get: return [
 		Text.CREDITS_HEAD_DESIGN,
@@ -45,6 +47,7 @@ static var LINES: Array:
 		Text.CREDITS_HEAD_MUSIC,
 		"Nuven",
 		"Loobas",
+		"Clearwavsound",
 		"",
 		Text.CREDITS_HEAD_ART,
 		"Benvictus",
@@ -59,8 +62,7 @@ static var LINES: Array:
 		"Toffeecraft",
 		"Carysaurus",
 		"LYASeeK · LapizWCG",
-		"Rainloaf",
-		"Pixeline",
+		"Rainloaf · Pixeline",
 		"@Pixel_Salvaje",
 		"DaFluffyPotato",
 		"",

@@ -154,6 +154,9 @@ const TURTLE_TO_WATER := 0.2
 const TURTLE_PADDLE_ON := 0.25
 const TURTLE_PADDLE_FPS := 6.0
 const TURTLE_TUCK := 3.0
+## Seconds a walk or a swim may make no ground (bent round a still walker into the same
+## place) before the turtle gives it up and rests, or dives.
+const TURTLE_STUCK := 1.0
 const TURTLE_UNDER := Vector2(2.0, 4.0)
 ## The walk is paced by ground covered, not by the clock: a turtle's legs step once for
 ## every TURTLE_STEP_PX world px it moves, so a turtle that is not going anywhere does not
@@ -649,22 +652,43 @@ static func _body(at: Vector2, half: float, tall: float) -> Array:
 
 ## A step from `at` to `next`, bent round every still walker: the part of the step heading
 ## into one is taken off, so the animal slides along the edge of its room instead of
-## walking into it, and anything still inside is put back on the edge.
+## walking into it, and a slide that would end inside is held on the edge.
+##
+## **One already inside is not put back on the edge** (2026-10-19, Richard: capybaras "go
+## crazy on the spot"): a walker who stops beside an animal has it inside his room from the
+## first frame, and the snap moved it up to `OBSTACLE_REACH` (29 px) in one frame, then
+## again as the slide turned. Inside, it only loses the part of its step heading further in,
+## and walks out by its own steps (a capybara steps out of the way, `_make_room`).
 func _round(at: Vector2, next: Vector2) -> Vector2:
 	if _still.is_empty():
 		return next
-	var r := Iso.tile_circle_extent(OBSTACLE_REACH)
-	for p in _still:
-		var d := next - p
-		if d.length() >= r:
+	return _slide_round(at, next, _still, Iso.tile_circle_extent(OBSTACLE_REACH), false)
+
+
+## The slide `_round` does, round any points and room: `points` are what to keep `room` px
+## from, and in `plane` the distance is measured on the ground's own plane (the screen's y
+## doubled, the iso tiles' 2:1), so a room is a flat ellipse round a body as it is drawn, as
+## wide across as it is deep. See `_round` for why one already inside is not snapped out.
+const SLIDE_EDGE := 0.05
+static func _slide_round(at: Vector2, next: Vector2, points: PackedVector2Array, room: float, plane: bool) -> Vector2:
+	var squash := Vector2(1.0, 2.0) if plane else Vector2.ONE
+	var a := at * squash
+	var b := next * squash
+	for q in points:
+		var p := q * squash
+		var d := b - p
+		if d.length() >= room:
 			continue
-		var n := (at - p).normalized() if (at - p).length() > 0.01 else Vector2.RIGHT
-		var step := next - at
+		var n := (a - p).normalized() if (a - p).length() > 0.01 else Vector2.RIGHT
+		var step := b - a
 		step -= n * minf(step.dot(n), 0.0)
-		next = at + step
-		if (next - p).length() < r:
-			next = p + (next - p).normalized() * r if (next - p).length() > 0.01 else p + n * r
-	return next
+		b = a + step
+		# On the edge counts as outside (`SLIDE_EDGE`): put back exactly on the edge, the
+		# next frame read it as inside by a float's width, let the step out, and the frame
+		# after put it back, a full step back and forth every frame (2026-10-19, measured).
+		if (a - p).length() >= room - SLIDE_EDGE and (b - p).length() < room - SLIDE_EDGE:
+			b = p + (b - p).normalized() * room if (b - p).length() > 0.01 else p + n * room
+	return b / squash
 
 
 ## Is `to` inside a still walker's room — no place to hop to or wander to.
@@ -1189,7 +1213,10 @@ func _frog_jump_in(f: Dictionary, away_from: Vector2) -> void:
 		if off.length() < 1.0:
 			off = Vector2(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-0.5, 0.5))
 		to = at + off.normalized() * 22.0
+		# Off the pad: it leaves it where the pad is, and lets go of the bob over the leap.
+		f["ride_off"] = true
 	else:
+		f.erase("ride_x")
 		var spot: Dictionary = f["spot"]
 		to = (spot["water"] as Vector2) + Vector2(_rng.randf_range(-8.0, 8.0), _rng.randf_range(-4.0, 4.0))
 	f["on_pad"] = false
@@ -1201,6 +1228,8 @@ func _frog_landed(f: Dictionary) -> void:
 	_frog_prints(f["at"])
 	if bool(f.get("dive", false)):
 		f["dive"] = false
+		f.erase("ride_x")
+		f.erase("ride_off")
 		if splash != null:
 			_ripple(f["at"], 10.0)
 			_ripple(f["at"], 20.0)
@@ -1209,6 +1238,46 @@ func _frog_landed(f: Dictionary) -> void:
 		f["to"] = _frog_swim_target(f)
 		return
 	_frog_sit(f)
+
+
+## How far a frog on a lily pad is carried off its own `at`, world px, this instant: the pad's
+## bob (`pad_bob`), whole while it sits or croaks there, taken up over the leap onto it and
+## let go over the leap off it, so it neither pops onto the moving pad nor off it. A frog not
+## on a pad is not moved. Drawing only: `at` stays the pad's place at rest, which is what the
+## frights and the walkers' sorting read.
+func _frog_ride(f: Dictionary) -> Vector2:
+	if not f.has("ride_x"):
+		return Vector2.ZERO
+	var share := 1.0
+	if int(f["state"]) == Frog.JUMP:
+		var t := clampf(float(f["t"]), 0.0, 1.0)
+		share = 1.0 - t if f.get("ride_off", false) else t
+	return pad_bob(float(f["ride_x"])) * share
+
+
+## Where a lily pad whose foot is at world x `x` is drawn off its place, world px, this
+## instant (2026-10-19, Richard: the frogs on the pads did not sway with them). A pad afloat
+## rides the swell and wanders on it in flora_sway.gdshader (its AFLOAT role); this is that
+## vertex shader's arithmetic on the CPU, term for term: the foot's x as the packed vertex
+## colour carries it (16 bits over `LakeGrid.ANCHOR_SPAN`, `pack_anchor`/`unpack_anchor_x`),
+## the lake's own clock (`LakeGrid.wave_time`, the shader's `lake_clock * wave_speed`), the
+## swell times the amplitude down the screen and the wander both ways (`LakeGrid._swell`,
+## `_sway`). Not rounded, as the shader does not round an afloat plant. The amplitude and the
+## wander are read off the plants' own material, so a stilled batch (the bench's
+## `BENCH_OFF=sway`) holds the frog still with it.
+func pad_bob(x: float) -> Vector2:
+	if grid == null:
+		return Vector2.ZERO
+	var amplitude := LakeGrid.WAVE_AMPLITUDE
+	var sway := LakeGrid.SWAY
+	var skin: ShaderMaterial = flora.material as ShaderMaterial if flora != null else null
+	if skin != null:
+		amplitude = float(skin.get_shader_parameter(&"wave_amplitude"))
+		sway = float(skin.get_shader_parameter(&"sway"))
+	var packed := LakeGrid.unpack_anchor_x(LakeGrid.pack_anchor(x, Flora.AFLOAT, 1.0))
+	var t := grid.wave_time()
+	var wander := LakeGrid._sway(packed, t) * (sway / LakeGrid.SWAY)
+	return Vector2(0.0, LakeGrid._swell(packed, t) * amplitude) + wander
 
 
 ## Somewhere to swim to: a pad in reach half the time, else a clean bit of shore.
@@ -1254,10 +1323,13 @@ func _frog_swum(f: Dictionary) -> void:
 		var pad: Vector2 = f["pad"]
 		f.erase("pad")
 		f["on_pad"] = true
+		f["ride_x"] = pad.x
+		f.erase("ride_off")
 		_frog_leap(f, pad, Frog.JUMP)
 	else:
 		var spot: Dictionary = f["spot"]
 		f["on_pad"] = false
+		f.erase("ride_x")
 		_frog_leap(f, spot["land"], Frog.JUMP)
 	if splash != null:
 		_ripple(f["at"], 9.0)
@@ -1341,8 +1413,29 @@ func _turtle_step(t: Dictionary, delta: float, seen: PackedVector2Array) -> void
 			if step.length() <= go:
 				t["at"] = to
 				_turtle_arrived(t)
+				# Settled on the sand: it basks now, and the walk's own bookkeeping below must
+				# not put it back. It did (2026-10-19, Richard: "I can still see idle stopped
+				# turtles"): the last line wrote WALK over the BASK `_turtle_rest` had just set,
+				# so every frame the turtle arrived again, rolled a new bask it never had, and
+				# stood on one walking frame with its legs still for good.
+				if int(t["state"]) == Turtle.BASK:
+					return
 			else:
-				t["at"] = _round(at, at + step.normalized() * go)
+				var next := _round(at, at + step.normalized() * go)
+				# Bent round a still walker into the same place: legs going on the spot. After
+				# `TURTLE_STUCK` it gives up the walk: a rest on the sand, a dive in the water.
+				if next.distance_to(at) < go * 0.25:
+					t["stuck"] = float(t.get("stuck", 0.0)) + delta
+					if float(t["stuck"]) > TURTLE_STUCK:
+						t["stuck"] = 0.0
+						if wet:
+							_turtle_fright(t, at)
+						else:
+							_turtle_rest(t)
+						return
+				else:
+					t["stuck"] = 0.0
+				t["at"] = next
 			t["walked"] = float(t.get("walked", 0.0)) + minf(go, step.length())
 			if not wet:
 				t["stride"] = float(t.get("stride", 0.0)) + go
@@ -1541,25 +1634,49 @@ const PATROL_INLAND := 1.2
 ## A snake keeps to `SNAKE_RANGE` tiles of its spot, and a fright sends it `SNAKE_AWAY` tiles.
 const SNAKE_RANGE := 1.6
 const SNAKE_AWAY := Vector2(1.4, 2.4)
-## A capybara pair: the follower keeps `CAPY_GAP` px from its lead, on whichever side it is
-## already, drifting round towards behind (`CAPY_BEHIND_PULL`), and catches up at a run past
-## `CAPY_CATCH_UP`. Each rest the lead may set off for the island (`CAPY_VISIT_ODDS`), stays
+## A capybara pair: the follower keeps `CAPY_GAP` px from its lead (on the ground's plane),
+## `CAPY_ASIDE` radians round from straight behind the lead's heading on whichever side it
+## is already, and catches up at a run past `CAPY_CATCH_UP`. Each rest the lead may set off for the island (`CAPY_VISIT_ODDS`), stays
 ## `CAPY_STAY` seconds and swims home.
 ##
 ## **Kept on its own side, not put behind** (2026-10-11, Richard: "bugging between each
 ## other, let them breathe"): its place used to be a fixed spot behind the lead, 14 px back
 ## and 8 aside, so a lead turning round swung the place to its other side and the follower
 ## walked straight through it. 36 px apart now, about a body and a half.
+## **Off the lead's heading, its side kept** (2026-10-19): the side is the follower's own
+## and only changes once it is `CAPY_SIDE_SWAP` plane px over the lead's line, so a lead
+## turning round puts its place from behind to beside-and-ahead on the same side, never
+## through the lead.
 const CAPY_GAP := 36.0
-const CAPY_BEHIND_PULL := 0.5
+const CAPY_ASIDE := 1.1
+const CAPY_SIDE_SWAP := 14.0
 const CAPY_CATCH_UP := 40.0
 const CAPY_GO := 10.0
 const CAPY_STOP := 2.0
 const CAPY_KEEP_UP := 1.15
+## Beside a walking lead the follower walks at its lead's pace times `x + y * gap / CAPY_GO`
+## (held to `x` at least and `CAPY_KEEP_UP` at most), so it settles about `(1 - x) / y` of
+## `CAPY_GO` short of its place and walks on with the lead, not stop-start behind it.
+const CAPY_EASE := Vector2(0.6, 0.5)
 const CAPY_VISIT_ODDS := 0.3
 const CAPY_STAY := Vector2(40.0, 90.0)
 ## Rest poses a capybara rolls (idle, sit, lie) and how long it takes to sit or lie down.
 const CAPY_SETTLE := 0.6
+## Room a capybara keeps round every other animal (2026-10-19, Richard: capybaras "go crazy
+## on the spot, especially colliding with other animals and with their own pair"), world px
+## on the ground's plane (`_slide_round`): `CAPY_KEEP` from any other land animal, a turtle
+## or a frog out of the water, `CAPY_MATE_KEEP` from its own partner, which it walks round
+## rather than through when the lead turns back on it. They walked through both before: a
+## lead turning round walked into its follower, and two pairs met and stood in each other.
+## Under `CAPY_GAP`, so a follower's place beside its lead stays outside the lead's room.
+const CAPY_KEEP := 30.0
+const CAPY_MATE_KEEP := 26.0
+## A capybara resting with another land animal or a turtle inside `CAPY_KEEP` walks off
+## calmly to `CAPY_KEEP_OFF` from it. After a walk out of the way that gave up (blocked, or
+## no ground made), it waits `ROOM_AGAIN` seconds before trying again: tried every frame it
+## walked a quarter second, rested, and walked again on the spot.
+const CAPY_KEEP_OFF := 56.0
+const ROOM_AGAIN := 2.0
 ## The capybara swims the dogs' way: cut at the waterline (`CAPY_SINK` of its picture under
 ## it), bobbing, a foam collar on the cut, the ferry's foam streak behind it and one ring
 ## going in (Dog.ENTRY_SPAN).
@@ -1578,7 +1695,8 @@ const PEACOCK_NEAR := 2.6
 const PEACOCK_HOLD := 2.5
 const PEACOCK_STRUT_FPS := 3.0
 ## A step that would put the animal into a tree, a rock or a building is turned this far
-## either way (radians, in order); blocked every way, a walk gives up after `STUCK_TIME`.
+## either way (radians, in order), the side it last turned to first (`_step_to`); blocked
+## every way, a walk gives up after `STUCK_TIME`.
 const SIDESTEPS: Array[float] = [0.6, -0.6, 1.2, -1.2, 1.57, -1.57]
 const STUCK_TIME := 0.25
 
@@ -1856,17 +1974,32 @@ func _step_to(c: Dictionary, to: Vector2, go: float, forced: bool = false) -> Ve
 	var next := at + dir * minf(go, at.distance_to(to))
 	if not forced and _minds_walkers(c):
 		next = _round(at, next)
+	if not forced and c["kind"] == &"capy":
+		next = _capy_clear(c, at, next)
 	# On its own ground it does not step off it: a fox or a wolf patrolling between two beach
 	# spots does not cut across the water (2026-10-06, Richard: "foxes are walking over
 	# water"), and a snake on its grass does not cross a sandy bay. Sidestepped instead. A
 	# capybara's swim and a fleeing animal are forced and go where they go.
 	var keep: bool = not forced and _walkable(c, at)
 	if (not _blocked(c, next) or _blocked(c, at)) and (not keep or _walkable(c, next)):
+		c.erase("sidestep")
 		return next
-	for turn in SIDESTEPS:
-		var side := at + dir.rotated(turn) * go
-		if not _blocked(c, side) and (not keep or _walkable(c, side)):
-			return side
+	# The side it last sidestepped to first, kept until a straight step goes again: the
+	# first sidestep that worked was taken fresh each frame, and along a tree's or a
+	# building's edge it came out left one frame and right the next, a capybara stepping a
+	# full step back and forth and turning round every frame (2026-10-19, measured: 880 steps
+	# reversed in half a minute).
+	var kept := float(c.get("sidestep", 0.0))
+	for pass_n in 2:
+		for turn in SIDESTEPS:
+			if kept != 0.0 and (signf(turn) == kept) != (pass_n == 0):
+				continue
+			if kept == 0.0 and pass_n == 1:
+				continue
+			var side := at + dir.rotated(turn) * go
+			if not _blocked(c, side) and (not keep or _walkable(c, side)):
+				c["sidestep"] = signf(turn)
+				return side
 	# Forced or not, nothing walks into a building, a pier or a pier's sign (2026-10-13):
 	# a fleeing animal or a capybara's swim may cut through the trees, never those.
 	if forced and (not _in_building(c, next) or _in_building(c, at)):
@@ -2060,6 +2193,7 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 			if float(c["stuck"]) > STUCK_TIME:
 				c["stuck"] = 0.0
 				c["path"] = []
+				_gave_up_room(c)
 				_rest(c)
 			return
 		c["stuck"] = 0.0
@@ -2080,6 +2214,7 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 				c["prog_t"] = 0.0
 				c["path"] = []
 				c.erase("hop")
+				_gave_up_room(c)
 				_rest(c)
 				return
 		_turn_with(c, next - at, delta)
@@ -2171,6 +2306,13 @@ func _arrived(c: Dictionary, flee: bool) -> void:
 		if c["zone"] == "isle":
 			c["stay"] = _now + _rng.randf_range(CAPY_STAY.x, CAPY_STAY.y)
 	_rest(c)
+
+
+## A walk out of somebody's way that did not get there: not tried again for `ROOM_AGAIN`.
+func _gave_up_room(c: Dictionary) -> void:
+	if c.get("making_room", false):
+		c["room_again"] = _now + ROOM_AGAIN
+		c["making_room"] = false
 
 
 func _rest(c: Dictionary) -> void:
@@ -2388,17 +2530,27 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 	c["fade"] = 0.0 if lead.get("arriving", false) else minf(float(c["fade"]) + delta / 0.8, 1.0)
 	var at: Vector2 = c["at"]
 	var lat: Vector2 = lead["at"]
-	var back := Vector2(float(lead["facing"]), 0.0)
-	# `CAPY_GAP` from its lead on the side it is on, leaning round towards behind, or the
-	# first place turned from there that is clear of the trees, the rocks and the buildings;
-	# the lead's own spot last.
-	var side := at - lat
-	var way := (side.normalized() if side.length() > 1.0 else back) + back * CAPY_BEHIND_PULL
-	way = way.normalized() if way.length() > 0.01 else back
+	# Its place: `CAPY_GAP` from its lead on the ground's plane, `CAPY_ASIDE` round from
+	# straight behind the way the lead is heading, on the side the follower is on, which is
+	# kept until it is clearly over on the other (`CAPY_SIDE_SWAP`). Read off the lead's eased
+	# heading, not off where the follower stands (2026-10-19): read off the follower's own
+	# place, a lead walking at it or past it swung the place from one side of the lead to the
+	# other and back between frames, and the follower stepped left, right, left with it. Or
+	# the first place turned from there that is clear of the trees, the rocks, the buildings
+	# and every other animal's room (`CAPY_KEEP`); the lead's own spot last.
+	var squash := Vector2(1.0, 2.0)
+	var heading: Vector2 = lead.get("heading", Vector2(-float(lead["facing"]), 0.0))
+	var ahead := (heading * squash).normalized() if heading.length() > 0.01 else Vector2(-float(lead["facing"]), 0.0)
+	var across := Vector2(-ahead.y, ahead.x)
+	var lean := across.dot((at - lat) * squash)
+	if not c.has("side") or (absf(lean) > CAPY_SIDE_SWAP and signf(lean) != float(c["side"])):
+		c["side"] = 1.0 if lean >= 0.0 else -1.0
+	var place := (-ahead * cos(CAPY_ASIDE) + across * float(c["side"]) * sin(CAPY_ASIDE)) * CAPY_GAP
 	var goal := lat
 	for turn: float in [0.0, 0.6, -0.6, 1.2, -1.2, PI]:
-		var off := way.rotated(turn) * Vector2(CAPY_GAP, CAPY_GAP * 0.5)
-		if lead.get("trip", false) or not _blocked(c, lat + off):
+		var off := place.rotated(turn * float(c["side"])) / squash
+		if lead.get("trip", false) or (_walkable(c, lat + off) and not _blocked(c, lat + off)
+				and not _capy_crowded(c, lat + off)):
 			goal = lat + off
 			break
 	var gap := at.distance_to(goal)
@@ -2407,10 +2559,66 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 	# its walk and rest pictures (2026-10-06, Richard: "jiggly and bugged when walking"). It
 	# walks a little quicker than its lead so it closes the gap rather than holding it.
 	var going := int(c["state"]) == Land.MOVE
-	if gap > (CAPY_STOP if going else CAPY_GO):
-		var speed := float(KINDS[&"capy"]["run"]) if gap > CAPY_CATCH_UP else float(KINDS[&"capy"]["walk"]) * CAPY_KEEP_UP
+	# Sitting or lying, it gets up before it walks, as its lead does (`_set_off`): it went
+	# from lying to walking in one frame.
+	if int(c["state"]) == Land.RISE:
+		c["timer"] = float(c["timer"]) - delta
+		if float(c["timer"]) > 0.0:
+			_capy_water(c)
+			return
+		c["state"] = Land.SIT
+		c["pose"] = "idle"
+	elif int(c["state"]) == Land.SIT and c["pose"] != "idle" and gap > CAPY_GO:
+		c["state"] = Land.RISE
+		c["timer"] = CAPY_SETTLE
+		c["rising"] = c["pose"]
+		c["pose_t"] = 0.0
+		_capy_water(c)
+		return
+	# One that has just been held on the spot waits a moment for its place to come clear,
+	# unless its lead is getting away from it.
+	var waiting := _now < float(c.get("wait", 0.0)) and gap < CAPY_CATCH_UP
+	# Walking with a walking lead, it walks on: it eases to the lead's own pace as it comes up
+	# on its place (`CAPY_EASE`) rather than stopping on it. Stopping there, the place
+	# walked off from under it at the lead's pace and it set off again half a second later,
+	# all the way along (2026-10-19, measured). It only stops once its lead has.
+	var lead_state := int(lead["state"])
+	var lead_walks := lead_state == Land.MOVE or lead_state == Land.FLEE
+	if (gap > (CAPY_STOP if going else CAPY_GO) or (going and lead_walks)) and not waiting:
+		# At a run to catch up, and at a run to get out of its lead's room when the lead has
+		# walked into it.
+		var crowded := _plane_gap(at, lat) < CAPY_MATE_KEEP
+		var walk := float(KINDS[&"capy"]["walk"])
+		var speed := walk * CAPY_KEEP_UP
+		if gap > CAPY_CATCH_UP or crowded:
+			speed = float(KINDS[&"capy"]["run"])
+		elif lead_walks:
+			var lead_pace := float(lead.get("speed", walk))
+			speed = clampf(lead_pace * (CAPY_EASE.x + CAPY_EASE.y * gap / CAPY_GO), lead_pace * CAPY_EASE.x,
+				maxf(lead_pace, walk) * CAPY_KEEP_UP)
 		speed *= 1.25 if lead.get("trip", false) else 1.0
-		var next := _step_to(c, goal, speed * delta, bool(lead.get("trip", false)))
+		var go := speed * delta
+		var next := _step_to(c, goal, go, bool(lead.get("trip", false)))
+		# Held where it is, its place behind its lead's room or another animal's: the step
+		# comes back a sliver of what was asked. `PROGRESS_TIME` of that and it stands and
+		# waits `ROOM_AGAIN` rather than walking on the spot with its legs going. (A step
+		# short because its place is nearer than a step is not held.)
+		# Sidestepping round something on to its place that it never gets nearer to counts as
+		# held too: a place two pixels off past a tree's edge it walked left and right under.
+		var sidestepping := c.has("sidestep") and next.distance_to(goal) > gap - go * 0.5
+		if gap > go and (next.distance_to(at) < go * 0.25 or sidestepping):
+			c["held_t"] = float(c.get("held_t", 0.0)) + delta
+			if float(c["held_t"]) > PROGRESS_TIME:
+				c["held_t"] = 0.0
+				c["wait"] = _now + ROOM_AGAIN
+				c["state"] = Land.SIT
+				c["pose_t"] = 0.0
+				c["pose"] = "idle"
+				c.erase("speed")
+				_capy_water(c)
+				return
+		else:
+			c["held_t"] = 0.0
 		_turn_with(c, next - at, delta)
 		c["step_px"] = float(c.get("step_px", 0.0)) + at.distance_to(next)
 		c["at"] = next
@@ -2434,30 +2642,146 @@ func _capy_water(c: Dictionary) -> void:
 
 
 ## Out of a walker's way, calmly: a capybara with somebody inside `ROOM` walks
-## to a spot `ROOM_OFF` away from them. True when it set off.
+## to a spot `ROOM_OFF` away from them; and out of another animal's way, `CAPY_KEEP_OFF`
+## from a land animal or a turtle resting inside its `CAPY_KEEP`. True when it set off. A lying
+## or sitting one gets up first (`_set_off`). One out of the way already, or getting up for
+## it, is not sent again; nor one whose last walk out of the way gave up within `ROOM_AGAIN`.
 func _make_room(c: Dictionary, seen: PackedVector2Array) -> bool:
 	if c.get("arriving", false):
+		return false
+	var state := int(c["state"])
+	if c.get("making_room", false) and (state == Land.MOVE or state == Land.RISE):
+		return false
+	if state != Land.MOVE and state != Land.RISE:
+		c["making_room"] = false
+	if _now < float(c.get("room_again", 0.0)):
 		return false
 	var at: Vector2 = c["at"]
 	var reach := Iso.tile_circle_extent(ROOM)
 	var walkers := PackedVector2Array(seen)
 	walkers.append_array(_still)
 	for p in walkers:
-		if p.distance_to(at) >= reach or int(c["state"]) == Land.MOVE and c.get("making_room", false):
+		if p.distance_to(at) >= reach:
 			continue
-		var away := (at - p).normalized() if at.distance_to(p) > 0.5 else Vector2.RIGHT
-		for turn: float in [0.0, 0.7, -0.7, 1.4, -1.4]:
-			var to := p + away.rotated(turn) * Iso.tile_circle_extent(ROOM_OFF)
-			if _walkable(c, to) and not _blocked(c, to):
-				c["to"] = to
-				c["state"] = Land.MOVE
-				c["pose"] = "idle"
-				c["making_room"] = true
-				c["path"] = []
+		if _room_from(c, p, Iso.tile_circle_extent(ROOM_OFF)):
+			return true
+	# Only at rest, and not the follower's to make (it keeps to its lead): a walking capybara
+	# slides round the others instead (`_capy_clear`).
+	if state != Land.SIT or c.has("lead"):
+		return false
+	for p in _capy_crowd(c, false):
+		if _plane_gap(at, p) < CAPY_KEEP:
+			if _room_from(c, p, CAPY_KEEP_OFF):
 				return true
-	if int(c["state"]) != Land.MOVE:
-		c["making_room"] = false
 	return false
+
+
+## Off to a spot `off` px away from `p`, the straight way first and then turned: true when
+## one was walkable, clear of the trees and the buildings, and out of every other animal's room.
+func _room_from(c: Dictionary, p: Vector2, off: float) -> bool:
+	var at: Vector2 = c["at"]
+	var away := (at - p).normalized() if at.distance_to(p) > 0.5 else Vector2.RIGHT
+	for turn: float in [0.0, 0.7, -0.7, 1.4, -1.4]:
+		var to := p + away.rotated(turn) * off
+		if _walkable(c, to) and not _blocked(c, to) and not _capy_crowded(c, to):
+			c["path"] = []
+			c["making_room"] = true
+			_set_off(c, to)
+			return true
+	return false
+
+
+## Every other animal a capybara keeps clear of, world px: the land animals (its partner too
+## if `with_mate`), the turtles out of the water, and the frogs out of it if `frogs`.
+func _capy_crowd(c: Dictionary, with_mate: bool, frogs: bool = false) -> PackedVector2Array:
+	var mate: Variant = c.get("lead")
+	var out := PackedVector2Array()
+	for o: Dictionary in _critters_on_land:
+		if o == c or bool(o.get("arriving", false)) or bool(o.get("wet", false)):
+			continue
+		if not with_mate and (o == mate or o.get("lead") == c):
+			continue
+		out.append(o["at"])
+	for t: Dictionary in _turtles:
+		var state := int(t["state"])
+		if state != Turtle.UNDER and state != Turtle.SWIM:
+			out.append(t["at"])
+	if frogs:
+		for f: Dictionary in _frogs:
+			if int(f["state"]) != Frog.SWIM:
+				out.append(f["at"])
+	return out
+
+
+## Distance on the ground's plane (the screen's y doubled), what `CAPY_KEEP` is measured in.
+static func _plane_gap(a: Vector2, b: Vector2) -> float:
+	return ((a - b) * Vector2(1.0, 2.0)).length()
+
+
+## Would a capybara standing at `to` be inside another animal's `CAPY_KEEP` (its partner
+## left out: where a pair stands to each other is the follower's to keep).
+func _capy_crowded(c: Dictionary, to: Vector2) -> bool:
+	for p in _capy_crowd(c, false):
+		if _plane_gap(to, p) < CAPY_KEEP:
+			return true
+	return false
+
+
+## A capybara's step `at` to `next`, steered round the other animals (`CAPY_KEEP`) and, a
+## follower's, round its lead (`CAPY_MATE_KEEP`), so it walks round them and never into
+## them. The lead does not steer round its own follower: two that each give way to the other
+## stepped back and forth between them; the follower is the one that keeps the pair apart,
+## and runs to do it when the lead walks into its room (`_capy_follow`). One already inside a
+## room is not pushed out (`_slide_round`): it walks out by its own steps.
+func _capy_clear(c: Dictionary, at: Vector2, next: Vector2) -> Vector2:
+	var others := _capy_crowd(c, false, true)
+	if not others.is_empty():
+		next = _steer_round(c, &"round_others", at, next, others, CAPY_KEEP)
+	var lead: Variant = c.get("lead")
+	if lead is Dictionary:
+		next = _steer_round(c, &"round_mate", at, next, PackedVector2Array([(lead as Dictionary)["at"]]), CAPY_MATE_KEEP)
+	return next
+
+
+## `_slide_round` on the ground's plane, with the way round kept. Walking head on into a
+## room, the slide leaves a sliver of the step whose side flips frame to frame as the two
+## move, and a capybara stepping left, right, left turned round on every frame (2026-10-19,
+## measured: 700 facing flips in a minute behind its own lead). So once a step is mostly
+## blocked (`ROUND_HEAD_ON` of it left) it goes round the room's edge at full pace, on the
+## side the step leaned to that first frame, kept in `key`; and it only lets go of that way
+## round once the room is behind it, or a straight step makes `ROUND_FREE` of its length
+## going the same way round. Let go any sooner, the straight step slid the other way and it
+## turned round again.
+const ROUND_HEAD_ON := 0.5
+const ROUND_FREE := 0.8
+func _steer_round(c: Dictionary, key: StringName, at: Vector2, next: Vector2, points: PackedVector2Array,
+		room: float) -> Vector2:
+	var want := next - at
+	var slid := _slide_round(at, next, points, room, true)
+	if want.length() < 0.001:
+		return slid
+	var made := (slid - at).length() / want.length()
+	var squash := Vector2(1.0, 2.0)
+	var near := Vector2.INF
+	for p in points:
+		if near == Vector2.INF or _plane_gap(at, p) < _plane_gap(at, near):
+			near = p
+	if near == Vector2.INF or _plane_gap(at, near) > room + want.length() * 2.0 + 1.0:
+		c.erase(key)
+		return slid
+	var n := ((at - near) * squash).normalized() if _plane_gap(at, near) > 0.01 else Vector2.RIGHT
+	var tangent := Vector2(-n.y, n.x)
+	if c.has(key):
+		var same_way := ((slid - at) * squash).dot(tangent * float(c[key])) >= 0.0
+		if made >= ROUND_FREE and same_way:
+			c.erase(key)
+			return slid
+	elif made >= ROUND_HEAD_ON:
+		return slid
+	else:
+		c[key] = 1.0 if tangent.dot(want * squash) >= 0.0 else -1.0
+	var round := (tangent * float(c[key]) / squash).normalized() * want.length()
+	return _slide_round(at, at + round, points, room, true)
 
 
 # ---- the peacock -------------------------------------------------------------------------
@@ -3552,12 +3876,15 @@ func _draw_frog(on: CanvasItem, f: Dictionary) -> void:
 	var ground := at + Shade.drop(day, lift)
 	var surface := Shade.On.WATER if bool(f["on_pad"]) or _wet(ground) else Shade.On.LAND
 	var sun := _sun()
+	# On a lily pad the frog and its shadow ride the pad's bob, unrounded, as the pad is
+	# drawn (`_frog_ride`).
+	var ride := _frog_ride(f)
 	if not _shadeless:
-		on.draw_set_transform_matrix(Shade.lying(ground.round(), sun.x, sun.y))
+		on.draw_set_transform_matrix(Shade.lying(ground.round() + ride, sun.x, sun.y))
 		on.draw_texture_rect_region(sheet, Rect2(-FROG_FOOT * FROG_ART, Vector2(FROG_CELL, FROG_CELL) * FROG_ART), src,
 			Shade.tint_on(day, surface, float(f["fade"])))
 		on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	var box := Rect2((at - FROG_FOOT * FROG_ART - Vector2(0.0, lift)).round(), Vector2(FROG_CELL, FROG_CELL) * FROG_ART)
+	var box := Rect2((at - FROG_FOOT * FROG_ART - Vector2(0.0, lift)).round() + ride, Vector2(FROG_CELL, FROG_CELL) * FROG_ART)
 	on.draw_texture_rect_region(sheet, box, src, Color(1.0, 1.0, 1.0, float(f["fade"])))
 
 

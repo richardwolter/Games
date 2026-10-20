@@ -64,6 +64,9 @@ static var _sheet: Texture2D = null
 ## same letters as one key, and every caller asks with `&"..."`.
 static var _pieces := {}
 static var _comb := {}
+## The layouts the builder worked out off the mockups (which bee stands where on the catch box,
+## the beard's points, the well's bars), by name: `hive_room.json`'s "data".
+static var _data := {}
 
 
 ## Read the sheet and its json, once. Anything missing is left empty and nothing is raised.
@@ -93,6 +96,9 @@ static func _load() -> void:
 				for mark: Variant in (marks as Dictionary).keys():
 					anchors[StringName(str(mark))] = _vec((marks as Dictionary)[mark])
 			_pieces[StringName(str(key))] = {"rect": _rect(cut), "anchors": anchors}
+	var extra: Variant = (book as Dictionary).get("data", {})
+	if extra is Dictionary:
+		_data = extra
 	var comb: Variant = (book as Dictionary).get("comb", {})
 	if comb is Dictionary and (comb as Dictionary).has("inner"):
 		var inner := _rect((comb as Dictionary)["inner"])
@@ -128,6 +134,7 @@ static func forget() -> void:
 	_sheet = null
 	_pieces = {}
 	_comb = {}
+	_data = {}
 
 
 ## The room sheet, or null before an import. Drawn nearest by whoever draws it: the room
@@ -175,6 +182,13 @@ static func anchor(name: StringName, a: StringName) -> Vector2:
 	if marks.has(a):
 		return marks[a]
 	return (entry.get("rect", Rect2()) as Rect2).size * 0.5
+
+
+## A layout the builder handed over by name (`hive_room.json`'s "data"), or `fallback` when the
+## json has none. Read, never written: the caller gets the parsed JSON as it is (floats).
+static func data(name: String, fallback: Variant = null) -> Variant:
+	_load()
+	return _data.get(name, fallback)
 
 
 ## Every anchor a piece carries, by name.

@@ -188,6 +188,10 @@ static func _where(subject: Variant) -> Variant:
 	return null
 
 
+## Which of the pack the last dogs shot followed.
+var _dog_turn := -1
+
+
 ## The subject a shot follows, or null when the lake has none.
 func _find(name: StringName) -> Variant:
 	var wild: Wildlife = lake.get(&"_wildlife") if lake != null else null
@@ -199,10 +203,14 @@ func _find(name: StringName) -> Variant:
 			var pads := fl.pad_spots()
 			return pads[randi() % pads.size()] if not pads.is_empty() else null
 		&"dogs":
-			for d in Dog.pack:
-				if is_instance_valid(d) and d.visible:
-					return d
-			return null
+			# Each dogs shot the next dog of the pack (2026-10-19, Richard: the credits only
+			# ever showed one of the dogs): the pack in turn, from the one after the last shown.
+			var pack: Array = Dog.pack.filter(func(d: Variant) -> bool:
+				return is_instance_valid(d) and (d as Node2D).visible)
+			if pack.is_empty():
+				return null
+			_dog_turn = (_dog_turn + 1) % pack.size()
+			return pack[_dog_turn]
 		&"fish":
 			var fish: Fish = lake.get(&"_fish") if lake != null else null
 			if fish == null or fish._schools.is_empty():

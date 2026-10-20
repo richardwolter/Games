@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/probe_frog_pad.gd" id="1_probe"]
+
+[node name="ProbeFrogPad" type="Node"]
+script = ExtResource("1_probe")

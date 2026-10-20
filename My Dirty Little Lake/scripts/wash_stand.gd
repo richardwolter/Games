@@ -78,6 +78,10 @@ const CONE_TIP := 1.5
 ## washing stays a job done by hand. The stream draws a pixel wider a level and the spray,
 ## gleams and drips scale with the power.
 const HOSE_GROW := [1.0, 1.2, 1.45]
+## How hard the jet scrubs at each level, apart from its width (2026-10-19, Richard: "hose
+## level 3 can be a bit stronger in cleaning"). Level 3 went 1.45 to 1.9; levels 1 and 2 as
+## they were. A first guess.
+const HOSE_POWER := [1.0, 1.2, 1.9]
 
 ## The hose's level, set by the room off the lake's save. 1 is the hose the pump came with.
 var hose_level := 1
@@ -1494,7 +1498,7 @@ func jet_radius() -> float:
 
 
 func jet_power() -> float:
-	return JET_POWER * _grow_of()
+	return JET_POWER * float(HOSE_POWER[clampi(hose_level, 1, HOSE_POWER.size()) - 1])
 
 
 func _grow_of() -> float:

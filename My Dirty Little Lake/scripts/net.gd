@@ -177,6 +177,27 @@ const LUCK_BURST_STARS := 14
 const LUCK_STAR_LIFE := 0.5
 const LUCK_SPARKS := 26
 const LUCK_TWINKLES := 8
+## A honeyed net drips (2026-10-16, `HoneyDrips`; the look is Richard's pick 2A off
+## `tools/hive_look/last_honey.png`, 2026-10-18): at most `HONEY_DRIPS_MOST` teardrops at once,
+## one a slot, the slots spread along the near rim, each hanging off a bead and each at its own
+## stage of its own loop. A slot waits `HONEY_DRIP_WAIT` (rolled), hangs its drop on a short
+## thread `HONEY_DRIP_HANG`, lets the thread out to `HONEY_DRIP_THREAD` px over
+## `HONEY_DRIP_STRETCH`, lets go and falls `HONEY_DRIP_DROP` px under the bead (plus the throw's
+## arc while it flies), and plops: a foam ring `HONEY_DRIP_RING` px wide while the splash layer
+## has room (never more than `HONEY_DRIP_SHARE` of its rings, the rain's and the animals' rule)
+## round a honey blob floating `HONEY_DRIP_BLOB` s. Only where open water is under the drop.
+const HONEY_DRIP_WAIT := Vector2(0.15, 0.7)
+const HONEY_DRIP_HANG := 0.5
+const HONEY_DRIP_STRETCH := 0.4
+const HONEY_DRIP_THREAD := Vector2(2.0, 5.0)
+const HONEY_DRIP_DROP := 12.0
+const HONEY_DRIP_FALL := 420.0
+const HONEY_DRIP_RING := 10.0
+const HONEY_DRIP_BLOB := 0.8
+const HONEY_DRIP_SHARE := 0.4
+const HONEY_DRIPS_MOST := 5
+## How far either way of the rim's nearest point the slots are spread, radians round the rim.
+const HONEY_DRIP_SPREAD := 1.15
 
 ## How long the landing takes to settle, in seconds.
 const LAND_TIME := 0.34
@@ -382,6 +403,10 @@ var hold: int = 3
 ## cast only. Cleared when the net comes home. `strength()` and `room_left()` read them.
 var luck_power: int = 0
 var luck_hold: int = 0
+## Honey is running (`Lake.HONEY_TIME`): set by the lake every frame on both nets. The rim
+## goes amber (`NetShape.honey`) and drips (`HoneyDrips`); what the net catches is no
+## different, the lake pays the honey's share off the sweep.
+var honey: bool = false
 
 ## A helper net — the double cast's second net. It never plays the angler's throw or ends
 ## it: that gesture belongs to the first net, which is still out when this one lands.
@@ -795,6 +820,198 @@ class LuckStars extends Node2D:
 
 
 var _luck_stars: LuckStars
+
+
+## Honey dripping off a honeyed net's rim (`HONEY_DRIP_*`): teardrops on the near rim, each
+## slot its own loop (wait, hang, stretch, fall, plop), drawn in the hive's own honey
+## (`HiveArt`) at one world px a pixel and ringed in the outline like every sprite, the thread a
+## hair of honey with none. Gated on `honey` alone, not on the gold, so a lucky honeyed cast
+## still drips. Drawing only: nothing reads a drop. The net is processed off under the
+## settings pause, and this with it.
+class HoneyDrips extends Node2D:
+	enum Stage { WAIT, HANG, STRETCH, FALL }
+	## The teardrop, 3 x 4 with its outline round it (5 x 6): s shine, l lit, m mid, d deep.
+	const TEAR := [".l.", "slm", "lmd", ".d."]
+	## The blob a plop leaves floating.
+	const BLOB := ["lm", "md"]
+	## Every sprite's near-black outline (the hut's and the box's).
+	const OUTLINE := Color8(24, 18, 17)
+	var net: CastNet
+	## One slot a drop: `{stage, clock, theta, at, floor, vel, fell}`, in the net's own px.
+	var _slots: Array[Dictionary] = []
+	## Blobs floating where drops went in: `{at, age}`.
+	var _blobs: Array[Dictionary] = []
+	var _was := false
+	var _rng := RandomNumberGenerator.new()
+
+	func _ready() -> void:
+		_rng.seed = 5309 if net == null or not net.helper else 5311
+		for i in HONEY_DRIPS_MOST:
+			_slots.append({"stage": Stage.WAIT, "clock": _rng.randf_range(0.0, HONEY_DRIP_WAIT.y),
+				"theta": 0.0, "at": Vector2.INF, "floor": INF, "vel": 0.0, "fell": 0.0})
+
+	## How many drops are out (hanging or falling): the harness asks.
+	func count() -> int:
+		var n := 0
+		for d: Dictionary in _slots:
+			if int(d["stage"]) != Stage.WAIT:
+				n += 1
+		return n
+
+	## The bearing round the rim that is drawn lowest on the screen: the middle of the near rim.
+	static func _nearest(s: NetShape) -> float:
+		var best := PI * 0.5
+		var low := -INF
+		for k in 24:
+			var theta := float(k) * TAU / 24.0
+			var y := s.at(1.0, theta).y
+			if y > low:
+				low = y
+				best = theta
+		return best
+
+	## Where slot `i`'s drop hangs from: a bead in its own stretch of the near rim.
+	func _pick(i: int, s: NetShape) -> float:
+		var mid := _nearest(s)
+		var span := HONEY_DRIP_SPREAD * 2.0 / float(HONEY_DRIPS_MOST)
+		var theta := mid - HONEY_DRIP_SPREAD + span * (float(i) + _rng.randf_range(0.2, 0.8))
+		var beads := float(NetShape.beads(s.w_open))
+		return roundf(theta * beads / TAU) * TAU / beads
+
+	## The pixel under the bead's middle: where the thread starts.
+	func _bead_foot(s: NetShape, theta: float) -> Vector2:
+		return net.draw_at() + s.at(1.0, theta) + Vector2(0.0, 2.0)
+
+	func _process(delta: float) -> void:
+		if net == null:
+			return
+		var dripping := net.honey and net.state != CastNet.State.IDLE
+		var s := net.shape_now()
+		for i in _slots.size():
+			var d := _slots[i]
+			d["clock"] = float(d["clock"]) - delta
+			match int(d["stage"]):
+				Stage.WAIT:
+					if float(d["clock"]) > 0.0 or not dripping or s == null:
+						continue
+					var theta := _pick(i, s)
+					var foot := _bead_foot(s, theta)
+					d["clock"] = _rng.randf_range(HONEY_DRIP_WAIT.x, HONEY_DRIP_WAIT.y)
+					# Only over open water: a drop over the beach waits for its next turn.
+					if not WaterSplash.wet_at(foot + Vector2(0.0, HONEY_DRIP_DROP)):
+						continue
+					d["theta"] = theta
+					d["at"] = foot
+					d["stage"] = Stage.HANG
+					d["clock"] = HONEY_DRIP_HANG * _rng.randf_range(0.7, 1.3)
+				Stage.HANG, Stage.STRETCH:
+					if s != null:
+						# It rides the rim where the shape has it this frame, and is taken back
+						# in if the haul drags the rim off the water.
+						d["at"] = _bead_foot(s, float(d["theta"]))
+						if not WaterSplash.wet_at((d["at"] as Vector2) + Vector2(0.0, HONEY_DRIP_DROP)):
+							d["stage"] = Stage.WAIT
+							continue
+					if float(d["clock"]) > 0.0 and s != null:
+						continue
+					if int(d["stage"]) == Stage.HANG and s != null:
+						d["stage"] = Stage.STRETCH
+						d["clock"] = HONEY_DRIP_STRETCH
+						continue
+					# Let go: the water under the bead, more under it while the throw is in the air.
+					var at: Vector2 = d["at"]
+					d["stage"] = Stage.FALL
+					d["floor"] = at.y + HONEY_DRIP_DROP + maxf(net.world_pos().y - net.draw_at().y, 0.0)
+					d["vel"] = 0.0
+					d["fell"] = 0.0
+				Stage.FALL:
+					d["vel"] = float(d["vel"]) + HONEY_DRIP_FALL * delta
+					d["fell"] = float(d["fell"]) + float(d["vel"]) * delta
+					var at: Vector2 = d["at"]
+					if at.y + float(d["fell"]) >= float(d["floor"]):
+						_plop(Vector2(at.x, float(d["floor"])))
+						d["stage"] = Stage.WAIT
+						d["clock"] = _rng.randf_range(HONEY_DRIP_WAIT.x, HONEY_DRIP_WAIT.y)
+		for k in range(_blobs.size() - 1, -1, -1):
+			_blobs[k]["age"] = float(_blobs[k]["age"]) + delta
+			if float(_blobs[k]["age"]) >= HONEY_DRIP_BLOB:
+				_blobs.remove_at(k)
+		var live := count() > 0 or not _blobs.is_empty()
+		if live or _was:
+			queue_redraw()
+		_was = live
+
+	## A drop meets the water: a foam ring while the splash layer has room, and a blob.
+	func _plop(at: Vector2) -> void:
+		if not WaterSplash.wet_at(at):
+			return
+		_blobs.append({"at": at, "age": 0.0})
+		var splash := net.splash
+		if splash != null and splash.ripples_up() < int(float(WaterSplash.MAX_RIPPLES) * HONEY_DRIP_SHARE):
+			splash.ripple(at, HONEY_DRIP_RING)
+
+	## The ramp: s shine, l lit, m mid, d deep (the hive's honey, `HiveArt`).
+	static func _ink(ch: String) -> Color:
+		match ch:
+			"s":
+				return HiveArt.HONEY_LIGHT
+			"l":
+				return HiveArt.HONEY
+			"m":
+				return HiveArt.HONEY_MID
+		return HiveArt.HONEY_DEEP
+
+	static func _cell(rows: Array, x: int, y: int) -> bool:
+		if y < 0 or y >= rows.size():
+			return false
+		var row: String = rows[y]
+		return x >= 0 and x < row.length() and row[x] != "."
+
+	## A sprite of `rows` with its top-left pixel at `o`, ringed in the outline.
+	func _sprite(rows: Array, o: Vector2) -> void:
+		var tall := rows.size()
+		var wide: int = (rows[0] as String).length()
+		for y in range(-1, tall + 1):
+			for x in range(-1, wide + 1):
+				if _cell(rows, x, y):
+					continue
+				if _cell(rows, x - 1, y) or _cell(rows, x + 1, y) or _cell(rows, x, y - 1) or _cell(rows, x, y + 1):
+					draw_rect(Rect2(o + Vector2(x, y), Vector2.ONE), OUTLINE)
+		for y in tall:
+			var row: String = rows[y]
+			for x in row.length():
+				if row[x] != ".":
+					draw_rect(Rect2(o + Vector2(x, y), Vector2.ONE), _ink(row[x]))
+
+	func _draw() -> void:
+		for b: Dictionary in _blobs:
+			var o := (b["at"] as Vector2).floor()
+			if float(b["age"]) < HONEY_DRIP_BLOB * 0.7:
+				_sprite(BLOB, o - Vector2(1.0, 1.0))
+			else:
+				# Sinking: one pixel of honey left.
+				draw_rect(Rect2(o, Vector2.ONE), HiveArt.HONEY_MID)
+		for d: Dictionary in _slots:
+			var stage := int(d["stage"])
+			if stage == Stage.WAIT:
+				continue
+			var foot := (d["at"] as Vector2).floor()
+			var thread := HONEY_DRIP_THREAD.x
+			if stage == Stage.STRETCH:
+				var k := 1.0 - clampf(float(d["clock"]) / HONEY_DRIP_STRETCH, 0.0, 1.0)
+				thread = floorf(lerpf(HONEY_DRIP_THREAD.x, HONEY_DRIP_THREAD.y, k) + 0.5)
+			if stage == Stage.FALL:
+				# The stub left on the bead, the drop falling with a lit tail riding on it.
+				var fell := floorf(float(d["fell"])) + HONEY_DRIP_THREAD.y
+				draw_rect(Rect2(foot, Vector2.ONE), HiveArt.HONEY_MID)
+				draw_rect(Rect2(foot + Vector2(0.0, fell - 1.0), Vector2.ONE), HiveArt.HONEY)
+				_sprite(TEAR, foot + Vector2(-1.0, fell))
+				continue
+			draw_rect(Rect2(foot, Vector2(1.0, thread)), HiveArt.HONEY_MID)
+			_sprite(TEAR, foot + Vector2(-1.0, thread - 1.0))
+
+
+var _honey_drips: HoneyDrips
 ## Seconds since a lucky net landed, or -1: the clock its burst and glint run on.
 var _lucky_age: float = -1.0
 
@@ -974,6 +1191,10 @@ func _ready() -> void:
 	_luck_stars.name = &"LuckStars"
 	_luck_stars.net = self
 	add_child(_luck_stars)
+	_honey_drips = HoneyDrips.new()
+	_honey_drips.name = &"HoneyDrips"
+	_honey_drips.net = self
+	add_child(_honey_drips)
 	_aim = AimLayer.new()
 	_aim.name = &"Aim"
 	_aim.net = self
@@ -1647,6 +1868,7 @@ func _shape_fresh() -> NetShape:
 	var s := NetShape.lying(mouth_extent())
 	s.w_open = open
 	s.gold = lucky()
+	s.honey = honey
 	if _lucky_age >= 0.0:
 		if _lucky_age < NetShape.BURST_RUN + NetShape.BURST_FADE:
 			s.landed = _lucky_age

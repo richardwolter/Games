@@ -173,6 +173,9 @@ static var VERB_CAST: String:
 static var VERB_INTERACT: String:
 	get: return TranslationServer.translate(&"VERB_INTERACT")
 
+static var VERB_EAT_HONEY: String:
+	get: return TranslationServer.translate(&"VERB_EAT_HONEY")
+
 static var VERB_OPEN_SHED: String:
 	get: return TranslationServer.translate(&"VERB_OPEN_SHED")
 
@@ -985,6 +988,9 @@ static var CUE_FERRY: String:
 
 static var CUE_METER: String:
 	get: return TranslationServer.translate(&"CUE_METER")
+
+static var CUE_HONEY: String:
+	get: return TranslationServer.translate(&"CUE_HONEY")
 
 static var NEED_STRENGTH: String:
 	get: return TranslationServer.translate(&"NEED_STRENGTH")

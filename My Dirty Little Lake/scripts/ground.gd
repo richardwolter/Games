@@ -229,15 +229,19 @@ const FLOOR_PIECES := ["log0", "log1", "log_moss0", "log_moss1", "stick0", "stic
 ## until `DRIFTWOOD_MOST`, `DRIFTWOOD_APART` 450 px apart, each one a picture off
 ## `DRIFTWOOD_PIECES` that differs from the nearest one laid, flipped on a hash. Was 15 of the
 ## one driftwood picture, 150 px apart.
+## Big ones only, fewer, up the beach (2026-10-19, Richard: the small logs and sticks "are
+## confusing with trash, it should be the big ones. But just a few of them, not too close to
+## the water"): the 86 px driftwood alone, flipped on a hash, at most 4, its foot 2 tiles or
+## more out of the water and every corner of it `DRIFTWOOD_DRY` up the sand. The forest floor
+## keeps its small logs and sticks.
 const DRIFTWOOD_SHARE := 0.04
-const DRIFTWOOD_MOST := 7
-const DRIFTWOOD_PIECES := ["driftwood", "driftwood", "log0", "log1", "log_moss0", "log_moss1",
-	"stick0", "stick1"]
-const DRIFTWOOD_BAND := Vector2(1.0, 4.2)
+const DRIFTWOOD_MOST := 4
+const DRIFTWOOD_PIECES := ["driftwood"]
+const DRIFTWOOD_BAND := Vector2(2.0, 4.2)
 const DRIFTWOOD_CLEAR := 6.0
 ## How far out of the water every corner of a log's drawing has to be, tiles: on the dry
 ## sand, not over the waterline.
-const DRIFTWOOD_DRY := 0.4
+const DRIFTWOOD_DRY := 1.2
 ## How far round a tile's middle a washed-up piece is kept off a log's drawing, world px
 ## (`LakeGrid.keep_off`): the strand and beach rubbish are tier 0, at most
 ## `LakeGrid.STRAND_WIDE` px across at the rubbish's grain, drifted and paired about a third
@@ -1353,6 +1357,22 @@ var _front_colors := PackedColorArray()
 var _front_indices := PackedInt32Array()
 
 
+## The buildings as drawn, each `[picture box, ground y]` in world px, handed in by the lake
+## every frame (`Lake._cover_walkers`). A plant or tuft whose picture overlaps one and whose
+## foot is above its ground line stands behind it, and the ground and the flora draw it under
+## the building, so neither `cover` draws it again over an animal or a walker: drawn again on
+## the layer over them it came out over the building too (2026-10-19, Richard: a bush behind
+## the house clipping through it).
+static var screens: Array = []
+
+
+static func behind_building(foot: Vector2, box: Rect2) -> bool:
+	for s: Array in screens:
+		if foot.y < float(s[1]) and (s[0] as Rect2).intersects(box):
+			return true
+	return false
+
+
 func cover(bodies: Array, front: bool = false) -> void:
 	if _prop_atlas == null:
 		return
@@ -1400,7 +1420,8 @@ func cover(bodies: Array, front: bool = false) -> void:
 					if seen.has(i) or _tuft_feet[i].y <= feet_y:
 						continue
 					var q := _tuft_quads[i]
-					if Rect2(_prop_points[q], _prop_points[q + 2] - _prop_points[q]).intersects(body):
+					var drawn := Rect2(_prop_points[q], _prop_points[q + 2] - _prop_points[q])
+					if drawn.intersects(body) and not behind_building(_tuft_feet[i], drawn):
 						seen[i] = true
 						picked.append(i)
 	picked.sort()

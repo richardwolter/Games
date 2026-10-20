@@ -9,6 +9,14 @@ the integration map (`docs/hive/map_digest.txt`, with the full detail in
 **Never deviate silently.** If something here is wrong or impossible, write the reason at
 the top of your report.
 
+> **Redrawn 2026-10-18** (CLAUDE.md, The Beehive Redrawn). Where this contract and the code
+> differ, the code and that section win. In short: the island sheet is
+> `tools/build_hive_island.py`'s (a cupboard of 12 jar slots, no shelf frames, a blossoming
+> tree for the shrub; section 3.1 and items 2 and 6 of section 5 are stale); every bee is
+> `BeeArt` (`assets/bees.*`) and every jar `HoneyPot` (`assets/honey_pot.*`); the uncap and
+> pour pieces are `HiveKitchenArt` (`assets/hive_kitchen.*`, `tools/build_hive_kitchen.py`);
+> there are no gloves, no crank and no smoke rings; `tools/build_hive.py` builds the room only.
+
 ## 0. Toolchain (this machine)
 
 - Godot: `"/c/Users/Administrador/Desktop/Godot_v4.7.1-stable_win64.exe"`, from the
@@ -37,7 +45,8 @@ the top of your report.
 
 - **An old, empty hive stands on the island's free lawn, left of the hut on screen**, from a
   new game. It is one isometric sprite: the hive, plus a **jar shelf** behind its shaded side
-  (two thin pine planks on posts). The jars are scenery: **3 per harvest, at most 12** (four
+  (two thin pine planks on posts). The jars were scenery (since 2026-10-16 they are eaten, a window of better pay: see
+  CLAUDE.md, Honey Jars Are Eaten): **3 per harvest, at most 12** (four
   harvests), filling the top plank first.
 - **Paint: sky blue** (`PAINTS["sky"]` in the mockup). The hive is weathered grey with faded
   blue flakes until the colony moves in, then its paint comes back. The roof is coral.
@@ -99,6 +108,13 @@ is 640x360 painted px at the 1280x720 design canvas).
 
 ### 3.1 `assets/hive.json` (island)
 
+> **Stale since 2026-10-18.** `tools/build_hive_island.py` writes it now: `frames`
+> (`hive_weathered`, `hive_colony0..4`, `hive_full`, `tree_bare`, `tree_bloom`, `tree_swarm`,
+> `tree_sil`, `swarm_sil`, `ready`), `levels`, `jar_slots` (12 `[x, y, shaded]`, the jars drawn
+> by `HoneyPot` at `Hive.jar_slot(k)`), `entrance`, `entrance_high`, `ready_at`, `ready_mid`,
+> `tree_at`/`tree_foot`/`tree_size`, `swarm_px`, `swarm_high`, `foot_tiles` (centre (0, 0),
+> half (0.4375, 0.4375)). The block below is the first pass's.
+
 ```json
 {
   "size": [W, H],
@@ -148,6 +164,12 @@ before inking, the hive's `cx` 30. Keep it exactly as approved on the sheet.
 `tools/last_hive_sheet.png` is a contact sheet of every frame at x6.
 
 ### 3.2 `assets/hive_room.json` (room pieces)
+
+> **Since 2026-10-18** the uncap's and the pour's pieces (knife, oak bucket, flume, stand,
+> bench, gate, lever, rosette) are `assets/hive_kitchen.json` (`HiveKitchenArt`), and the room
+> sheet carries catch A's box, smoke A's hive and scarf ring and queen B's well (`qwell_*`,
+> `qframe`) plus the mockups' layouts in `data` (`HiveArt.data`). Pieces in the table below
+> may be gone or unused.
 
 ```json
 {"pieces": {"<name>": {"rect": [x, y, w, h], "anchors": {"<a>": [x, y]}}}}

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-"""Draw the beehive sidequest's art: the hive on the island, and the pieces of the hive room.
+"""Draw the beehive sidequest's art: the pieces of the hive room (the island is
+tools/build_hive_island.py's since 2026-10-18; this module keeps its old island helpers
+because the mockups in tools/hive_look/ import them).
 
 The look was picked off tools/hive_mockup.py (2026-09-29, `/grill-me` with Richard), and the
 drawing moved here out of it so the game and the mockup are drawn by the same functions; the
@@ -9,9 +11,7 @@ outline (OUT, the hut's and the box's) round everything opaque. Richard may poli
 after ("rules first, polish after"); the json holds while the rects do.
 
 Output:
-  assets/hive.png, hive.json            the island sheet (docs/hive/contract.md 3.1)
   assets/hive_room.png, hive_room.json  the room's pieces and their anchors (3.2)
-  tools/last_hive_sheet.png             every island frame at 6x on grass, parts laid together
   tools/last_hive_room_sheet.png        every room piece at 2x with its anchors marked
 
 **The island sprite is two parts on one canvas.** The hive and its jar shelf are one picture
@@ -1697,11 +1697,8 @@ def billow(r, seed):
 
 
 # === baking ================================================================================
-ASSET_ISLAND = os.path.join("assets", "hive.png")
-CONTRACT_ISLAND = os.path.join("assets", "hive.json")
 ASSET_ROOM = os.path.join("assets", "hive_room.png")
 CONTRACT_ROOM = os.path.join("assets", "hive_room.json")
-SHEET_ISLAND = os.path.join("tools", "last_hive_sheet.png")
 SHEET_ROOM = os.path.join("tools", "last_hive_room_sheet.png")
 
 ISLAND_PAINT = PAINTS["sky"]        # Richard's pick off the mockup
@@ -1832,89 +1829,12 @@ def _island_geometry():
     return {"foot": foot, "centre": centre, "half": half, "window_cols": cols, "entrance": entrance}
 
 
-def build_island():
-    """The island sheet: eight frames of one size, the swarm and the ready mark."""
-    geo = _island_geometry_hd()
-    old, sky = WEATHERED, ISLAND_PAINT
-    mask_old, mask_new = _hive_mask(old, "weathered"), _hive_mask(sky, "colony")
-    shelf_old, hive_old = _split(island_hive_hd(old, "weathered"), mask_old)
-    parts = {"hive_weathered": hive_old,
-             "hive_colony": _split(island_hive_hd(sky, "colony", window="dark"), mask_new)[1],
-             "hive_full": _split(island_hive_hd(sky, "full", drip=True), _hive_mask(sky, "full", True))[1],
-             "shelf_weathered": shelf_old}
-    for j in JARS_SHOWN:
-        parts["shelf_%d" % j] = _split(island_hive_hd(sky, "colony", j, window="dark"), mask_new)[0]
-    # Every pairing the game draws lays back into the mockup's one sprite.
-    checks = [("shelf_weathered", "hive_weathered", island_hive_hd(old, "weathered"))]
-    for j in JARS_SHOWN:
-        checks.append(("shelf_%d" % j, "hive_colony", island_hive_hd(sky, "colony", j, window="dark")))
-        checks.append(("shelf_%d" % j, "hive_full", island_hive_hd(sky, "full", j, drip=True)))
-    for s, h, whole in checks:
-        laid = parts[s].copy()
-        laid.alpha_composite(parts[h])
-        assert _same(laid, whole), "%s under %s is not the whole sprite" % (s, h)
-
-    # One crop for all of them: the union of what is drawn, a pixel of margin round it.
-    boxes = [im.getbbox() for im in parts.values()]
-    x0 = min(b[0] for b in boxes) - 1
-    y0 = min(b[1] for b in boxes) - 1
-    x1 = max(b[2] for b in boxes) + 1
-    y1 = max(b[3] for b in boxes) + 1
-    fw, fh = x1 - x0, y1 - y0
-    frames = {k: v.crop((x0, y0, x1, y1)) for k, v in parts.items()}
-
-    def local(p):
-        return [p[0] - x0, p[1] - y0]
-
-    swarm, ready = island_swarm_hd(), ready_mark_hd()
-    order = ["hive_weathered", "hive_colony", "hive_full", "shelf_weathered"] + ["shelf_%d" % j for j in JARS_SHOWN]
-    per_row = 4
-    rows = (len(order) + per_row - 1) // per_row
-    sw = per_row * (fw + 1) + 1
-    sh = rows * (fh + 1) + 1 + max(swarm.height, ready.height) + 1
-    sheet = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    rects = {}
-    for i, name in enumerate(order):
-        x, y = 1 + (i % per_row) * (fw + 1), 1 + (i // per_row) * (fh + 1)
-        sheet.alpha_composite(frames[name], (x, y))
-        rects[name] = [x, y, fw, fh]
-    ty = 1 + rows * (fh + 1)
-    sheet.alpha_composite(swarm, (1, ty))
-    sheet.alpha_composite(ready, (2 + swarm.width, ty))
-    sheet.save(ASSET_ISLAND)
-
-    foot = local(geo["foot"])
-    cols = [[c[0] - x0, c[1] - y0, c[2]] for c in geo["window_cols"]]
-    wx0, wy0 = min(c[0] for c in cols), min(c[1] for c in cols)
-    wx1, wy1 = max(c[0] + 1 for c in cols), max(c[1] + c[2] for c in cols)
-    shrub = _to_painted(*SHRUB_TILE)
-    shrub_at = [int(round(shrub[0])), int(round(shrub[1]))]
-    swarm_at = [shrub_at[0] + SWARM_OFF_SHRUB[0], shrub_at[1] + SWARM_OFF_SHRUB[1]]
-    contract = {
-        "size": [fw, fh],
-        "foot": foot,
-        "ground_hive": _ground(frames["hive_colony"]),
-        "ground_shelf": _ground(frames["shelf_0"]),
-        "frames": rects,
-        "window": [wx0, wy0, wx1 - wx0, wy1 - wy0],
-        "window_cols": cols,
-        "entrance": local(geo["entrance"]),
-        "ready_at": local(READY_AT),
-        "ready": [2 + swarm.width, ty, ready.width, ready.height],
-        "swarm": [1, ty, swarm.width, swarm.height],
-        "swarm_at": swarm_at,
-        "shrub_at": shrub_at,
-        "shrub_tile": list(SHRUB_TILE),
-        "foot_tiles": {"centre": [round(v, 4) for v in geo["centre"]],
-                       "half": [round(v, 4) for v in geo["half"]]},
-    }
-    with open(CONTRACT_ISLAND, "w", newline="\n") as f:
-        json.dump(contract, f, indent=1)
-        f.write("\n")
-    return frames, contract
+# build_island() and island_contact() lived here until 2026-10-18: the island sheet
+# (assets/hive.png, hive.json) is tools/build_hive_island.py's now (island pick C), and running
+# this builder must not write over it. The island's drawing helpers above stay: the mockups in
+# tools/hive_look/ import this module and call them.
 
 
-# --- the room ------------------------------------------------------------------------------
 def _crop(im, anchors, box=None):
     """A piece cut to what is drawn (or to `box`), its anchors moved with it."""
     box = box or im.getbbox()
@@ -2045,7 +1965,435 @@ def room_pieces():
     for k, (r, seed) in enumerate(((5, 11), (8, 12), (11, 13), (14, 14), (18, 15), (22, 16))):
         im, anchors = billow(r, seed)
         out["billow_%d" % k] = _crop(im, anchors, (0, 0, im.width, im.height))
+    _overhaul_pieces(out, ROOM_DATA)
     return out, comb_inner
+
+
+# --- the hive's visual overhaul (2026-10-18): catch A, smoke A (+ C's ring), queen B ---------
+# Richard picked these off tools/hive_look/last_{catch,smoke,queen}.png. The pieces are drawn by
+# the mockups' own functions, called, not copied (tools/build_bees.py's rule: the bee and the
+# sheets stay one drawing), so tools/hive_look/ must be there to build the room. Every bee the
+# steps draw at run time is BeeArt's (bee "A"); what is baked here is the scenery round them,
+# plus the layouts the mockups worked out (which bee stands where), handed over as data in
+# hive_room.json's "data" (HiveArt.data).
+ROOM_DATA = {}
+SMOKE_RINGS = [(236, 142), (236, 178), (233, 246)]      # hive_step_smoke RINGS
+SMOKE_RING_HALVES = [(50, 17), (56, 16), (40, 13)]      # and RING_HALVES
+SMOKE_BILLOW_R = (1.6, 2.2, 2.9, 3.6, 4.4, 5.2, 6.0, 6.6)
+SMOKE_BILLOW_FADES = (0.0, 0.5, 1.0)
+SCARF_FRAMES = 4
+
+
+def _mockups():
+    import sys
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hive_look")
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import look  # noqa: F401
+    import catch_mockup as cm
+    import smoke_mockup as sm
+    import queen_mockup as qm
+    qm.V = "A"                       # the pick is bee A; the queen sheet drew R
+    return look, cm, sm, qm
+
+
+def _overhaul_pieces(out, data):
+    look, cm, sm, qm = _mockups()
+    _catch_pieces(out, data, look, cm)
+    _smoke_pieces(out, data, look, sm)
+    _queen_pieces(out, data, look, qm)
+
+
+def _catch_pieces(out, data, look, cm):
+    """Catch A, "bees on the frames": the box front-on with 0..5 frames taken (the stripe flecks
+    in the gaps by the frames taken) and lit (the gaps glowing honey-warm while a clump in hand
+    is over it). The bees on its bars, its board and in the sky are the step's to draw: their
+    places, off the mockup's `_bar_bees`, `_fanners`, `_guard` and `cloud`, are data."""
+    cm.use("A")
+    anchors = {"feet": [cm.FEET[0], cm.FEET[1]], "mouth": [cm.CX, cm.FY0 - 6],
+               "board": [cm.CX, cm.PLINTH + 1]}
+    span = cm.FY0 - 3 - cm.OY - 1
+    for k in range(cm.BARS):
+        anchors["bar%d_t" % k] = [cm.bar_mid(k, cm.OY + 1), cm.OY + 1]
+        anchors["bar%d_b" % k] = [cm.bar_mid(k, cm.FY0 - 3), cm.FY0 - 3]
+    for g in range(cm.BARS + 1):
+        for tag, y in (("t", cm.OY + 2), ("b", cm.FY0 - 3)):
+            x0, x1 = cm._gap_span(g, y)
+            anchors["gap%d_%s" % (g, tag)] = [(x0 + x1) / 2.0, y]
+    xl, xr = cm._top_lr(cm.FY0 - 2)
+    anchors["rim_l"], anchors["rim_r"] = [xl, cm.FY0 - 1], [xr, cm.FY0 - 1]
+    xl, xr = cm._top_lr(cm.OY)
+    anchors["back_l"], anchors["back_r"] = [xl, cm.OY - 1], [xr, cm.OY - 1]
+    for n in range(cm.BARS + 1):
+        im = cm.box_body("A", n, False)
+        out["catchbox_%d" % n] = (im, dict(anchors))
+    out["catchbox_lit"] = (cm.box_body("A", 0, True), dict(anchors))
+
+    # The bees on the bars, the mockup's `_bar_bees` worked out once: each with the count of
+    # frames taken it shows from, its place in the box's own pixels, pose, turn, facing, whether
+    # it is in the box's shade (the far end of a bar) and whether it is half down a gap.
+    bees = []
+    for k in range(cm.BARS):
+        rng = random.Random(300 + 7 * k)
+        crowd = [(0.08, "walk", rng.choice((1, 3)), None),
+                 (0.42 + rng.uniform(-0.06, 0.06), "walk", 0, rng.random() < 0.5),
+                 (0.72 + rng.uniform(-0.05, 0.05), "walk", rng.choice((1, 3)), None),
+                 (1.0, "rest", 0, k >= 2)]
+        if k % 2:
+            crowd[1], crowd[2] = (crowd[1][0] + 0.12,) + crowd[1][1:], (0.25,) + crowd[2][1:]
+        for t, pose, turn, left in crowd:
+            y = cm.OY + 1 + t * span
+            x = cm.bar_mid(k, int(round(y))) + 0.5 + rng.choice((-1, 0, 1))
+            lf = rng.random() < 0.5 if left is None else left
+            bees.append({"from": k + 1, "x": x, "y": y, "pose": pose, "turn": turn, "left": lf,
+                         "shade": t < 0.3, "half": False, "frame": k + int(t * 10), "bar": k})
+        g = k + 1 if k % 2 == 0 else k
+        y = cm.OY + 1 + (0.55 + 0.1 * (k % 3)) * span
+        x0, x1 = cm._gap_span(g, int(round(y)))
+        bees.append({"from": k + 1, "x": (x0 + x1) / 2.0 + 0.5, "y": y, "pose": "walk", "turn": 3,
+                     "left": k % 2 == 0, "shade": False, "half": True, "frame": k, "bar": k})
+    spill = [(3, (None, 0.95), "walk", False), (4, ("rim", 0.3), "walk", True),
+             (4, (None, 0.55), "walk", True), (5, ("rim", 0.62), "rest", False),
+             (5, ("rim", 0.86), "walk", True), (5, ("back", 0.4), "walk", False),
+             (5, ("back", 0.7), "rest", True)]
+    for i, (need, (where, t), pose, left) in enumerate(spill):
+        shade = False
+        if where == "rim":
+            xl, xr = cm._top_lr(cm.FY0 - 2)
+            x, y = xl + t * (xr - xl), cm.FY0 - 1
+        elif where == "back":
+            xl, xr = cm._top_lr(cm.OY)
+            x, y = xl + t * (xr - xl), cm.OY - 1
+            shade = True
+        else:
+            kk = min(need, cm.BARS - 1)
+            y = cm.OY + 1 + t * span
+            x = cm.bar_mid(kk, int(round(y))) + 0.5
+        bees.append({"from": need, "x": x, "y": y, "pose": pose, "turn": 0, "left": left,
+                     "shade": shade, "half": False, "frame": 2 * i, "bar": -1})
+    data["catch_bar_bees"] = bees
+
+    # The clumps in the sky: the mockup's `cloud` points (14 a clump, 3 of them loose), as
+    # offsets from the clump's middle with the role each one plays (back row, middle, rim).
+    clumps = []
+    for c in range(5):
+        rng = random.Random(11 + c)
+        n, n_loose = 14, 3
+        sx, sy = 7.6, 5.2
+        area = (n - n_loose) * sx * sy * 1.25
+        ry = math.sqrt(area / (math.pi * 1.3))
+        rx = ry * 1.3
+        pts = []
+        for _ in range(20000):
+            if len(pts) >= n - n_loose:
+                break
+            u, v = rng.uniform(-1, 1), rng.uniform(-1, 1)
+            if not look._inside("clump", u, v):
+                continue
+            x, y = u * rx, v * ry
+            if all(((x - a) / sx) ** 2 + ((y - b) / sy) ** 2 >= 1.0 for a, b, _, _ in pts):
+                pts.append((x, y, u, v))
+        pts.sort(key=lambda p: p[1])
+        bees_c = []
+        for x, y, u, v in pts:
+            r = math.hypot(u, v)
+            phase = rng.randrange(6)
+            if v < -0.35 and r > 0.35:
+                role, left = "back", rng.random() < 0.5
+                pose = "rest" if rng.random() < 0.5 else "walk"
+            elif r < 0.55:
+                role, left = "middle", rng.random() < 0.5
+                pose = "walk" if rng.random() < 0.7 else "rest"
+            else:
+                role = "rim"
+                left = (u < 0) if rng.random() < 0.85 else not (u < 0)
+                pose = "hover" if rng.random() < 0.75 else "walk"
+            bees_c.append({"x": x, "y": y, "role": role, "left": left, "pose": pose, "phase": phase})
+        for i in range(n_loose):
+            bees_c.append({"x": 0.0, "y": 0.0, "role": "loose", "left": False, "pose": "fly",
+                           "phase": rng.randrange(6), "a0": rng.uniform(0, 2 * math.pi),
+                           "rr": rng.uniform(1.35, 1.6), "rx": rx + 6, "ry": ry + 5,
+                           "spin": 1 if i % 2 else -1})
+        clumps.append(bees_c)
+    data["catch_clumps"] = clumps
+
+
+def _smoke_pieces(out, data, look, sm):  # noqa: C901
+    """Smoke A: the beard's packed under layer baked a band at a time (its top bees are the
+    step's, drawn live and placed off the mockup's own points), the smoker one box tall, the
+    billows in the mockup's stepped style and thinning, the Zs, and C's scarf of smoke wrapped
+    round each stop (its far half behind the beard, its near half over it), four drift frames."""
+    import numpy as np
+    b = sm.beard(["waiting"] * 3, frame=0, guards=False)
+    under = b["under"]
+    mask, dist = b["mask"], b["dist"]
+    bands = []
+    for band in range(3):
+        y0 = 0 if band == 0 else sm.BAND_TO[band - 1]
+        y1 = sm.BAND_TO[band] if band < 2 else look.ROOM_GRID[1]
+        part = Image.new("RGBA", look.ROOM_GRID, (0, 0, 0, 0))
+        part.paste(under.crop((0, y0, look.ROOM_GRID[0], y1)), (0, y0))
+        box = part.getbbox()
+        out["beard_under_%d" % band] = (part.crop(box), {"tl": [0, 0]})
+        bands.append([box[0], box[1]])
+    rows = {}
+    for y in range(mask.shape[0]):
+        cols = np.where(mask[y])[0]
+        if cols.size:
+            rows[str(y)] = [int(cols.min()), int(cols.max())]
+    # the top layer's points, the mockup's own, with their light step and the rolls each state
+    # reads (calm / agitated / waiting all pick off one roll, as `beard` does)
+    rng = random.Random(4101 + 3)
+    pts = sm._points(4101 + 1, (6.6, 4.4), 3.0)
+    pts.sort(key=lambda p: p[1] + rng.uniform(-3.5, 3.5))
+    top = []
+    for x, y in pts:
+        d = int(dist[int(y), int(x)])
+        rim = d <= sm.RIM_PX
+        left = rng.random() < 0.5 if not rim else (x < sm.CX) ^ (rng.random() < 0.25)
+        top.append([round(x, 2), round(y, 2), sm._band(y), 1 if rim else 0,
+                    ("lit", "mid", "shade").index(sm.step_at(x, y)), round(rng.random(), 3),
+                    1 if left else 0, rng.choice((1, 3)), rng.choice((0, 0, 1, 3)),
+                    rng.choice((0, 1, 3)), rng.randrange(6), rng.randrange(2)])
+    whirr = []
+    for band in range(3):
+        t0, t1 = sm.band_rows(band)
+        out_b = []
+        for y in range(t0 + 2, t1 - 1, 5):
+            cols = np.where(mask[y])[0]
+            if not cols.size:
+                continue
+            for side, edge in ((-1, cols.min()), (1, cols.max())):
+                out_b.append([int(edge - side * 3), y + (2 if side > 0 else 0), side])
+        whirr.append(out_b)
+    fest = []
+    for i, (dx, n) in enumerate(sm.FESTOONS):
+        x = int(round(sm.CX + dx))
+        col = np.where(mask[:, x])[0]
+        fest.append([x, int(col.max() - 2 if col.size else sm.MASS_BOT), n, i])
+    t0 = sm.band_rows(0)[0]
+    ref = rows[str(t0 + 5)][0]
+    zs = [[n, x - ref, y - t0] for n, (x, y) in ((4, (186, 136)), (5, (177, 124)), (7, (165, 108)))]
+    data["beard"] = {"under": bands, "rows": rows, "top": top, "whirr": whirr, "festoons": fest,
+                     "walkers": [list(w) for w in sm.WALKERS], "zs": zs,
+                     "band_rows": [list(sm.band_rows(k)) for k in range(3)],
+                     "cx": sm.CX, "rim_px": sm.RIM_PX}
+    for n in (4, 5, 7):
+        out["zed_%d" % n] = (sm.zed(n), {"tl": [0, 0]})
+    # the smoker, one box tall (`smoker`, facing left), held by the outer board's middle
+    for name, squeeze in (("smoker", 0.0), ("smoker_half", 0.5), ("smoker_shut", 1.0)):
+        im, an = sm.smoker(squeeze)
+        box = im.getbbox()
+        anchors = {"nozzle": list(an["nozzle"]), "bellows": list(an["grip"]),
+                   "feet": list(an["feet"]), "top": list(an["top"])}
+        out[name] = _crop(im, anchors, box)
+    for k, r in enumerate(SMOKE_BILLOW_R):
+        for f, fade in enumerate(SMOKE_BILLOW_FADES):
+            im, c = sm.billow(r, 500 + k * 7, fade=fade, lobes=2 if r < 3 else 3)
+            out["sbillow_%d_%d" % (k, f)] = (im, {"c": list(c)})
+    # C's scarf, ring only (the lead off the nozzle is the step's billows): once round the stop,
+    # the far half behind the beard, curls off its upper side, a frayed tail
+    for band in range(3):
+        cx, cy = SMOKE_RINGS[band]
+        rx, ry = SMOKE_RING_HALVES[band][0] * 1.08, SMOKE_RING_HALVES[band][1] * 0.82
+        for f in range(SCARF_FRAMES):
+            back, front = _scarf_ring(sm, look, f, (cx, cy), (rx, ry), 3 + band)
+            for tag, im in (("b", back), ("f", front)):
+                box = im.getbbox() or (0, 0, 1, 1)
+                out["scarf_%d_%s%d" % (band, tag, f)] = (im.crop(box), {"tl": [0, 0]})
+                data.setdefault("scarf_at", {})["%d_%s%d" % (band, tag, f)] = [box[0], box[1]]
+
+
+def _scarf_ring(sm, look, frame, loop_c, loop_r, seed):
+    """smoke_mockup.scarf without its lead: a strand from the stop's right end once round it."""
+    cx, cy = loop_c
+    rx, ry = loop_r
+    ring_pts = []
+    for k in range(0, 15):
+        ang = k / 14.0 * math.tau * 0.93
+        ring_pts.append((cx + math.cos(ang) * rx * (1 - 0.06 * k / 14), cy + math.sin(ang) * ry))
+    line, run = sm.path_of(ring_pts, 30)
+    total = run[-1]
+    back_d, front_d = [], []
+    drift = (frame % 4) * 2.5
+    s_ = 2.0
+    while s_ < total:
+        u = s_ / total
+        x, y = sm.at_len(line, run, s_)
+        r = 0.75 + 0.45 * min(1.0, u * 3) + 0.7 * abs(math.sin((s_ - drift) / 6.0 + seed)) ** 2
+        behind = y < cy - 0.5
+        if math.sin((s_ - drift) / 9.0 + seed * 2.1) < 0.95:
+            (back_d if behind else front_d).append((x, y, r))
+        s_ += 0.6
+    k = 0
+    c_at = 10.0 + drift
+    while c_at < total - 6:
+        x, y = sm.at_len(line, run, c_at)
+        nx, ny = sm.normal_at(line, run, c_at)
+        if ny > 0:
+            nx, ny = -nx, -ny
+        size = (2.0 + 1.6 * min(1.0, c_at / total * 2)) * (0.75 + 0.5 * ((k * 0.618) % 1.0))
+        ox, oy = x + nx * size, y + ny * size
+        behind = y < cy - 0.5
+        spin = 1 if k % 2 else -1
+        for j in range(26):
+            t = j / 25.0
+            ang = math.atan2(-ny, -nx) + spin * t * math.tau * 1.15
+            rr = size * (1.0 - 0.75 * t)
+            (back_d if behind else front_d).append((ox + math.cos(ang) * rr, oy + math.sin(ang) * rr,
+                                                    0.85 if t < 0.8 else 0.6))
+        k += 1
+        c_at += sm.CURL_EVERY * (0.7 + 0.6 * ((k * 0.382 + 0.2) % 1.0))
+    back, front = sm.blank(), sm.blank()
+    for discs, L in ((back_d, back), (front_d, front)):
+        if discs:
+            L.alpha_composite(sm.smoke_body(discs, look.ROOM_GRID, lip_only=True, cross=40))
+    ex, ey = sm.at_len(line, run, total)
+    for k in range(3):
+        im, c = sm.billow(2.2 - k * 0.5, seed + 40 + k, fade=0.15 * k, lobes=2)
+        sm.lay(back if ey < cy else front, im, (ex + 3 + k * 3.5, ey - 4 - k * 3), c)
+    return back, front
+
+
+def _queen_pieces(out, data, look, qm):
+    """Queen B, "the well, deeper": the open box seen from above, rebalanced. Baked in three
+    layers round what moves: the back (the box's inside, the frames further back, the next
+    frame's upright face and the comb behind it in the gaps, the side walls, a few still bees on
+    the next frame), the tipped frame 1.3x (`qframe`), and the front (two bars with the dark
+    between, bees peering over the near one, brace comb, beads of honey, the near wall). The
+    workers, the queen and her court, and the bees on the front bars are the step's."""
+    W, H = look.ROOM_GRID
+    fx, fy = qm.B_FRAME_AT
+    tipped, comb_box = qm.brood(*qm.B_FRAME)
+    art = Art(W, H)
+    for y in range(18, H):
+        l, r = qm.b_inner(y)
+        art.rect(int(l), y, int(r - l) + 1, 1, WELL_DEEPER)
+    l0, r0 = qm.b_inner(18)
+    art.rect(int(l0) - 34, 0, int(r0 - l0) + 68, 5, PAINTS["sky"][1])
+    art.rect(int(l0) - 34, 0, int(r0 - l0) + 68, 1, PAINTS["sky"][0])
+    art.rect(int(l0) - 34, 5, int(r0 - l0) + 68, 6, PINE)
+    art.rect(int(l0) - 34, 5, int(r0 - l0) + 68, 2, PINE_LIT)
+    art.rect(int(l0), 11, int(r0 - l0), 7, DARK_WOOD_LO)
+    back_bars = []
+    for k, (y, h) in enumerate(((19, 2), (23, 3))):
+        l, r = qm.b_inner(y)
+        qm.gap(art, int(l) + qm.b_wall(y), int(r) - qm.b_wall(y), y - 2, y, 90 + k, honey=0.5)
+        qm.bar(art, int(l) + qm.b_wall(y), int(r) - qm.b_wall(y), y, h, 95 + k)
+        back_bars.append((int(l) + qm.b_wall(y), int(r) - qm.b_wall(y), y, h))
+    behind = Art(W, H)
+    comb(behind, 0, 28, W, H, qm.honey_kind(60, 170), cell=CELL_SMALL, seed=44)
+    beh = behind.im
+    qm.comb_glints(beh, 0.0, 7)
+    beh = qm.stepped(beh, lambda x, y: 4 if x < W // 2 else 3)
+    mask = Image.new("L", (W, H), 0)
+    md = ImageDraw.Draw(mask)
+    md.polygon([qm.b_inner(28)[0], 28, qm.NEXT[0], 28, qm.NEXT[0], H, qm.b_inner(H)[0], H], fill=255)
+    md.polygon([qm.NEXT[1], 28, qm.b_inner(28)[1], 28, qm.b_inner(H)[1], H, qm.NEXT[1], H], fill=255)
+    cut = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    cut.paste(beh, (0, 0), mask)
+    art.paste(cut, 0, 0)
+    nxt = Art(W, H)
+    comb(nxt, qm.NEXT[0] + 6, 34, qm.NEXT[1] - 6, H, qm.honey_kind(64, 168), cell=CELL_SMALL, seed=31)
+    glint = qm.comb_glints(nxt.im, 0.22, 4)
+    shadow = tipped.getchannel("A").point(lambda v: 255 if v > 40 else 0)
+
+    def depth(x, y):
+        n = 1 if y < 110 else 2 if y < 200 else 3
+        sx, sy = x - fx - 7, y - fy - 5
+        if 0 <= sx < shadow.width and 0 <= sy < shadow.height and shadow.getpixel((sx, sy)):
+            n += 1
+        return n
+
+    face = qm.stepped(nxt.im, depth)
+    fpx = face.load()
+    for x, y in glint:
+        if fpx[x, y][3]:
+            fpx[x, y] = qm.step_down(HONEY_LIGHT, depth(x, y) - 1)
+    art.paste(face, 0, 0)
+    end = Art(W, H)
+    for x0 in (qm.NEXT[0], qm.NEXT[1] - 6):
+        end.rect(x0, 30, 6, H - 30, PINE)
+        end.rect(x0, 30, 2, H - 30, PINE_LIT)
+        end.rect(x0 + 5, 30, 1, H - 30, PINE_DEEP)
+    end.rect(qm.NEXT[0] - 6, 28, qm.NEXT[1] - qm.NEXT[0] + 12, 6, PINE)
+    end.rect(qm.NEXT[0] - 6, 28, qm.NEXT[1] - qm.NEXT[0] + 12, 2, PINE_LIT)
+    end.rect(qm.NEXT[0] - 6, 33, qm.NEXT[1] - qm.NEXT[0] + 12, 1, PINE_DEEP)
+    art.paste(qm.stepped(end.im, lambda x, y: 1 if y < 110 else 2), 0, 0)
+    for y in range(18, H):
+        l, r = qm.b_inner(y)
+        l, r = int(l), int(r)
+        rim = 6 + int(9 * (y / H))
+        fw = qm.b_wall(y)
+        plank = (y - 18) % 26 == 0
+        art.rect(l - rim - 8, y, 8, 1, PAINTS["sky"][0] if y % 24 else PAINTS["sky"][1])
+        art.rect(l - rim, y, rim, 1, PINE_LIT if y % 11 else PINE)
+        art.rect(l, y, fw, 1, PINE_DEEP if plank else PINE_SHADE)
+        art.rect(l, y, 1, 1, qm.darker(PINE_SHADE, 0.3))
+        art.rect(l + fw, y, 1, 1, OUT)
+        art.rect(r - fw + 1, y, fw, 1, PINE if plank else PINE_LIT)
+        art.rect(r - fw, y, 1, 1, OUT)
+        art.rect(r, y, rim, 1, PINE if y % 11 else PINE_SHADE)
+        art.rect(r + rim, y, 8, 1, PAINTS["sky"][2] if y % 24 else PAINTS["sky"][3])
+        art.px(l - rim - 9, y, OUT)
+        art.px(r + rim + 8, y, OUT)
+    side = qm.Room()
+    for k, rect in enumerate(((qm.NEXT[0] + 7, 44, fx + 16, 268),
+                              (fx + qm.B_FRAME[0] + 12, 44, qm.NEXT[1] - 7, 268))):
+        for x, y, pose, left, turn, f in qm.crowd(side, rect, 5, 8 + k):
+            qm.put_bee(art.im, x, y, pose, left, turn, f, tint=2 if y < 160 else 3)
+    marks = {"tl": [0, 0]}
+    for k, (l, r, y, h) in enumerate(back_bars):
+        marks["bar%d_l" % k] = [l, y]
+        marks["bar%d_r" % k] = [r, y + h]
+    out["qwell_back"] = (art.im, dict(marks))
+    out["qframe"] = (tipped, {"tl": [0, 0], "inner_tl": [comb_box[0], comb_box[1]],
+                              "inner_br": [comb_box[2], comb_box[3]]})
+    # the front: from the tipped frame's foot down
+    fr = Art(W, H)
+    y_foot = fy + qm.B_FRAME[1] + 4
+    for y in range(y_foot, H):
+        l, r = qm.b_inner(y)
+        fr.rect(int(l) + 4, y, int(r - l) - 7, 1, WELL_DEEPER)
+    prev = y_foot
+    peekers = {1: [(266, False, 0), (404, True, 1), (176, True, 2)]}
+    front_bars = []
+    for k, (y, h) in enumerate(((282, 9), (301, 12))):
+        l, r = qm.b_inner(y + h)
+        qm.gap(fr, int(l) + 4, int(r) - 4, prev, y, 40 + k)
+        for x, left, f in peekers.get(k, ()):
+            qm.peeker(fr.im, x, y, left, f)
+        qm.bar(fr, int(l) + 2, int(r) - 2, y, h, 50 + k)
+        front_bars.append((int(l) + 2, int(r) - 2, y, h))
+        prev = y + h
+    l, r = qm.b_inner(320)
+    qm.gap(fr, int(l) + 4, int(r) - 4, prev, 321, 60)
+    fr.rect(0, 321, W, 9, PINE)
+    fr.rect(0, 321, W, 3, PINE_LIT)
+    fr.rect(0, 329, W, 1, PINE_SHADE)
+    fr.rect(0, 330, W, H - 330, PAINTS["sky"][1])
+    fr.rect(0, 330, W, 2, PAINTS["sky"][0])
+    for yy in (343, 356):
+        fr.rect(0, yy, W, 1, PAINTS["sky"][2])
+    for xx in range(14, W, 96):
+        fr.rect(xx, 334, 1, 8, PAINTS["sky"][2])
+    qm.brace_ridge(fr.im, 452, 291, 301, 3)
+    qm.brace_ridge(fr.im, 128, 313, 321, 3)
+    qm.honey_bead(fr.im, 330, 283)
+    qm.honey_bead(fr.im, 504, 302)
+    fmarks = {"tl": [0, 0]}
+    for k, (l, r, y, h) in enumerate(front_bars):
+        fmarks["bar%d_l" % k] = [l, y]
+        fmarks["bar%d_r" % k] = [r, y + h]
+    out["qwell_front"] = (fr.im, fmarks)
+    data["queen"] = {"frame_at": [fx, fy], "queen_at": list(qm.B_QUEEN),
+                     "front_bars": [list(b) for b in front_bars],
+                     "back_bars": [list(b) for b in back_bars],
+                     "bar_life": [[150, 286, "walk", False], [214, 286, "rest", True],
+                                  [372, 286, "walk", True], [556, 286, "rest", False],
+                                  [112, 306, "walk", True], [240, 306, "walk", False],
+                                  [436, 306, "walk", True], [580, 306, "rest", True]],
+                     "court_angles": list(qm.COURT_ANGLES)}
 
 
 def _pack(pieces, wide):
@@ -2073,6 +2421,7 @@ IN_THE_AIR = {"orbit"}
 
 
 def build_room():
+    ROOM_DATA.clear()
     pieces, comb_inner = room_pieces()
     for name, (im, anchors) in pieces.items():
         for a, p in anchors.items():
@@ -2090,6 +2439,7 @@ def build_room():
     dx, dy, off = CELL_BIG[1]
     contract["comb"] = {"inner": comb_inner, "pitch": [dx, dy], "offset": off,
                         "cell": [len(CELL_BIG[0][0]), len(CELL_BIG[0])]}
+    contract["data"] = ROOM_DATA
     sheet.save(ASSET_ROOM)
     with open(CONTRACT_ROOM, "w", newline="\n") as f:
         json.dump(contract, f, indent=1)
@@ -2110,75 +2460,6 @@ def _dot(d, x, y, s, col=MARK):
 def _cut(path, rect):
     x, y, w, h = rect
     return Image.open(path).convert("RGBA").crop((x, y, x + w, y + h))
-
-
-def island_contact(frames, contract):
-    """Every frame alone at 6x on grass; then each pairing the game draws, the foot (magenta),
-    the entrance (blue) and the window (yellow) marked; then the whole scene round the foot
-    with the shrub, the swarm, the ready mark and the footprint's diamond."""
-    z = 6
-    fw, fh = contract["size"]
-    gap = 12
-    names = list(frames)
-    pairs = [("shelf_weathered", "hive_weathered", "weathered")] + \
-            [("shelf_%d" % j, "hive_colony", "colony, %d jars" % j) for j in JARS_SHOWN] + \
-            [("shelf_3", "hive_full", "full, 3 jars"), ("shelf_12", "hive_full", "full, 12 jars")]
-    per = 4
-    cw, ch = fw * z + gap, fh * z + gap + 14
-    top_rows = (len(names) + per - 1) // per
-    pair_rows = (len(pairs) + per - 1) // per
-    scene_w, scene_h = 110, 80
-    W = max(per * cw, scene_w * z) + gap
-    H = (top_rows + pair_rows) * ch + scene_h * z + gap * 3 + 14
-    sheet = Image.new("RGBA", (W, H), (22, 34, 32, 255))
-    d = ImageDraw.Draw(sheet)
-    for i, name in enumerate(names):
-        x, y = gap + (i % per) * cw, gap + (i // per) * ch
-        tile = Image.new("RGBA", (fw, fh), GRASS)
-        tile.alpha_composite(frames[name])
-        sheet.alpha_composite(big(tile, z), (x, y))
-        d.text((x, y + fh * z + 1), name, fill=LABEL)
-    oy = gap + top_rows * ch
-    foot = contract["foot"]
-    for i, (s, h, label) in enumerate(pairs):
-        x, y = gap + (i % per) * cw, oy + (i // per) * ch
-        tile = Image.new("RGBA", (fw, fh), GRASS)
-        tile.alpha_composite(frames[s])
-        tile.alpha_composite(frames[h])
-        sheet.alpha_composite(big(tile, z), (x, y))
-        _dot(d, x + foot[0] * z, y + foot[1] * z, z - 1)
-        e = contract["entrance"]
-        _dot(d, x + e[0] * z, y + e[1] * z, z - 1, (80, 220, 255, 255))
-        wx, wy, ww, wh = contract["window"]
-        d.rectangle([x + wx * z, y + wy * z, x + (wx + ww) * z - 1, y + (wy + wh) * z - 1], outline=(255, 255, 0, 255))
-        d.text((x, y + fh * z + 1), label, fill=LABEL)
-    sy = oy + pair_rows * ch + gap + 14
-    scene = Image.new("RGBA", (scene_w, scene_h), GRASS)
-    fx, fy = 70, 52                     # where the foot lands in the scene
-    ox, oy2 = fx - foot[0], fy - foot[1]
-    flora = json.load(open("assets/flora.json"))["shrub_flowering"]["full"]
-    shrub = _cut("assets/flora.png", flora)
-    sa = contract["shrub_at"]
-    scene.alpha_composite(shrub, (fx + sa[0] - flora[2] // 2, fy + sa[1] - flora[3]))
-    swarm = _cut(ASSET_ISLAND, contract["swarm"])
-    wa = contract["swarm_at"]
-    scene.alpha_composite(swarm, (fx + wa[0] - swarm.width // 2, fy + wa[1]))
-    scene.alpha_composite(frames["shelf_0"], (ox, oy2))
-    scene.alpha_composite(frames["hive_full"], (ox, oy2))
-    mark = _cut(ASSET_ISLAND, contract["ready"])
-    ra = contract["ready_at"]
-    scene.alpha_composite(mark, (ox + ra[0] - mark.width // 2, oy2 + ra[1] - mark.height // 2))
-    sheet.alpha_composite(big(scene, z), (gap, sy))
-    c, hf = contract["foot_tiles"]["centre"], contract["foot_tiles"]["half"]
-    pts = []
-    for tx, ty in ((c[0] - hf[0], c[1] - hf[1]), (c[0] + hf[0], c[1] - hf[1]),
-                   (c[0] + hf[0], c[1] + hf[1]), (c[0] - hf[0], c[1] + hf[1])):
-        px, py = _to_painted(tx, ty)
-        pts.append((gap + (fx + 0.5 + px) * z, sy + (fy + 0.5 + py) * z))
-    d.line(pts + [pts[0]], fill=MARK, width=2)
-    d.text((gap, sy - 14), "scene: shelf_0 under hive_full, the shrub and swarm, the ready mark; "
-           "the footprint in magenta", fill=LABEL)
-    sheet.save(SHEET_ISLAND)
 
 
 def room_contact(pieces):
@@ -2214,11 +2495,9 @@ def room_contact(pieces):
 
 
 def main():
-    frames, contract = build_island()
     pieces, _ = build_room()
-    island_contact(frames, contract)
     room_contact(pieces)
-    print(ASSET_ISLAND, CONTRACT_ISLAND, ASSET_ROOM, CONTRACT_ROOM, SHEET_ISLAND, SHEET_ROOM)
+    print(ASSET_ROOM, CONTRACT_ROOM, SHEET_ROOM)
 
 
 if __name__ == "__main__":

@@ -160,12 +160,24 @@ func _drive_wanderers(delta: float) -> void:
 		_wander_pos[k] += v * delta
 
 
-## The loose bees, wings flicking, each facing the way it flies.
+## The loose bees, bee A's flight (`BeeArt`, 2026-10-18), each facing the way it flies and on
+## its own phase so the air does not flap in step.
 func draw_wanderers(alpha := 1.0) -> void:
+	var tint := Color(1.0, 1.0, 1.0, alpha)
 	for k in _wander_pos.size():
-		var wings := fmod(age * 22.0 + _wander_phase[k], 2.0) < 1.0
-		HiveArt.draw(self, &"bee_r" if wings else &"bee_r_rest", to_canvas(_wander_pos[k].floor()),
-			&"c", _wander_vel[k].x < 0.0, alpha)
+		bee_at(self, BeeArt.frame_name(&"worker_fly",
+			BeeArt.frame_at(&"worker_fly", age + _wander_phase[k])), _wander_pos[k],
+			_wander_vel[k].x < 0.0, 0, tint)
+
+
+## Bee A's frame `name` with its body's middle on the painted pixel `p` falls in (art grid), at
+## the room's grain, on `ci` (this control by default). `turn` is quarter turns anticlockwise
+## (1: a right-facing bee crawling up, 3: down). Every bee the steps draw comes through here.
+func bee_at(
+	ci: CanvasItem, name: StringName, p: Vector2, left := false, turn := 0, tint := Color.WHITE
+) -> Rect2:
+	return BeeArt.draw(ci if ci != null else self, name, to_canvas(p.floor()), left,
+		HiveArt.PIXEL, turn, tint)
 
 
 ## Start the shared ending over the thing at `at` (painted px), about `wide` across: the rays

@@ -17,20 +17,47 @@ extends Node2D
 ## `shadow_drop`). One species a school; the tier says which species it may be. Sizes are
 ## the sheet's own, at `ART` world px an art pixel.
 
-## Clean share at which each tier appears, and what a school of it is.
+## What each tier is, and how it comes in as the lake clears.
 ##
 ## About a third more schools in every tier since 2026-09-18 (Richard: "increase fish
 ## population by a little"): `most` 14/7/2 to 18/9/3 and `per_tiles` 70/160/700 to
 ## 55/125/550. Half as many again on 2026-09-25 (Richard: "more prominent"): 27/14/5 and
-## 36/83/360. When each tier arrives, and what a school is, are as they were.
+## 36/83/360.
+##
+## **Progressive since 2026-10-19** (Richard: "Fish are appearing too sudden, lets make it more
+## progressive, with small schools then growing in population and size as the lake cleans
+## up"). A tier used to switch on at its share and buy every school its clean water allowed on
+## the next reckon: nineteen schools of minnows came in on one frame at 17% clean, fourteen
+## perch-sized at 38%, five carp at 68%. Now each tier has a ramp, from its first school at
+## `at` to its whole `most` at `full`, eased in (`smoothstep`, rounded up, so the first school
+## comes as soon as the ramp opens and the next few come slowly), and the ramp also moves the
+## school's size from `members_from` to `members_to`: the first minnows are a pair or three,
+## and a school already swimming grows a fish at a time as the lake clears (`_grow_one`). The
+## larger tiers' ramps start later and overlap, so the bigger fish come in one school at a
+## time over the middle and the end of the run. `at` is still where a tier's first fish may
+## come. The end of the run is what it was: 27/14/5 schools of 3-6/3-5/1.
 const TIERS := [
-	{"at": 0.12, "size": Vector2(20.0, 7.0), "members": Vector2i(3, 6), "speed": 26.0,
+	{"at": 0.08, "full": 0.6, "size": Vector2(20.0, 7.0),
+		"members_from": Vector2i(2, 3), "members_to": Vector2i(3, 6), "speed": 26.0,
 		"per_tiles": 36.0, "most": 27, "ripple": 2.6, "span": 6.0, "species": ["minnow"]},
-	{"at": 0.38, "size": Vector2(28.0, 10.0), "members": Vector2i(3, 5), "speed": 34.0,
+	{"at": 0.3, "full": 0.85, "size": Vector2(28.0, 10.0),
+		"members_from": Vector2i(2, 3), "members_to": Vector2i(3, 5), "speed": 34.0,
 		"per_tiles": 83.0, "most": 14, "ripple": 1.8, "span": 12.0, "species": ["roach", "perch", "rudd"]},
-	{"at": 0.68, "size": Vector2(42.0, 14.0), "members": Vector2i(1, 1), "speed": 22.0,
+	{"at": 0.55, "full": 0.95, "size": Vector2(42.0, 14.0),
+		"members_from": Vector2i(1, 1), "members_to": Vector2i(1, 1), "speed": 22.0,
 		"per_tiles": 360.0, "most": 5, "ripple": 1.2, "span": 26.0, "species": ["tench", "carp"]},
 ]
+## How the schools come in: at most one new school every `ARRIVE_GAP` seconds (rolled between
+## the two, so arrivals have no beat), whatever the share did, the tier furthest behind what
+## its ramp asks for first. A school that could not find clean water to start in is tried again
+## `ARRIVE_RETRY` later. Loading a run (`refresh`'s `settled`) still puts them all in at once.
+const ARRIVE_GAP := Vector2(2.5, 4.5)
+const ARRIVE_RETRY := 0.5
+## And how a school grows: one fish added to one school short of its size every `GROW_GAP`
+## seconds, fading in over `MEMBER_FADE` a whole art pixel at a time as a school does
+## (`shaders/fish.gdshader` dissolves on the packed fade).
+const GROW_GAP := Vector2(1.2, 2.4)
+const MEMBER_FADE := 1.6
 const SHEET := "res://assets/fish.png"
 const SHEET_JSON := "res://assets/fish.json"
 ## World px to an art pixel of the sheet, the rubbish's own.
@@ -84,10 +111,17 @@ var boats: Array[Boat] = []
 var stage: float = 0.0
 
 ## One dictionary a school: tier, at (world), heading (unit, world), members (offsets),
-## wobble seeds, ripple clock, fade 0..1, flee timer.
+## member_fade (each member's own 0..1, for the ones that join it later), size_roll (where in
+## its tier's range of sizes this school sits), wobble seeds, ripple clock, fade 0..1, flee timer.
 var _schools: Array = []
 var _clean_tiles := PackedInt32Array()
 var _reckon_in: float = 0.0
+## What the stage asks of each tier, worked out by `_reckon`: schools wanted, and how far along
+## its ramp the tier is (0..1), which sets how big its schools are.
+var _want := [0, 0, 0]
+var _ramp := [0.0, 0.0, 0.0]
+var _arrive_in: float = 0.0
+var _grow_in: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _sheet: Texture2D
 var _cell := Vector2(48, 40)
@@ -96,7 +130,7 @@ var _species: Array = []
 var _rows_per := 4
 var _bodies: Node2D
 ## Every fish this frame, worked out once in `_process` and drawn twice (shadows, bodies):
-## [school, member, spot, shadow drop, body tint]. It was worked out in each draw, with the
+## [school, member, spot, shadow drop, body tint, fade]. It was worked out in each draw, with the
 ## lake's depth asked three times a fish (2026-10-02, the clean-lake bench).
 var _spots: Array = []
 ## The water's ramp over anything under it: deep to light, the palette's clean swatches.
@@ -147,8 +181,12 @@ func refresh(clean_share: float, clean: PackedInt32Array, settled: bool = false)
 	if settled:
 		_reckon()
 		_reckon_in = RECKON_EVERY
+		_fill_all()
 		for s: Dictionary in _schools:
 			s["fade"] = 1.0
+			var each: PackedFloat32Array = s.get("member_fade", PackedFloat32Array())
+			each.fill(1.0)
+			s["member_fade"] = each
 		_spots = _fish_spots()
 		queue_redraw()
 
@@ -169,6 +207,12 @@ func _process(delta: float) -> void:
 	if _reckon_in <= 0.0:
 		_reckon_in = RECKON_EVERY
 		_reckon()
+	_arrive_in -= delta
+	if _arrive_in <= 0.0:
+		_arrive_in = _rng.randf_range(ARRIVE_GAP.x, ARRIVE_GAP.y) if _arrive_one() else ARRIVE_RETRY
+	_grow_in -= delta
+	if _grow_in <= 0.0:
+		_grow_in = _rng.randf_range(GROW_GAP.x, GROW_GAP.y) if _grow_one() else ARRIVE_RETRY
 	if _schools.is_empty():
 		return
 	for boat in boats:
@@ -187,25 +231,127 @@ func _process(delta: float) -> void:
 	_bodies.queue_redraw()
 
 
-## Bring the schools up to what the stage buys, and no further.
+## What the stage buys of each tier: how far along its ramp it is, and the schools that
+## buys, never more than its clean water has room for (`per_tiles`). Only works it out; the
+## schools come in one at a time (`_arrive_one`) and grow one fish at a time (`_grow_one`).
 func _reckon() -> void:
-	if grid == null:
-		return
+	for tier in TIERS.size():
+		var spec: Dictionary = TIERS[tier]
+		var ramp := ramp_of(tier, stage)
+		_ramp[tier] = ramp
+		if ramp <= 0.0:
+			_want[tier] = 0
+			continue
+		# Rounded up, so the first school comes as soon as the ramp has opened at all.
+		var by_ramp := ceili(float(spec["most"]) * ramp)
+		_want[tier] = mini(by_ramp, int(float(_clean_tiles.size()) / float(spec["per_tiles"])))
+
+
+## How far along its ramp a tier is at clean share `share`: nought before `at`, one from
+## `full`, eased between.
+static func ramp_of(tier: int, share: float) -> float:
+	var spec: Dictionary = TIERS[tier]
+	if share < float(spec["at"]):
+		return 0.0
+	return smoothstep(float(spec["at"]), float(spec["full"]), share)
+
+
+## How many fish a school of `tier` is at this point of its ramp, for a school whose
+## `size_roll` (0..1) says where in the tier's range it sits.
+func _size_of(tier: int, roll: float) -> int:
+	var spec: Dictionary = TIERS[tier]
+	var from: Vector2i = spec["members_from"]
+	var to: Vector2i = spec["members_to"]
+	var ramp: float = _ramp[tier]
+	var least := lerpf(float(from.x), float(to.x), ramp)
+	var most := lerpf(float(from.y), float(to.y), ramp)
+	return maxi(int(roundf(lerpf(least, most, roll))), 1)
+
+
+## Schools of each tier swimming now.
+func _have() -> Array:
 	var by_tier := [0, 0, 0]
 	for s: Dictionary in _schools:
 		by_tier[int(s["tier"])] += 1
+	return by_tier
+
+
+## One new school, for the tier furthest behind what its ramp asks (by share of what it asks,
+## so a tier that has only just opened is not starved by one with many owed). False when
+## nothing is owed or no clean water would take one this time.
+func _arrive_one() -> bool:
+	if grid == null:
+		return false
+	var have := _have()
+	var pick := -1
+	var behind := 0.0
 	for tier in TIERS.size():
-		var spec: Dictionary = TIERS[tier]
-		if stage < float(spec["at"]):
+		var want: int = _want[tier]
+		if want <= int(have[tier]):
 			continue
-		var want := mini(int(float(_clean_tiles.size()) / float(spec["per_tiles"])), int(spec["most"]))
-		var have: int = by_tier[tier]
-		if have >= want:
-			continue
-		for n in want - have:
+		var short := float(want - int(have[tier])) / float(want)
+		if short > behind:
+			behind = short
+			pick = tier
+	if pick < 0:
+		return false
+	var s := _spawn(pick)
+	if s.is_empty():
+		return false
+	_schools.append(s)
+	return true
+
+
+## Every school the stage buys, all at once and at its full size: a run just loaded is not
+## the lake clearing, it is the lake as it stands.
+func _fill_all() -> void:
+	if grid == null:
+		return
+	var have := _have()
+	for tier in TIERS.size():
+		for n in maxi(int(_want[tier]) - int(have[tier]), 0):
 			var s := _spawn(tier)
 			if not s.is_empty():
 				_schools.append(s)
+	for s: Dictionary in _schools:
+		while _add_member(s):
+			pass
+
+
+## One fish joins one school that is short of its size, the one furthest behind first. The
+## school must be in sight of its water (fading in or swimming whole), not on its way out.
+func _grow_one() -> bool:
+	var pick: Dictionary = {}
+	var behind := 0
+	for s: Dictionary in _schools:
+		# A school put in by hand (a probe's) has no size of its own to grow to.
+		if not bool(s["rising"]) or not s.has("size_roll"):
+			continue
+		var short := _size_of(int(s["tier"]), float(s["size_roll"])) - (s["members"] as PackedVector2Array).size()
+		if short > behind:
+			behind = short
+			pick = s
+	if pick.is_empty():
+		return false
+	return _add_member(pick)
+
+
+## A fish more in `s`, if it is short of its size: somewhere in the school's spread, faded
+## out, to fade in on its own (`MEMBER_FADE`).
+func _add_member(s: Dictionary) -> bool:
+	var tier := int(s["tier"])
+	var members: PackedVector2Array = s["members"]
+	if not s.has("size_roll") or members.size() >= _size_of(tier, float(s["size_roll"])):
+		return false
+	var reach := float(TIERS[tier]["size"].x) * SPREAD
+	members.append(Vector2(_rng.randf_range(-reach, reach), _rng.randf_range(-reach, reach) * 0.5))
+	var each: PackedFloat32Array = s.get("member_fade", PackedFloat32Array())
+	while each.size() < members.size() - 1:
+		each.append(1.0)
+	each.append(0.0)
+	s["members"] = members
+	s["member_fade"] = each
+	return true
 
 
 func _spawn(tier: int) -> Dictionary:
@@ -218,18 +364,24 @@ func _spawn(tier: int) -> Dictionary:
 		var at := Vector2(float(tile.x) + 0.5, float(tile.y) + 0.5)
 		if not _swimmable(at):
 			continue
-		var count := _rng.randi_range(spec["members"].x, spec["members"].y)
+		# A new school comes in at the size its tier's ramp has reached; the whole of it fades
+		# in with the school, so each member's own fade starts full.
+		var roll := _rng.randf()
+		var count := _size_of(tier, roll)
 		var members := PackedVector2Array()
+		var each := PackedFloat32Array()
 		var reach := float(spec["size"].x) * SPREAD
 		for i in count:
 			members.append(Vector2(_rng.randf_range(-reach, reach), _rng.randf_range(-reach, reach) * 0.5))
+			each.append(1.0)
 		var angle := _rng.randf_range(0.0, TAU)
 		var kinds: Array = spec["species"]
 		return {
 			"tier": tier, "at": Iso.tile_to_world(at.x, at.y),
 			"species": kinds[_rng.randi_range(0, kinds.size() - 1)],
 			"heading": Vector2(cos(angle), sin(angle) * 0.5).normalized(),
-			"members": members, "seed": _rng.randf() * 100.0, "ripple": _rng.randf() * 2.0,
+			"members": members, "member_fade": each, "size_roll": roll,
+			"seed": _rng.randf() * 100.0, "ripple": _rng.randf() * 2.0,
 			"fade": 0.0, "flee": 0.0, "rising": true,
 		}
 	return {}
@@ -290,6 +442,14 @@ func _swim(s: Dictionary, delta: float) -> void:
 			s["fade"] = maxf(float(s["fade"]) - delta / FADE, 0.0)
 	elif bool(s["rising"]):
 		s["fade"] = minf(float(s["fade"]) + delta / FADE, 1.0)
+	# A fish that joined the school later fades in on its own, whatever the school is doing:
+	# it is drawn at the school's fade times its own, so it never shows more than the school.
+	if s.has("member_fade"):
+		var each: PackedFloat32Array = s["member_fade"]
+		for i in each.size():
+			if each[i] < 1.0:
+				each[i] = minf(each[i] + delta / MEMBER_FADE, 1.0)
+		s["member_fade"] = each
 	# The rings: one from the leader every so often, more often while fleeing.
 	var clock := float(s["ripple"]) - delta * (3.0 if flee > 0.0 else 1.0)
 	if clock <= 0.0:
@@ -323,7 +483,7 @@ static func _flat(v: Vector2) -> Vector2:
 	return Vector2(v.x, v.y)
 
 
-## Every fish, as (school, member index, where, shadow drop, body tint) in draw order: back
+## Every fish, as (school, member index, where, shadow drop, body tint, fade) in draw order: back
 ## to front. The depth under each is asked once, for both the drop and the tint.
 func _fish_spots() -> Array:
 	var out: Array = []
@@ -332,13 +492,15 @@ func _fish_spots() -> Array:
 	var sun := Shade.drop(null, 1.0)
 	for s: Dictionary in _schools:
 		var m: PackedVector2Array = s["members"]
+		var each: PackedFloat32Array = s.get("member_fade", PackedFloat32Array())
 		for i in m.size():
+			var fade := float(s["fade"]) * (each[i] if i < each.size() else 1.0)
 			var ts := t + float(s["seed"])
 			var spot: Vector2 = (s["at"] as Vector2) + m[i] \
 				+ Vector2(sin(ts * 1.3 + float(i)), cos(ts * 1.1 + float(i) * 0.7) * 0.5) * 3.0
 			var d := depth_at(spot)
 			out.append([s, i, spot, sun * lerpf(SHADOW_DEPTH_NEAR, SHADOW_DEPTH_FAR, d),
-				_tint_at(d, float(s["fade"]), MIX_SHALLOW + DEEPER, MIX_BAND_END + DEEPER, MIX_DEEP + DEEPER)])
+				_tint_at(d, fade, MIX_SHALLOW + DEEPER, MIX_BAND_END + DEEPER, MIX_DEEP + DEEPER), fade])
 	out.sort_custom(func(a: Array, b: Array) -> bool: return (a[2] as Vector2).y < (b[2] as Vector2).y)
 	return out
 
@@ -354,7 +516,7 @@ func _draw() -> void:
 		var drop: Vector2 = f[3]
 		var region := _region(String(s["species"]), _heading_index(s, int(f[1])), _rows_per - 1)
 		draw_texture_rect_region(_sheet, Rect2(spot + drop - _cell * ART * 0.5, _cell * ART), region,
-			Color(ink, ink.a * float(s["fade"])))
+			Color(ink, ink.a * float(f[5])))
 
 
 ## The bodies, on the child with the fish shader. The vertex colour carries the water's

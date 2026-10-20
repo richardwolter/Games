@@ -2,11 +2,14 @@
 ## sidequest; `docs/hive/contract.md` section 6, approved off `tools/last_hive_mockup_room.png`).
 ##
 ## **Outdoors, like the wash room, and built the same way**: the wash room's own
-## `WashBackdrop` behind everything — the view from the island, the lake still running on
-## it, the pack and the pigeons still about — veiled less than the wash room veils it
-## (`DARKEN` 0.82 against its 0.66: here the pieces are what is looked at, not grime that has
-## to read against the lawn) and its far bank slid along (`BANK_OFFSET`), so the trees behind
-## the hive are not the ones behind the pump. Over it, one step at a time, the step's own
+## `WashBackdrop` behind everything, **exactly the wash room's view** (2026-10-19, Richard:
+## the trash, dogs and boats seen, the treeline as the washing scene's): the same darkening,
+## the same far bank, the rubbish, the ferries, the pack and the pigeons the lake lends. The
+## bare, veiled view with the bank slid along (2026-10-18, pick A) is retired. Over it **a low
+## hedge of the island's flowers** runs along the window's foot with bees working it
+## (`HiveHedge`, baked by `tools/build_hive_hedge.py`), in front of the view and behind the
+## step.
+## Over it, one step at a time, the step's own
 ## scene; over that the room's two pieces of furniture, drawn on the art grid the steps use:
 ## - **the step plank** at the top: oak, one comb cell a step of *this visit's* plan — lit
 ##   for the step in hand, filling with honey from the bottom when it is done — joined by a
@@ -59,10 +62,6 @@ const BETWEEN := 0.7
 const DONE_HOLD := 2.2
 ## A done cell fills with honey from its foot over this long.
 const PIP_FILL := 0.3
-
-## The view behind: veiled less than the wash room's, the far bank slid along.
-const DARKEN := 0.82
-const BANK_OFFSET := 150.0
 
 ## The plank, in painted pixels of the art grid (the mockup's `pips_art`): a cell every
 ## `PIP_SPACING`, the plank that wide a cell plus `PLANK_PAD`, its wood from `PLANK_TOP` down
@@ -129,6 +128,7 @@ var hive: Hive
 var honey := 0.0
 
 var _backdrop: WashBackdrop
+var _hedge: HiveHedge
 var _host: Control
 var _overlay: Overlay
 var _close: CloseButton
@@ -167,10 +167,13 @@ func _ready() -> void:
 			_prompts[tile] = load(path)
 	_backdrop = WashBackdrop.new()
 	_backdrop.name = &"Backdrop"
-	_backdrop.darken = DARKEN
-	_backdrop.bank_offset = BANK_OFFSET
 	add_child(_backdrop)
 	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_hedge = HiveHedge.new()
+	_hedge.name = &"Hedge"
+	_hedge.room = self
+	add_child(_hedge)
+	_hedge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_host = Control.new()
 	_host.name = &"Steps"
 	_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -211,6 +214,9 @@ func open(up: bool) -> void:
 		return
 	if filth_left.is_valid():
 		_backdrop.filth = float(filth_left.call())
+	# The wash room's own view (2026-10-19, Richard: "I should still be able to see the trash,
+	# dogs and boats"): the pack, the fleet, the rubbish and the flock handed on as
+	# `WashRoom.open` hands them.
 	if pack_size.is_valid():
 		_backdrop.pack = int(pack_size.call())
 	if fleet_size.is_valid():
@@ -220,6 +226,7 @@ func open(up: bool) -> void:
 		_backdrop.bird_sheet = flock.sheet()
 		_backdrop.bird_kinds = flock.kinds()
 	_backdrop.reset()
+	_hedge.reset()
 	_drop_step()
 	_plan.clear()
 	if hive != null:
@@ -277,6 +284,10 @@ func is_done() -> bool:
 
 func backdrop() -> WashBackdrop:
 	return _backdrop
+
+
+func hedge() -> HiveHedge:
+	return _hedge
 
 
 ## The words the card is showing, or fading to: what a harness reads to prove the card is

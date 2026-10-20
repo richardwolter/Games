@@ -804,7 +804,9 @@ var _dogs: Array[ShedDog] = []
 var house_stage: int = 3
 var house_seen: int = 3
 ## The demo's half step (`HouseInside.half`): whether its play-in has been seen. Emits
-## `half_played` the visit it plays, for the lake's card.
+## `half_played` the visit it plays, for the lake's card, and the full game's stage-ups emit
+## it too (2026-10-19, Richard: the full game lacked the "your house will fix itself" card),
+## so the first time the room is seen mending the card is owed; the lake shows it once.
 signal half_played
 var half_seen: bool = true
 var _house_under: Array[HouseInside.Layer] = []
@@ -4688,6 +4690,8 @@ func _house_shown() -> void:
 			_house_playing.append("u12")
 		if house_stage >= 3 and HouseInside.has_set("u23"):
 			_house_playing.append("u23")
+		if not _house_playing.is_empty():
+			half_played.emit()
 	elif house_stage <= 1 and HouseInside.half and not half_seen and HouseInside.has_set("u1h"):
 		_house_playing.append("u1h")
 		half_seen = true

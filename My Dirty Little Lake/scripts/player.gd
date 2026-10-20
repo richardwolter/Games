@@ -207,7 +207,11 @@ var can_walk: bool = true
 ## walks up the beach to the shed while the player's hands are held, which is exactly the
 ## case `can_walk` refuses — so this is read **instead of** the input, not through it.
 ## Cleared by the walk itself on arrival, so a caller can watch it for the end.
-var walk_to := Vector2.INF
+## Setting it, even to the spot it held, plans the way there afresh (`_led_aim`).
+var walk_to := Vector2.INF:
+	set(value):
+		walk_to = value
+		_path_to = Vector2.INF
 ## How near counts as arrived, in tiles. A stride is about a tenth of a tile a frame, so
 ## anything under that would be walked past and back.
 const LED_CLOSE := 0.35
@@ -405,6 +409,148 @@ func cast_stand(tile: Vector2, reach: float) -> Vector2:
 	if best != Vector2.INF:
 		return best
 	return near if near != Vector2.INF else shore_toward(tile)
+
+
+# ---------------------------------------------------------------- the led walk's way round
+
+## A led walk (a press on the island, the led cast, a press on the hut, the pump or the hive,
+## the arrival) finds its way round what stands on the island (2026-10-19, Richard: "improve
+## player auto walking and pathing after the changes on the isle"). It pushed straight at its
+## spot and slid along whatever it met, and the bigger hive with its tree, and the pump moved a
+## tile off the hut, turned that into stalls against a corner. Now a path on a grid of
+## `PATH_RES` points a tile over the island's box, solid wherever the angler may not stand,
+## `PATH_NEAR` dearer next to anything solid so it keeps off walls, pulled straight wherever
+## the next point is in plain sight (`_sees`, every `PATH_SEE` tile). A point is passed within
+## `PATH_NEXT`. Built once and again only when the crate, the pump or the hive moves. Nothing
+## is drawn or saved; `_slide` still takes the last brush against a wall.
+const PATH_RES := 4
+const PATH_NEAR := 3.0
+const PATH_SEE := 0.1
+const PATH_NEXT := 0.22
+
+var _path := PackedVector2Array()
+var _path_to := Vector2.INF
+var _grid: AStarGrid2D
+var _grid_key := ""
+var _grid_from := Vector2.ZERO
+
+
+## Where the led walk heads this frame: the next point of its path to `walk_to`.
+func _led_aim() -> Vector2:
+	if walk_to != _path_to:
+		_path = led_path(tile_pos, walk_to)
+		_path_to = walk_to
+	while _path.size() > 1 and tile_pos.distance_to(_path[0]) <= PATH_NEXT:
+		_path.remove_at(0)
+	return _path[0] if not _path.is_empty() else walk_to
+
+
+## The way from `from` to `to`, tile space, the points to walk to in turn, the last one `to`.
+func led_path(from: Vector2, to: Vector2) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if _sees(from, to):
+		out.append(to)
+		return out
+	_build_grid()
+	var a := _open_cell(_cell_of(from))
+	var b := _open_cell(_cell_of(to))
+	if a.x < 0 or b.x < 0:
+		out.append(to)
+		return out
+	var ids := _grid.get_id_path(a, b, true)
+	if ids.is_empty():
+		out.append(to)
+		return out
+	var points := PackedVector2Array()
+	for id: Vector2i in ids:
+		points.append(_grid_from + (Vector2(id) + Vector2(0.5, 0.5)) / float(PATH_RES))
+	points.append(to)
+	var anchor := from
+	var i := 0
+	while i < points.size():
+		var j := i
+		while j + 1 < points.size() and _sees(anchor, points[j + 1]):
+			j += 1
+		out.append(points[j])
+		anchor = points[j]
+		i = j + 1
+	return out
+
+
+## May the angler stand here, whoever is standing where: the rule `_can_stand` enforces, without
+## its leave for somebody already inside a thing.
+func _open(at: Vector2) -> bool:
+	if _wet_by(at) >= WALK_LIMIT:
+		return false
+	if crate_tile != Vector2.INF and Yard.covers(crate_tile, at, Yard.WALK_KEEP):
+		return false
+	if Pump.covers(at, Pump.WALK_KEEP) or Hive.covers(at, Hive.WALK_KEEP):
+		return false
+	return not Iso.in_shed(at.x, at.y, Iso.SHED_KEEP)
+
+
+## Whether the straight line from `a` to `b` is all ground the angler may stand on. The first
+## stretch off `a` is not asked: a walk may start against a wall.
+func _sees(a: Vector2, b: Vector2) -> bool:
+	var steps := int(ceil(a.distance_to(b) / PATH_SEE))
+	for i in range(1, steps + 1):
+		var at := a.lerp(b, float(i) / float(steps))
+		if at.distance_to(a) < PATH_NEXT:
+			continue
+		if not _open(at):
+			return false
+	return true
+
+
+func _build_grid() -> void:
+	var key := "%s|%s|%s" % [crate_tile, Pump.tile, Hive.tile]
+	if _grid != null and key == _grid_key:
+		return
+	_grid_key = key
+	var half := Iso.ISLAND_RADIUS + Vector2(1.5, 1.5)
+	_grid_from = Iso.ISLAND_CENTRE - half
+	var size := Vector2i(ceili(half.x * 2.0 * PATH_RES), ceili(half.y * 2.0 * PATH_RES))
+	_grid = AStarGrid2D.new()
+	_grid.region = Rect2i(Vector2i.ZERO, size)
+	_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	_grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_grid.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_grid.update()
+	for y in size.y:
+		for x in size.x:
+			var cell := Vector2i(x, y)
+			if not _open(_grid_from + (Vector2(cell) + Vector2(0.5, 0.5)) / float(PATH_RES)):
+				_grid.set_point_solid(cell, true)
+	for y in size.y:
+		for x in size.x:
+			var cell := Vector2i(x, y)
+			if _grid.is_point_solid(cell):
+				continue
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var c := cell + d
+				if _grid.is_in_boundsv(c) and _grid.is_point_solid(c):
+					_grid.set_point_weight_scale(cell, PATH_NEAR)
+					break
+
+
+func _cell_of(at: Vector2) -> Vector2i:
+	var c := Vector2i(((at - _grid_from) * float(PATH_RES)).floor())
+	return c.clamp(Vector2i.ZERO, _grid.region.size - Vector2i.ONE)
+
+
+## The open cell nearest `cell`, ring by ring; (-1, -1) when none is close.
+func _open_cell(cell: Vector2i) -> Vector2i:
+	if not _grid.is_point_solid(cell):
+		return cell
+	for r in range(1, 10):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var c := cell + Vector2i(dx, dy)
+				if _grid.is_in_boundsv(c) and not _grid.is_point_solid(c):
+					return c
+	return Vector2i(-1, -1)
 
 
 ## How far into the water a spot is, in world pixels, or 0 on the island's drawn ground.
@@ -753,9 +899,11 @@ func _process(delta: float) -> void:
 		# gives and what the step below expects to be handed.
 		if tile_pos.distance_to(walk_to) <= LED_CLOSE:
 			walk_to = Vector2.INF
+			_path_to = Vector2.INF
 		else:
+			var aim := _led_aim()
 			push = (
-				Iso.tile_to_world(walk_to.x, walk_to.y)
+				Iso.tile_to_world(aim.x, aim.y)
 				- Iso.tile_to_world(tile_pos.x, tile_pos.y)
 			).normalized()
 	elif can_walk:

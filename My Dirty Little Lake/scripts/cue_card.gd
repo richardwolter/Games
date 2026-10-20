@@ -73,6 +73,10 @@ const THEMES := {
 		"ink": Color(0.30, 0.16, 0.0), "icon": &"bee", "entrance": &"buzz", "stripes": true},
 	&"honey": {"band": Color(0.86, 0.50, 0.10), "mark": Color(1.0, 0.72, 0.36),
 		"ink": Color(0.36, 0.14, 0.0), "icon": &"jar", "entrance": &"drip"},
+	# The first jar held (2026-10-16, `Lake.HONEY_TIME`): a deeper amber than the first honey's
+	# moment, a jar with its lid popping, and a card that oozes down on strands of honey.
+	&"honey_jar": {"band": Color(0.78, 0.40, 0.06), "mark": Color(1.0, 0.70, 0.30),
+		"ink": Color(0.34, 0.13, 0.0), "icon": &"jar_open", "entrance": &"ooze"},
 	&"lucky": {"band": Color(0.84, 0.62, 0.16), "mark": Color(1.0, 0.84, 0.28),
 		"ink": Color(0.33, 0.19, 0.0), "icon": &"star", "entrance": &"pop"},
 	&"double": {"band": Color(0.42, 0.36, 0.64), "mark": Color(0.78, 0.72, 0.96),
@@ -125,6 +129,21 @@ const ROWS := {
 		"kpyyyoypk",
 		"kpyyyyypk",
 		".kkkkkkk.",
+	],
+	# The honey jar's own icon: the jar, honey to the brim and over it down one side, and its
+	# lid (`jar_lid`) drawn apart so it can pop up off the rim and drop back.
+	&"jar_open": [
+		"kkkkkkkkk.",
+		"kyyyyyyykk",
+		"kpyoyyypyk",
+		"kpyyyyypyk",
+		"kpyyyoypk.",
+		"kpyyyyypk.",
+		".kkkkkkk..",
+	],
+	&"jar_lid": [
+		".kkkkkkk..",
+		".kwpwpwk..",
 	],
 	&"net": [
 		"..kkk..",
@@ -505,6 +524,13 @@ func _pose(entrance: StringName, t: float, card: Rect2) -> Dictionary:
 		&"drip":
 			out["at"] = Vector2(0.0, -70.0 * (1.0 - s))
 			out["scale"] = Vector2(1.0 - 0.12 * (1.0 - s), 1.0 + 0.2 * (1.0 - s))
+		&"ooze":
+			# Lowered from above on a slow, sticky pull: no spring, no overshoot, stretched
+			# tall while it moves and settling squat for a moment as it stops.
+			var e := 1.0 - exp(-t * 5.5)
+			out["at"] = Vector2(0.0, -64.0 * (1.0 - e))
+			var squat := sin(clampf((t - 0.45) / 0.4, 0.0, 1.0) * PI) * 0.06
+			out["scale"] = Vector2(1.0 - 0.1 * (1.0 - e) + squat, 1.0 + 0.22 * (1.0 - e) - squat)
 		_:
 			out["scale"] = Vector2.ONE * s
 	return out
@@ -598,6 +624,63 @@ func _draw_fx(look: Dictionary, t: float, card: Rect2) -> void:
 				var fall := (loop - 1.4) / 1.0
 				draw_rect(Rect2(foot.x, foot.y, 2.0, 2.0), gold, true)
 				draw_rect(Rect2(foot.x - 1.0, foot.y + 10.0 + fall * fall * 70.0, 4.0, 4.0), Color(gold, 1.0 - fall), true)
+		&"ooze":
+			# The strands of honey the card was lowered on (2026-10-18, Richard's pick 5B), from its
+			# top edge up out of sight, riding down with it: each tapers in hard steps as it climbs
+			# (three pixels at the foot, two over its middle, one at the top), kinks a pixel and
+			# spreads into a blob where it meets the rim; the right one parts early and hangs a
+			# bead. They thin as the card settles, let go, and their ends ball up and fall back.
+			var top := c.y + (_pose(&"ooze", t, card)["at"] as Vector2).y - half.y - RIM - 1.0
+			for i in 3:
+				var x := floorf(c.x + (float(i) - 1.0) * half.x * 0.55)
+				var k := clampf(t / (FX_LONG * (0.8 + 0.15 * float(i))), 0.0, 1.0)
+				if k < 0.6:
+					var reach := roundi(70.0 * (1.0 - pow(k / 0.6, 2.0)) * (0.75 + 0.12 * float(i)))
+					_strand(x, top, reach, i, i == 2 and k > 0.12)
+				elif k < 1.0:
+					var drop := (k - 0.6) / 0.4
+					var y := roundf(top - 18.0 + drop * drop * 18.0)
+					_bead(Vector2(x - 1.0, y), 1.0 - drop * 0.5)
+
+
+## One strand of honey from the card's rim `top` up `reach` px: three pixels wide at the foot
+## (lit, honey, shade), two over its middle, one at the top, in hard steps, kinking a pixel as
+## it climbs, and a blob where it meets the rim. `snap`: parted part way up, a bead hanging off
+## the lower piece.
+func _strand(x: float, top: float, reach: int, k: int, snap: bool) -> void:
+	if reach <= 0:
+		return
+	var lit := HiveArt.HONEY_LIGHT
+	var mid := HiveArt.HONEY
+	var shade := HiveArt.HONEY_MID
+	var gap_from := int(float(reach) * 0.62)
+	for d in range(1, reach + 1):
+		if snap and d >= gap_from and d < gap_from + 5:
+			continue
+		var y := top - float(d)
+		var share := float(d) / float(reach)
+		var wob := 1.0 if ((share > 0.4 and share < 0.75) == (k % 2 == 0)) else 0.0
+		if share < 0.45:
+			_dot(Vector2(x - 1.0 + wob, y), 1.0, lit)
+			_dot(Vector2(x + wob, y), 1.0, mid)
+			_dot(Vector2(x + 1.0 + wob, y), 1.0, shade)
+		elif share < 0.8:
+			_dot(Vector2(x + wob, y), 1.0, lit)
+			_dot(Vector2(x + 1.0 + wob, y), 1.0, shade)
+		else:
+			_dot(Vector2(x + wob, y), 1.0, mid)
+	draw_rect(Rect2(x - 2.0, top - 1.0, 5.0, 3.0), mid, true)
+	draw_rect(Rect2(x - 1.0, top - 1.0, 3.0, 1.0), lit, true)
+	if snap:
+		_bead(Vector2(x - 1.0, top - float(gap_from) + 1.0), 1.0)
+
+
+## A three-pixel bead of honey with its top-left at `at`: lit at the top left, shaded at the
+## foot right.
+func _bead(at: Vector2, alpha: float) -> void:
+	draw_rect(Rect2(at, Vector2(3.0, 3.0)), Color(HiveArt.HONEY, alpha), true)
+	draw_rect(Rect2(at, Vector2.ONE), Color(HiveArt.HONEY_LIGHT, alpha), true)
+	draw_rect(Rect2(at + Vector2(2.0, 2.0), Vector2.ONE), Color(HiveArt.HONEY_MID, alpha), true)
 
 
 func _dot(at: Vector2, side: float, ink: Color) -> void:
@@ -672,6 +755,21 @@ func _draw_icon(look: Dictionary, strip: Rect2, t: float, alpha: float) -> void:
 			_draw_rows(rows, mid + Vector2(0.0, roundf(sin(t * 5.0)) * cell), cell, band, alpha)
 		&"jar":
 			_draw_rows(ROWS[&"jar"], mid, cell, band, alpha)
+		&"jar_open":
+			# The honey pot's own icon, **the sealed pot with its label and gingham lid**, the
+			# same jar as the HUD plate's (2026-10-19, Richard: "should always look the same"),
+			# hopping a sheet pixel or two and settling, once every 1.6 s.
+			var beat := fmod(t, 1.6)
+			var pop := clampi(roundi(sin(clampf(beat / 0.5, 0.0, 1.0) * PI) * 2.0), 0, 2)
+			if HoneyPot.ready():
+				# Its feet a cell left of the canvas's middle and eight down.
+				HoneyPot.draw(self, &"cue_sealed", (mid + Vector2(-1.0, 8.0 - float(pop)) * cell).round(),
+					cell, Color(1.0, 1.0, 1.0, alpha))
+			else:
+				var body: Array = ROWS[&"jar_open"]
+				_draw_rows(body, mid + Vector2(0.0, 1.0) * cell, cell, band, alpha)
+				_draw_rows(ROWS[&"jar_lid"],
+					mid + Vector2(0.0, 1.0 - float(body.size() + 2) * 0.5 - float(pop)) * cell, cell, band, alpha)
 		&"meter":
 			# The meter in little: a framed bar, murky on the left and clean on the right, its
 			# seam rocking to and fro, and the garbage circle at its left end.

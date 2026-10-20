@@ -771,6 +771,28 @@ var _hive_open := false
 ## Seconds until the hive's gate and refill are next asked (`_hive_step`).
 var _hive_tick := 0.0
 
+## Honey jars are eaten (2026-10-16, `/grill-me` with Richard). A jar off the hive's shelf
+## (`Hive.jars`) is a window of `HONEY_TIME` seconds; another eaten while it runs adds its
+## seconds to it, and the bonus never stacks past `HONEY_BONUS`. While it runs, every piece of
+## rubbish **either net** takes (the double cast's and a lucky cast's included, and what a
+## tornado hit pours in) pays `HONEY_BONUS` of its base price (`EconomyConfig.price_of`, not
+## the Recycle Bonus) into the purse **at once**, and a honey coin flies from the catch to the
+## plate; the sale at the pier is as it was. Finds, pigeons and what the dogs fetch get none.
+## **The clock runs only while the lake is in play** (`_honey_runs`): frozen under any board,
+## the menu, a moment, a glide, the arrival and the ending, and in the settings pause.
+## **Session only**: nothing of it is saved, and the menu's pose ends the window. Numbers are
+## first guesses.
+const HONEY_TIME := 15.0
+const HONEY_BONUS := 0.5
+var _honey_left := 0.0
+## The whole window the seconds left were eaten into: the HUD's drain is left over this.
+var _honey_span := 0.0
+## The frame the last jar went down on: a keyboard H in pad mode reaches both the desk and the
+## pad's poll in one frame, and one press is one jar.
+var _honey_ate_at := -10
+## The bees round the angler while it runs (`HoneyBees`).
+var _honey_bees: HoneyBees
+
 ## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
 var _dog: Dog
 ## The whole pack, `_dog` first. Every dog is wired like the first (`_fit_dog`) and shares
@@ -917,9 +939,11 @@ const HINT_TEXT := {
 	&"demo_goal": "DEMO_GOAL",
 	# The demo's half-mended room, in the house the visit its play-in runs (2026-10-15).
 	&"demo_house": "DEMO_HOUSE",
+	# The first jar of honey held (2026-10-16), at the jar plate: what eating one does.
+	&"honey_jar": "CUE_HONEY",
 }
 const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter",
-	&"hive_demo", &"demo_goal", &"demo_house"]
+	&"hive_demo", &"demo_goal", &"demo_house", &"honey_jar"]
 var _cues_seen: Dictionary = {}
 var _hints: Array[StringName] = []
 var _hint_up: StringName = &""
@@ -1288,6 +1312,11 @@ func _ready() -> void:
 	_yard = $Yard as Yard
 	_dog = $Dog as Dog
 	_dogs = [_dog]
+	# The honey's bees ride the angler: they walk and sort with him and stop with him under
+	# the settings pause.
+	_honey_bees = HoneyBees.new()
+	_honey_bees.name = &"HoneyBees"
+	_angler.add_child(_honey_bees)
 
 	var shore := Iso.shore_outline()
 	_shape_bank()
@@ -1598,6 +1627,7 @@ func _ready() -> void:
 	_mark("shop art")
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
+	_skin.honey_pressed.connect(func() -> void: _eat_honey())
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
 	_room.close_asked.connect(_shut.bind(_set_shed))
 	_room.wash_asked.connect(_shed_to_wash)
@@ -2560,6 +2590,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _desk_pressed(event, &"open_settings") and not _panelled():
 		_set_settings(true)
 		return
+	# A jar of honey (H): `_eat_honey` says no under a board, with no jar, and in the demo.
+	if _desk_pressed(event, &"eat_honey"):
+		_eat_honey()
+		return
 
 	var click := event as InputEventMouseButton
 	if click == null:
@@ -2737,6 +2771,9 @@ func _pad_buttons(busy: bool) -> void:
 		return
 	if busy:
 		return
+	# The D-pad's up eats a jar of honey: free on the bare lake, where nothing else reads it.
+	if Input.is_action_just_pressed(&"eat_honey"):
+		_eat_honey()
 	if Input.is_action_just_pressed(&"open_shed"):
 		# X on the water is the corner's decorate button: the shed from anywhere.
 		_set_shed(true)
@@ -3331,6 +3368,96 @@ func _mark_ready_seen() -> void:
 func _mark_swarm_seen() -> void:
 	if _hive != null:
 		_hive.moment_seen = true
+
+
+## Whether the lake is in play for the honey (`HONEY_TIME`): its clock runs and a jar may be
+## eaten only while nothing is over the water. Not the Recycle Bonus's gate, which runs under
+## the shop and the house: this is what holds a due tornado back (`_tornado_step`), less the
+## tours and the first steps, which the game plays under. The credits board is behind the
+## menu (`_fronted`); the settings pause and the lost pad's card are `_world_paused`.
+func _honey_runs() -> bool:
+	return not (
+		_fronted() or _world_paused or _panelled() or _moment >= 0.0 or _farewell != null
+		or _arrive != Arrive.OFF
+	)
+
+
+## Whether a jar may be eaten now: one on the shelf, the lake in play, and not the demo.
+func _can_eat_honey() -> bool:
+	return not Demo.on() and _hive != null and _hive.jars > 0 and _honey_runs()
+
+
+## A jar eaten (the `eat_honey` key, the pad's D-pad up, or a click on the jar plate): one
+## off the shelf, `HONEY_TIME` more seconds of honey. Returns whether one went down. One a
+## frame (`_honey_ate_at`): a keyboard H in pad mode reaches both the desk and the pad's poll.
+func _eat_honey() -> bool:
+	var frame := Engine.get_process_frames()
+	if not _can_eat_honey() or absi(frame - _honey_ate_at) <= 1:
+		return false
+	_honey_ate_at = frame
+	_hive.jars -= 1
+	_honey_left += HONEY_TIME
+	_honey_span = _honey_left
+	if _sfx != null:
+		_sfx.play(&"hive_pop")
+	# The first jar's card has said its piece the moment one is eaten: ended if it is up, and
+	# taken out of the queue and marked seen if it is still waiting there (behind a pigeon's
+	# card, say), or it would come up afterwards telling an eater to eat.
+	if _hint_up == &"honey_jar":
+		_end_hint(true)
+	_hints.erase(&"honey_jar")
+	_cues_seen[&"honey_jar"] = true
+	return true
+
+
+## One frame of the honey: its clock while the lake is in play, and the nets and the bees told.
+func _honey_step(delta: float) -> void:
+	if _honey_left > 0.0 and _honey_runs():
+		_honey_left = maxf(_honey_left - delta, 0.0)
+		if _honey_left <= 0.0:
+			_honey_span = 0.0
+	var on := _honey_left > 0.0
+	for net: CastNet in [_net, _net2]:
+		if net != null:
+			net.honey = on
+	if _honey_bees != null:
+		_honey_bees.left = _honey_left
+
+
+## The honey's share of what a net has just taken: `HONEY_BONUS` of each rubbish piece's base
+## price into the purse at once, and one honey coin for the lot from where it was caught (one
+## a sweep, not one a piece: a maxed sweep is sixty pieces). Finds are passed over. Returns
+## what was paid. The one place the honey pays: the sweep and the tornado's pour both ask.
+## **Only while the clock runs** (`_honey_runs`): a net already flying or reeling when a board
+## comes up (the wash room never holds one) catches on, and would otherwise be paid honey out
+## of a window that is standing still.
+func _honey_pay(defs: PackedInt32Array, from: Vector2) -> float:
+	if _honey_left <= 0.0 or not _honey_runs() or _economy == null:
+		return 0.0
+	var paid := 0.0
+	var pieces := 0
+	for index in defs:
+		if index < 0 or index >= _grid.defs.size():
+			continue
+		var def := _grid.defs[index]
+		if def.keepsake:
+			continue
+		paid += HONEY_BONUS * _economy.price_of(def.material, def.tier)
+		pieces += 1
+	if pieces == 0:
+		return 0.0
+	sludge += paid
+	# Not while the shed is up: its room covers the plate the coin is aimed at.
+	if _coins != null and not _shed_open:
+		_coins.fly(from, true, pieces)
+	return paid
+
+
+## The last `count` pieces of a net's catch: what one sweep, or one tornado hit, put in it.
+static func _catch_tail(net: CastNet, count: int) -> PackedInt32Array:
+	if net == null or count <= 0:
+		return PackedInt32Array()
+	return net.catch.slice(maxi(net.catch.size() - count, 0))
 
 
 ## The day's sun to the sound board, every frame: the crickets wait on the late afternoon.
@@ -4683,6 +4810,10 @@ func _pose_world(scatter: bool) -> void:
 	for dog in _dogs:
 		for piece in dog.doze(true, scatter):
 			_dog_brought_back(piece)
+	# The honey's window is the sitting's: the pose ends it (the jar is eaten, the time is not
+	# saved), and the nets are told on the next frame.
+	_honey_left = 0.0
+	_honey_span = 0.0
 	_sort_walkers()
 
 
@@ -4833,6 +4964,9 @@ func _on_net_caught(def_index: int) -> void:
 ## is a new pool of clean water in a new shape, and the cap keeps a long drag from piling
 ## them up.
 func _on_net_swept(at: Vector2, taken: int, hold: int, mouth: float, _net_from: CastNet) -> void:
+	# Honey pays off the sweep's own pieces, the tail of the catch (first: the patch below
+	# returns early).
+	_honey_pay(_catch_tail(_net_from, taken), at)
 	if taken > 0 and _net_from == _net and _steps != null and _steps.step == FirstSteps.Step.CAST:
 		_steps.step = FirstSteps.Step.NOTE
 		_steps_landed = false
@@ -6213,6 +6347,10 @@ func _hint_step(delta: float) -> void:
 		_owe_hint(&"meter")
 	if Demo.on() and _first_buy_done and not _farewell_shown and not _cues_seen.has(&"demo_goal"):
 		_owe_hint(&"demo_goal")
+	# The first jar held (2026-10-16): asked of the shelf rather than told by the harvest, so a
+	# save already holding jars gets it too. It waits for the hive room to close like any hint.
+	if not Demo.on() and _hive != null and _hive.jars > 0 and not _cues_seen.has(&"honey_jar"):
+		_owe_hint(&"honey_jar")
 	if _hint_up == &"" and _hints.is_empty():
 		return
 	if _settings == null:
@@ -6233,6 +6371,12 @@ func _hint_step(delta: float) -> void:
 		_hint_left = LUCK_HINT_HOLD if LUCK_HINTS.has(_hint_up) else HINT_HOLD
 		_cues_seen[_hint_up] = true
 	var target := _hint_target(_hint_up)
+	# The jar plate gone with the last jar and its window: the card has nothing left to point
+	# at and would hold the queue for ever. It was seen.
+	if _hint_up == &"honey_jar" and not held and _honey_left <= 0.0 \
+			and (_hive == null or _hive.jars <= 0):
+		_end_hint(true)
+		return
 	if held or target.size.x <= 0.0:
 		_hint_card.hide_hint(true)
 		return
@@ -6267,6 +6411,8 @@ func _hint_target(kind: StringName) -> Rect2:
 			return _skin.get_global_transform() * _skin.meter_box()
 		&"demo_goal":
 			return _skin.get_global_transform() * _skin.upgrades_box()
+		&"honey_jar":
+			return _skin.get_global_transform() * _skin.honey_box()
 		&"demo_house":
 			if _room == null:
 				return Rect2()
@@ -6457,6 +6603,8 @@ func _process(delta: float) -> void:
 		_first_buy_step()
 		_hint_step(delta)
 		_hive_step(delta)
+	# Every frame, so the menu's pose reaches the nets; its clock decides for itself.
+	_honey_step(delta)
 	_haul_count_step()
 	_achievements_step(delta)
 	if _tornado != null:
@@ -6563,6 +6711,11 @@ const WALKER_COVER_ANGLER := Vector2(13.0, 42.0)
 func _cover_walkers() -> void:
 	if _flora == null and _grounds.is_empty() and _wildlife == null:
 		return
+	# The buildings a plant may stand behind, for both covers (Ground.screens).
+	var screens: Array = []
+	for box: Rect2 in _wildlife_buildings():
+		screens.append([box, box.end.y])
+	Ground.screens = screens
 	var view := _visible_world_rect().grow(40.0)
 	var bodies: Array = []
 	if _angler != null and _angler.visible and _angler.z_index == IN_FRONT 			and view.has_point(_angler.position):
@@ -7289,7 +7442,12 @@ func _on_net_touched_down(at: Vector2, mouth: float, net: CastNet) -> void:
 
 ## A hit put what the funnel carried into a net: the count over the angler turns into the
 ## storm tally (`HaulCount.storm_hit`) for the rest of the cast.
-func _on_tornado_netted(_net_hit: Node, _pieces: int) -> void:
+func _on_tornado_netted(net_hit: Node, pieces: int) -> void:
+	# What it poured is the tail of that net's catch, and honey pays on it like a sweep's: no
+	# `caught` was said for these pieces (the meter moved at the lift).
+	var net := net_hit as CastNet
+	if net != null:
+		_honey_pay(_catch_tail(net, pieces), net.world_pos())
 	_haul_count_step()
 	if _haul_count != null:
 		_haul_count.storm_hit()
@@ -7603,6 +7761,13 @@ func _update_hud() -> void:
 	# player is inside.
 	_open_upgrades.count = affordable
 	_skin.hint = _last_pieces_line()
+	# The jar plate (2026-10-16): the jars and the window, nothing at all in the demo, whose
+	# hive is scenery.
+	var honey_on := not Demo.on() and _hive != null
+	_skin.honey_jars = _hive.jars if honey_on else 0
+	_skin.honey_left = _honey_left if honey_on else 0.0
+	_skin.honey_span = _honey_span
+	# Its jar is the honey pot (`HoneyPot.draw_hud`), which the plate draws for itself.
 
 	if not _menu_open:
 		# The purse goes home with the shop closed.
@@ -7946,6 +8111,9 @@ func load_game() -> bool:
 	_hints.clear()
 	_end_hint(false)
 	_ferry_wait = 0.0
+	# No honey comes in from a file: the window is the sitting's (`HONEY_TIME`).
+	_honey_left = 0.0
+	_honey_span = 0.0
 	# A moment owed before the load is the old sitting's: the flags it would mark are the
 	# file's now, and a swarm owed its moment is owed it again by `_hive_step`.
 	_moments.clear()

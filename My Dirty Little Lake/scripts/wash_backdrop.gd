@@ -211,6 +211,20 @@ var darken := DARKEN
 ## pump, so the hive room shifts them to be somewhere else on the shore. Nought is the wash
 ## room's own view. Stepped to whole painted pixels, like everything else here.
 var bank_offset := 0.0
+## **The hive room's view** (2026-10-18, the hive overhaul, Richard's pick A off
+## `tools/hive_look/last_backdrop.png`): the same lake with nothing on it, and its far half
+## calmed. Both are off by default, so the wash room never sees either.
+## - `bare`: no rubbish afloat, no ferries, no dogs and no pigeons. Whatever the room lends
+##   is ignored; `reset` lays out nothing and nothing is sent.
+## - `veil`: the far bank and the lake taken towards the sky's lowest step, in hard bands, the
+##   far bank most and the near water least (`VEIL_BANK`, `VEIL_LAKE` at full strength, times
+##   `veil`), and the water's streaks halved. Drawn over the darkening, so it is what the
+##   mockup measured. The hive room draws it at 0.6.
+var bare := false
+var veil := 0.0
+const VEIL_BANK := 0.42
+## The lake's seven bands, far to near: the first three, the next two, the last two.
+const VEIL_LAKE := [0.36, 0.30, 0.24]
 ## How far down the bank strip the treetops are, as a share of it: where the sky ends.
 const CROWNS_AT := 0.12
 
@@ -265,6 +279,8 @@ var fleet := 1
 var rubbish: Array = []
 
 var _bank: Texture2D
+## The far bank's silhouette in white, for the veil (built on the first ask).
+var _bank_mask: Texture2D
 var _lawn: Texture2D
 var _cloud_art: Texture2D
 var _cloud_boxes := {}
@@ -378,6 +394,9 @@ func reset() -> void:
 	_dogs.clear()
 	_next_bird = _roll.randf_range(2.0, BIRD_EVERY.x)
 	_hulls.clear()
+	if bare:
+		_flotsam.clear()
+		return
 	for k in clampi(fleet, 0, 4):
 		var hull := Hull.new()
 		hull.lane = k % BOAT_LANES.size()
@@ -483,9 +502,10 @@ func step(delta: float) -> void:
 	var grey := Color.WHITE.lerp(RAIN_TINT, Weather.now).lerp(Color(1.5, 1.5, 1.6), Weather.flash_now)
 	modulate = Color(tint.r * grey.r, tint.g * grey.g, tint.b * grey.b)
 	_bark_in = maxf(_bark_in - delta, 0.0)
-	_drive_birds(delta)
-	_drive_dogs(delta)
-	_drive_hulls(delta)
+	if not bare:
+		_drive_birds(delta)
+		_drive_dogs(delta)
+		_drive_hulls(delta)
 	for puff: Array in _puffs:
 		puff[1] = float(puff[1]) + delta
 	_puffs = _puffs.filter(func(puff: Array) -> bool: return float(puff[1]) < PUFF_LIFE)
@@ -796,12 +816,49 @@ func _draw() -> void:
 	_draw_dogs()
 	# The veil: `darken` over the ground and the water, not the sky.
 	draw_rect(Rect2(0.0, lake.position.y, size.x, size.y - lake.position.y), Color(0.0, 0.0, 0.0, 1.0 - darken))
+	if veil > 0.0:
+		_draw_veil(lake, bank_top, steps[steps.size() - 1])
 	_draw_birds()
 	_draw_rain(lake)
 	# Whatever a tall window leaves under the lawn strip: its last row, carried down.
 	var lawn_end := lake.end.y + _lawn.get_height() * PIXEL
 	if lawn_end < size.y:
 		draw_rect(Rect2(0.0, lawn_end, size.x, size.y - lawn_end), _palette.grass_light * Color(darken, darken, darken))
+
+
+## The hive room's veil (see `veil`): the far bank's silhouette and the lake's bands, each
+## laid over in the sky's lowest step at its share. Hard edges at the bands.
+func _draw_veil(lake: Rect2, bank_top: float, low: Color) -> void:
+	var mask := bank_mask()
+	if mask != null:
+		_tile(mask, bank_top, Color(low, VEIL_BANK * veil), bank_offset, FAR_PIXEL)
+	var y := lake.position.y
+	for k in BANDS.size():
+		var tall := snappedf(lake.size.y * float(BANDS[k][0]), PIXEL)
+		if k == BANDS.size() - 1:
+			tall = lake.end.y - y
+		var share: float = VEIL_LAKE[0] if k < 3 else (VEIL_LAKE[1] if k < 5 else VEIL_LAKE[2])
+		draw_rect(Rect2(0.0, y, size.x, tall), Color(low, share * veil))
+		y += tall
+
+
+## The far bank's strip as a white silhouette, its alpha kept: what the veil is laid through.
+func bank_mask() -> Texture2D:
+	if _bank_mask == null and _bank != null:
+		var image := _bank.get_image()
+		if image == null:
+			return null
+		image = image.duplicate()
+		if image.is_compressed():
+			image.decompress()
+		image.convert(Image.FORMAT_RGBA8)
+		# White wherever the strip is painted, clear elsewhere: one masked blit, no pixel loop.
+		var white := Image.create(image.get_width(), image.get_height(), false, Image.FORMAT_RGBA8)
+		white.fill(Color.WHITE)
+		var mask := Image.create(image.get_width(), image.get_height(), false, Image.FORMAT_RGBA8)
+		mask.blit_rect_mask(white, image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
+		_bank_mask = ImageTexture.create_from_image(mask)
+	return _bank_mask
 
 
 ## The sky's steps run into each other through a pixel-art dither (2026-10-02, Richard: "the
@@ -947,7 +1004,7 @@ func _draw_water(lake: Rect2) -> void:
 		var streak: Vector3 = _streaks[k]
 		# Rolled again every `STREAK_HOLD`, each on its own beat: in whole, out whole.
 		var beat := int((now + streak.z * STREAK_HOLD) / STREAK_HOLD)
-		if _hash(k, beat) > STREAK_SHOWN:
+		if _hash(k, beat) > STREAK_SHOWN * (0.5 if veil > 0.0 else 1.0):
 			continue
 		var at_y := snappedf(lake.position.y + streak.y * (lake.size.y - PIXEL), PIXEL)
 		var step := 0

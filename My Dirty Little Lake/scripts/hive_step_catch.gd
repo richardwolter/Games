@@ -1,22 +1,36 @@
 ## The hive room's first step: the swarm dragged out of the air into the box (2026-09-30, the
-## beehive's second pass, Richard; off `tools/hive_mockup2.py` `room_catch`).
+## beehive's second pass, Richard; off `tools/hive_mockup2.py` `room_catch`. Redrawn 2026-10-18,
+## the hive's visual overhaul: option A of `tools/hive_look/last_catch.png`, "bees on the
+## frames").
 ##
-## **No branch.** The swarm is in the air over the lawn as clouds of real bees — every one the
-## sheet's own bee sprite, wings flicking — split into `CLUMPS` clumps, each hanging about its
-## own spot in the sky and breathing, a dashed ring breathing round where a press takes it.
-## The open brood box stands on the lawn; its mouth lights while a clump in hand is over it.
+## **No branch.** The swarm is in the air over the lawn as `CLUMPS` living clouds of bee A
+## (`BeeArt`), each hanging about its own spot in the sky and breathing: a back row tucked in
+## and a step darker, a middle crawling over one another, a rim hovering with its faces turned
+## out, and a few loose ones circling. The clouds are drawn into one `CanvasGroup` through
+## `shaders/hive_swarm.gdshader`, so the whole swarm wears one ink outline and where two bees
+## touch the line between them is the soft brown (the mockup's `_lay` and `_ring_outline`),
+## not a black lattice. A dashed ring breathes round each, where a press takes it.
+##
+## The box is the nucleus box front-on in the hive's sky blue (`catchbox_*`, baked by
+## `tools/build_hive.py` off the mockup): lid off, five frame top bars, a pine cleat, the
+## entrance and its landing board, a guard bee walking it. **Its mouth lights** — the gaps
+## between the frames glow honey-warm and two bees fan on the landing board (`catchbox_lit`) —
+## while a clump in hand is over it, and while a clump is pouring in.
+##
 ## **The player presses on a clump and drags it**: its middle follows the pointer and every bee
 ## in it chases its own place round that middle at its own pace (`CHASE`), so a clump pulled
-## fast strings out into a trail behind the pointer and gathers again when it stops. **Let go
-## over the box** and the clump pours into its mouth: most of it goes in and joins the heap,
-## and `MISS` of it veers off at the lip and flies back to a cloud still in the air. Let go
-## anywhere else and it drifts home. No failure, no timer.
+## fast strings out behind the pointer, flying, and balls up round it again when it stops. **Let
+## go over the box** and the clump pours in: a curtain of bees diving head first between the
+## frames, `MISS` of them veering off back to a cloud still in the air. Let go anywhere else and
+## it drifts home. No failure, no timer.
 ##
-## **The box says how full it is twice**: the heap of bees over its bars grows with what is in
-## (`HEAP_TALL`), and the five comb cells on its front fill with bees one by one. **At
-## `ENOUGH` (80%) boxed the step is done**: the last of the air pours in by itself, the pile
-## crawls down through the cracks between the bars, the shared ending plays over the box
-## (`HiveStep.payoff`) with `hive_crown`, and `finished` follows `PAYOFF_HOLD` later.
+## **The box counts on its frames, no UI**: every clump's worth boxed settles on the next frame,
+## left to right — its own crowd on the bar, one squeezing down the gap with only its tail out,
+## the gaps beside it showing stripes — and as it fills they spill onto the bar ends, the rim
+## and the back rim (`catch_bar_bees`, the mockup's `_bar_bees`). A new frame's bees drop in.
+## **At `ENOUGH` (80%) boxed the step is done**: the last of the air pours in by itself, the
+## shared ending plays over the box (`HiveStep.payoff`) with `hive_crown`, and `finished`
+## follows `PAYOFF_HOLD` later.
 ##
 ## **Sound** (2026-10-04): the colony's buzz while a clump is in hand, higher the faster it is
 ## dragged; a whoomp and a chime a step up the scale for each clump poured in.
@@ -34,84 +48,74 @@ extends HiveStep
 
 ## The box's feet on the art grid, and its pieces' own numbers for a layout with no json.
 const BOX_FEET_AT := Vector2(318.0, 302.0)
-const BOX_MOUTH := Vector2(61.0, 6.0)
-const BOX_FEET := Vector2(55.0, 69.0)
-## The five comb cells on the box's front, in the box piece's own pixels: the first cell's top
-## left and the step to the next (the mockup's 278 + 18k, 283 on its pasted box).
-const PIP_STEP := 18.0
-const PIPS := 5
+const BOX_MOUTH := Vector2(93.0, 59.0)
+const BOX_FEET := Vector2(93.0, 114.0)
+const BOX_BOARD := Vector2(93.0, 110.0)
+## The five frames on the box, the six gaps round them.
+const BARS := 5
 
-## The swarm: this many clumps, each of `PER_CLUMP` bees spread `SPREAD` painted pixels about
-## its middle (a gaussian, half-widths), round these homes in the sky.
+## The swarm: this many clumps round these homes in the sky (the middle one 8 px lower than it
+## was: a clump of bee A is about 40 px across, and at 66 its top sat on the step board).
 const CLUMPS := 5
-const PER_CLUMP := 64
-const SPREAD := Vector2(34.0, 20.0)
 const HOMES: Array[Vector2] = [
-	Vector2(104.0, 112.0), Vector2(212.0, 82.0), Vector2(338.0, 66.0), Vector2(452.0, 88.0),
+	Vector2(104.0, 112.0), Vector2(212.0, 82.0), Vector2(338.0, 74.0), Vector2(452.0, 88.0),
 	Vector2(548.0, 118.0),
 ]
 const SEED := 2101
 ## A clump drifts about its home this far on slow sines, and breathes this much.
 const DRIFT := Vector2(14.0, 7.0)
-const BREATHE := 0.12
-## The clumps are loose (2026-10-04, Richard: "messier, not all concentrated"): every bee in the
-## air jitters `JITTER` px about its place, and now and then strays out on a loop up to `STRAY`
-## px and back, each on its own clock. A clump in hand pulls its strays in.
-const JITTER := 4.0
-const STRAY := 46.0
+const BREATHE := 0.06
+## Every bee in a clump jitters this many painted px about its place; a rim bee now and then
+## strays out on a loop up to `STRAY` px and back (2026-10-04, Richard: "messier").
+const JITTER := 0.6
+const STRAY := 22.0
+## The loose bees round a clump circle it at this many radians a second.
+const ORBIT := 0.9
+## The back row of a clump is tucked in and a step darker.
+const BACK_TINT := Color(0.82, 0.8, 0.79)
 ## Loose bees with no clump, wandering the sky (`HiveStep.wanderers`): not catchable.
-const AIR := 28
-const AIR_BOX := Rect2(20.0, 20.0, 600.0, 190.0)
+const AIR := 10
+const AIR_BOX := Rect2(20.0, 20.0, 600.0, 170.0)
 ## A bee's chase after its place, a second: the slowest and the quickest. The spread is the
 ## trail: the quick ones stay on the pointer, the slow ones string out behind.
 const CHASE := Vector2(3.0, 12.0)
 ## A clump in hand draws in to this share of its spread, and its middle eases after the pointer
-## this fast.
-const HELD_TIGHT := 0.55
+## this fast. A bee further than `FLYING` from its place is drawn flying, facing the way it goes.
+const HELD_TIGHT := 0.85
 const HELD_EASE := 22.0
+const FLYING := 8.0
 ## Grab reach round a clump's middle, painted pixels, measured with the height stretched.
 const GRAB_REACH := 34.0
 ## Let go within this of the box's mouth (height stretched), the clump pours in.
 const DROP_REACH := Vector2(70.0, 46.0)
-## A pouring bee within this of the mouth goes in; `MISS` of them veer off back to the air.
-const IN_REACH := 7.0
+## A pouring bee within this of its gap goes in; `MISS` of them veer off back to the air.
+const IN_REACH := 3.0
 const MISS := 0.12
-## The fly-in: a pouring bee's place is the mouth, spread this much.
-const POUR_SPREAD := Vector2(20.0, 4.0)
+## A pouring bee dives head first once it is within this of its gap.
+const DIVE_FROM := 40.0
+## The mouth stays lit this long after the last pouring bee went in.
+const LIT_AFTER := 0.4
 ## Done at this share boxed.
 const ENOUGH := 0.8
-## Long enough for the pile to go in through the cracks and the shared ending to land.
+## Long enough for the shared ending to land.
 const PAYOFF_HOLD := 2.6
-## The heap over the bars: its half-width across the mouth and its height when all are in.
-const HEAP_HALF := 52.0
-const HEAP_TALL := 26.0
-## The box's mouth brightens while a clump in hand is over it (2026-10-04, Richard: the three
-## yellow ellipses round the box were "really ugly"; gone): this strong at most.
-const MOUTH_LIT := 0.55
-## The shadow under the box, in the one ink every shadow on land takes (`Shade.tint_on`),
-## nudged along the sun as if from `CONTACT_RISE` painted px up: a solid core under its base and
-## a checkered fringe round it (2026-10-04, Richard: the plain ellipse "looks bad").
-const CONTACT_RISE := 4.0
-const SHADE_CORE := Vector2(56.0, 4.0)
-const SHADE_FRINGE := Vector2(68.0, 6.0)
-## The round comb cells on the box's front: their middle across the front from the box's feet
-## mark, their row, their radius and step.
-const PIP_Y := 51.0
-const PIP_R := 5.0
+## A new frame's crowd drops in from this far up over this long.
+const DROP_IN := 10.0
+const DROP_TIME := 0.35
+## The box's shadow on the lawn: its footprint (the front's width, a step narrower at the back,
+## `FOOT_DEPTH` rows deep) swept along the one sun (`Shade.drop`) as if from `SHADE_RISE`
+## painted px up; a solid core in the one ink every shadow on land takes, and a checkered
+## fringe a pixel round it at `FRINGE_SHARE` of the ink (the mockup's core and fringe).
+const FOOT_HALF := 57.0
+const FOOT_DEPTH := 26.0
+const FOOT_INSET := 10.0
+const SHADE_RISE := 30.0
+const FRINGE_SHARE := 0.5
 ## The ring on each clump in the air, round where a press takes it: its pulse (painted px and
 ## a second), and its dashes turning.
 const MARK_BREATHE := 2.5
 const MARK_RATE := 2.6
 const MARK_TURN := 0.6
-## The pile going in through the cracks once the swarm is caught: the gaps between the box's
-## top bars, as offsets across from the mouth's middle (the builder's bars, every 11 px), when
-## the first bee starts down and how long each takes.
-const CRACK_FIRST := -49.0
-const CRACK_STEP := 11.0
-const CRACKS := 10
-const DRAIN_FROM := 0.3
-const DRAIN_SPREAD := 1.0
-const DRAIN_TIME := 0.5
 ## Sound: the colony's buzz while a clump is in hand, swelling in and out over `BUZZ_FADE`, up
 ## to `BUZZ_DB`. **Dragged fast it gets louder, not much higher** (2026-10-04, Richard: the
 ## pitch sweep "sounds like a formula 1 car"): a few percent of pitch at most
@@ -129,19 +133,14 @@ const BUZZ_WAVER := 0.025
 const WHOOMP_DB := -6.0
 const CHIME_DB := -14.0
 const CHIME_STEPS: Array[float] = [1.0, 1.122, 1.26, 1.335, 1.498]
-## The trail of a clump in hand: this many ghost places, one every `TRAIL_EVERY` seconds.
-const TRAIL := 7
-const TRAIL_EVERY := 0.035
-## The wing whisk behind a flying bee, and how fast wings beat (flips a second).
-const WHISK := Color(248 / 255.0, 244 / 255.0, 232 / 255.0)
-const BEAT := 22.0
-## Empty comb cells on the box front, and the stripes across a full one.
-const CELL_EMPTY := Color(60 / 255.0, 40 / 255.0, 26 / 255.0)
+## The swarm's outline and the soft brown where two bees touch (`look.SW["coin_deep"]`).
+const SOFT_LINE := Color(132 / 255.0, 88 / 255.0, 22 / 255.0)
 
 enum Bee { AIR, POUR, IN, BACK }
 
 var _roll := RandomNumberGenerator.new()
-## Per bee: its clump, its state, its place, its offset in the clump, its chase and its phase.
+## Per bee: its clump, its state, its place, its offset in the clump, its chase, its phase, its
+## role in the cloud and its pose there, and the box gap it pours into.
 var _clump: PackedInt32Array = []
 var _state: PackedInt32Array = []
 var _pos: PackedVector2Array = []
@@ -149,26 +148,61 @@ var _off: PackedVector2Array = []
 var _chase: PackedFloat32Array = []
 var _phase: PackedFloat32Array = []
 var _was: PackedVector2Array = []
-## Its place in the heap once in, the heap slot.
-var _slot: PackedVector2Array = []
+var _role: PackedByteArray = []
+var _pose: Array[StringName] = []
+var _faces_left: PackedByteArray = []
+var _loose: Array[Dictionary] = []
+var _gap_of: PackedInt32Array = []
 ## Per clump: its middle, whether it is still in the air (not poured), and its home.
 var _mid: PackedVector2Array = []
 var _gone: Array[bool] = []
 var _held := -1
 var _pointer := Vector2.ZERO
-var _trail: Array[Vector2] = []
-var _trail_clock := 0.0
 var _in := 0
 var _total := 1
 var _caught := false
 var _caught_age := 0.0
 var _was_down := false
+var _lit_left := 0.0
 var _buzz: AudioStreamPlayer
 var _buzz_level := 0.0
 var _whoomp: AudioStreamPlayer
 var _chime: AudioStreamPlayer
 var _held_was := Vector2.ZERO
 var _drag_speed := 0.0
+## The bar bees' layout, read once; when each frame's crowd first showed (step age).
+var _bar_bees: Array = []
+var _frame_at: Array[float] = []
+## The shadow's runs, laid out once: `[Vector2 start, int long, bool core]`.
+var _shade_runs: Array = []
+var _group: CanvasGroup
+var _swarm: SwarmLayer
+var _front: FrontLayer
+
+const ROLE_BACK := 0
+const ROLE_MIDDLE := 1
+const ROLE_RIM := 2
+const ROLE_LOOSE := 3
+
+
+func _ready() -> void:
+	_group = CanvasGroup.new()
+	_group.name = &"Swarm"
+	_group.fit_margin = 12.0
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/hive_swarm.gdshader")
+	mat.set_shader_parameter(&"ink", HiveArt.OUT)
+	mat.set_shader_parameter(&"soft", SOFT_LINE)
+	_group.material = mat
+	add_child(_group)
+	_swarm = SwarmLayer.new()
+	_swarm.step = self
+	_group.add_child(_swarm)
+	_front = FrontLayer.new()
+	_front.step = self
+	_front.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_front)
+	_front.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 func begin() -> void:
@@ -179,14 +213,22 @@ func begin() -> void:
 	_caught = false
 	_caught_age = 0.0
 	_was_down = false
-	_trail.clear()
+	_lit_left = 0.0
 	_make_players()
 	_buzz_level = 0.0
 	_mid = PackedVector2Array(HOMES)
 	_gone.clear()
 	for k in CLUMPS:
 		_gone.append(false)
-	var count := CLUMPS * PER_CLUMP
+	_bar_bees = HiveArt.data("catch_bar_bees", []) as Array
+	_frame_at.clear()
+	for k in BARS + 1:
+		_frame_at.append(-1.0)
+	_frame_at[0] = 0.0
+	var clumps: Array = HiveArt.data("catch_clumps", []) as Array
+	var count := 0
+	for c in CLUMPS:
+		count += (clumps[c] as Array).size() if c < clumps.size() else 14
 	_total = count
 	_clump.resize(count)
 	_state.resize(count)
@@ -195,22 +237,44 @@ func begin() -> void:
 	_off.resize(count)
 	_chase.resize(count)
 	_phase.resize(count)
-	_slot.resize(count)
-	for i in count:
-		var c := i / PER_CLUMP
-		_clump[i] = c
-		_state[i] = Bee.AIR
-		var off := Vector2(_roll.randfn(0.0, 0.5) * SPREAD.x, _roll.randfn(0.0, 0.5) * SPREAD.y)
-		_off[i] = off
-		_pos[i] = HOMES[c] + off
-		_was[i] = _pos[i]
-		_chase[i] = _roll.randf_range(CHASE.x, CHASE.y)
-		_phase[i] = _roll.randf() * TAU
-		# The heap: wide at its foot, rounding off as it rises (bee_mass's own shape).
-		var t := _roll.randf()
-		var half := HEAP_HALF * sqrt(maxf(1.0 - t, 0.0))
-		_slot[i] = Vector2(_roll.randf_range(-half, half), -t)
+	_role.resize(count)
+	_faces_left.resize(count)
+	_gap_of.resize(count)
+	_pose.clear()
+	_loose.clear()
+	var i := 0
+	for c in CLUMPS:
+		var members: Array = clumps[c] if c < clumps.size() else []
+		var n := members.size() if not members.is_empty() else 14
+		for m in n:
+			var bee: Dictionary = members[m] if m < members.size() else {}
+			_clump[i] = c
+			_state[i] = Bee.AIR
+			var role := _role_of(String(bee.get("role", "middle")))
+			_role[i] = role
+			_off[i] = Vector2(float(bee.get("x", _roll.randfn(0.0, 6.0))), float(bee.get("y", _roll.randfn(0.0, 4.0))))
+			_pose.append(StringName("worker_" + String(bee.get("pose", "walk"))))
+			_faces_left[i] = 1 if bool(bee.get("left", false)) else 0
+			_phase[i] = float(bee.get("phase", 0)) * 0.37 + _roll.randf() * TAU
+			_loose.append(bee)
+			_pos[i] = HOMES[c] + _home_off(i)
+			_was[i] = _pos[i]
+			_chase[i] = _roll.randf_range(CHASE.x, CHASE.y)
+			_gap_of[i] = _roll.randi() % (BARS + 1)
+			i += 1
+	_lay_shadow()
 	wanderers(AIR, AIR_BOX, SEED + 7)
+
+
+static func _role_of(name: String) -> int:
+	match name:
+		"back":
+			return ROLE_BACK
+		"rim":
+			return ROLE_RIM
+		"loose":
+			return ROLE_LOOSE
+	return ROLE_MIDDLE
 
 
 # --- the harness's hooks ------------------------------------------------------------------
@@ -242,7 +306,6 @@ func grab_at(p: Vector2) -> int:
 			near = d
 			best = c
 	_held = best
-	_trail.clear()
 	if best >= 0:
 		_held_was = _mid[best]
 	return best
@@ -296,15 +359,27 @@ func settle() -> void:
 	done_once()
 
 
+## How many frames the bees in the box have settled on, 0..5: a clump's worth a frame.
+func frames_taken() -> int:
+	return clampi(int(floorf(boxed_share() / ENOUGH * BARS + 0.001)), 0, BARS)
+
+
 # --- the play -----------------------------------------------------------------------------
 
+func _box_tl() -> Vector2:
+	var feet: Vector2 = HiveArt.anchor(&"catchbox_0", &"feet") if HiveArt.knows(&"catchbox_0") else BOX_FEET
+	return BOX_FEET_AT - feet
+
+
+## A point of the box's own picture on the art grid.
+func _on_box(name: StringName, fallback: Vector2) -> Vector2:
+	if HiveArt.knows(&"catchbox_0"):
+		return _box_tl() + HiveArt.anchor(&"catchbox_0", name)
+	return _box_tl() + fallback
+
+
 func _mouth() -> Vector2:
-	return _box_feet() - HiveArt.anchor(&"box", &"feet") + HiveArt.anchor(&"box", &"mouth") \
-		if HiveArt.knows(&"box") else _box_feet() - BOX_FEET + BOX_MOUTH
-
-
-func _box_feet() -> Vector2:
-	return BOX_FEET_AT
+	return _on_box(&"mouth", BOX_MOUTH)
 
 
 ## Whether a clump let go at `p` pours into the box.
@@ -362,13 +437,20 @@ func _drive_buzz(delta: float) -> void:
 	_buzz.pitch_scale = minf(1.0 + _drag_speed * BUZZ_PITCH_PER, BUZZ_PITCH_MOST) + waver * BUZZ_WAVER
 
 
+## Where a pouring bee is headed: the top of its gap between the frames, a pixel either way.
+func _gap_target(b: int) -> Vector2:
+	var g := _gap_of[b]
+	var at := _on_box(StringName("gap%d_t" % g), BOX_MOUTH + Vector2((g - 2.5) * 18.0, -9.0))
+	return at + Vector2(sin(_phase[b] * 3.0), 3.0)
+
+
 func _pour(c: int) -> void:
 	_gone[c] = true
+	_lit_left = LIT_AFTER
 	for b in _pos.size():
 		if _clump[b] != c or _state[b] == Bee.IN:
 			continue
 		_state[b] = Bee.POUR
-		_off[b] = Vector2(_roll.randf_range(-1.0, 1.0) * POUR_SPREAD.x, _roll.randf_range(-1.0, 1.0) * POUR_SPREAD.y)
 
 
 func _land(b: int) -> void:
@@ -392,7 +474,9 @@ func _send_back(b: int) -> void:
 		return
 	_clump[b] = best
 	_state[b] = Bee.BACK
-	_off[b] = Vector2(_roll.randfn(0.0, 0.5) * SPREAD.x, _roll.randfn(0.0, 0.5) * SPREAD.y)
+	_role[b] = ROLE_RIM
+	_pose[b] = &"worker_hover"
+	_off[b] = Vector2(_roll.randfn(0.0, 7.0), _roll.randfn(0.0, 5.0))
 
 
 func _check_enough() -> void:
@@ -405,8 +489,19 @@ func _check_enough() -> void:
 	for c in CLUMPS:
 		if not _gone[c]:
 			_pour(c)
-	payoff(_mouth() + Vector2(0.0, -6.0), 90.0)
+	payoff(_mouth() + Vector2(0.0, -4.0), 90.0)
 	HiveStep.sound(&"hive_crown")
+
+
+## Bee `b`'s place in its clump this moment, from the clump's middle: a loose one circles it,
+## the rest keep their spot in the cloud breathing and jittering, a rim bee now and then strays.
+func _home_off(b: int) -> Vector2:
+	if _role[b] == ROLE_LOOSE:
+		var bee: Dictionary = _loose[b]
+		var a := float(bee.get("a0", 0.0)) + age * ORBIT * float(bee.get("spin", 1))
+		var rr := float(bee.get("rr", 1.4))
+		return Vector2(cos(a) * float(bee.get("rx", 20.0)) * rr, sin(a) * float(bee.get("ry", 15.0)) * rr)
+	return _off[b]
 
 
 func _process(delta: float) -> void:
@@ -433,19 +528,7 @@ func _process(delta: float) -> void:
 			sin(age * 0.5 + c * 1.7) * DRIFT.x, sin(age * 0.8 + c * 2.3) * DRIFT.y
 		)
 		_mid[c] = _mid[c].lerp(home, 1.0 - exp(-1.6 * delta))
-	if _held >= 0:
-		_trail_clock -= delta
-		if _trail_clock <= 0.0:
-			_trail_clock = TRAIL_EVERY
-			_trail.push_front(_mid[_held])
-			if _trail.size() > TRAIL:
-				_trail.pop_back()
-	elif not _trail.is_empty():
-		_trail_clock -= delta
-		if _trail_clock <= 0.0:
-			_trail_clock = TRAIL_EVERY
-			_trail.pop_back()
-	var mouth := _mouth()
+	var pouring := false
 	for b in _pos.size():
 		_was[b] = _pos[b]
 		var s := _state[b]
@@ -454,13 +537,14 @@ func _process(delta: float) -> void:
 		var c := _clump[b]
 		var target: Vector2
 		if s == Bee.POUR:
-			target = mouth + _off[b]
+			pouring = true
+			target = _gap_target(b)
 		else:
 			var tight := HELD_TIGHT if c == _held else 1.0 + BREATHE * sin(age * 1.3 + c)
 			var ph := _phase[b]
 			var jitter := Vector2(sin(age * (2.4 + fmod(ph, 1.3)) + ph), cos(age * (1.9 + fmod(ph, 1.1)) + ph * 1.7)) * JITTER
-			target = _mid[c] + _off[b] * tight + jitter
-			if c != _held and s == Bee.AIR:
+			target = _mid[c] + _home_off(b) * tight + jitter
+			if c != _held and s == Bee.AIR and _role[b] == ROLE_RIM:
 				target += _stray(b)
 		_pos[b] = _pos[b].lerp(target, 1.0 - exp(-_chase[b] * delta))
 		if s == Bee.BACK and _pos[b].distance_to(target) < 6.0:
@@ -470,12 +554,26 @@ func _process(delta: float) -> void:
 				_send_back(b)
 			else:
 				_land(b)
+	if pouring:
+		_lit_left = LIT_AFTER
+	else:
+		_lit_left = maxf(_lit_left - delta, 0.0)
 	_check_enough()
+	# A frame's crowd drops in the first time the count reaches it.
+	var taken := frames_taken()
+	for k in range(1, taken + 1):
+		if _frame_at[k] < 0.0:
+			_frame_at[k] = age
 	_drive_buzz(delta)
 	if _caught:
 		_caught_age += delta
 		if _caught_age >= PAYOFF_HOLD:
 			done_once()
+	if _swarm != null:
+		_swarm.queue_redraw()
+		_front.queue_redraw()
+		var scale := (get_viewport().get_final_transform() * get_global_transform_with_canvas()).get_scale()
+		(_group.material as ShaderMaterial).set_shader_parameter(&"art_px", absf(scale.x) * HiveArt.PIXEL)
 
 
 func pad_mark() -> Rect2:
@@ -487,8 +585,8 @@ func pad_mark() -> Rect2:
 func _stray(b: int) -> Vector2:
 	var ph := _phase[b]
 	var h := fposmod(ph * 7.31, 1.0)
-	var p := fposmod(age / (4.0 + 6.0 * h) + h * 3.7, 1.0)
-	var peel := sin(clampf((p - 0.72) / 0.28, 0.0, 1.0) * PI)
+	var p := fposmod(age / (5.0 + 7.0 * h) + h * 3.7, 1.0)
+	var peel := sin(clampf((p - 0.78) / 0.22, 0.0, 1.0) * PI)
 	if peel <= 0.0:
 		return Vector2.ZERO
 	var turn := ph * 3.0 + sin(age * 2.0 + ph) * 0.8
@@ -497,98 +595,189 @@ func _stray(b: int) -> Vector2:
 
 # --- drawing ------------------------------------------------------------------------------
 
+## Whether the mouth is lit: a clump in hand over it, or one pouring in.
+func _lit() -> bool:
+	return (_held >= 0 and _over_mouth(_pointer)) or _lit_left > 0.0
+
+
 func _draw() -> void:
-	var feet := _box_feet()
-	var mouth := _mouth()
-	_draw_shadow(feet)
-	HiveArt.draw(self, &"box", to_canvas(feet), &"feet")
-	_draw_pips(feet)
-	# A clump in hand over the mouth: the mouth lights, warm, so a let-go here is a pour.
-	if _held >= 0 and _over_mouth(_pointer):
-		var lit := MOUTH_LIT * (0.8 + 0.2 * sin(age * 8.0))
-		_ellipse(mouth + Vector2(0.0, 1.0), Vector2(56.0, 5.0), Color(HiveArt.HONEY_SHINE, lit * 0.5))
-		_ellipse(mouth + Vector2(0.0, 1.0), Vector2(40.0, 3.0), Color(HiveArt.STAR_WHITE, lit * 0.4))
-	# The heap over the bars: every bee in, in its slot, the heap as tall as what is in. Once
-	# the swarm is caught the pile goes in through the cracks, the top of it last.
-	var tall := HEAP_TALL * sqrt(boxed_share())
-	for b in _pos.size():
-		if _state[b] != Bee.IN:
-			continue
-		var slot := _slot[b]
-		var at := mouth + Vector2(slot.x * sqrt(boxed_share() / ENOUGH * 0.9 + 0.1), slot.y * tall - 1.0)
-		var alpha := 1.0
-		if _caught:
-			var start := DRAIN_FROM + (-slot.y) * DRAIN_SPREAD + fposmod(_phase[b], 0.3)
-			var s := clampf((_caught_age - start) / DRAIN_TIME, 0.0, 1.0)
-			if s >= 1.0:
-				continue
-			if s > 0.0:
-				var k := clampi(roundi((at.x - mouth.x - CRACK_FIRST) / CRACK_STEP), 0, CRACKS - 1)
-				var crack := Vector2(mouth.x + CRACK_FIRST + k * CRACK_STEP, mouth.y + 3.0)
-				at = at.lerp(crack, s * s * (3.0 - 2.0 * s))
-				alpha = 1.0 - clampf((s - 0.6) / 0.4, 0.0, 1.0)
-		_bee(at, sin(_phase[b] + age * 0.7) > 0.0, sin(age * BEAT * 0.3 + _phase[b]) > 0.6, alpha)
-	# The trail of the clump in hand: soft honey-light smudges where it has been.
-	for k in _trail.size():
-		var fade := 1.0 - float(k + 1) / float(TRAIL + 1)
-		var ink := HiveArt.HONEY_LIGHT
-		ink.a = 0.28 * fade
-		_ellipse(_trail[k], Vector2(16.0 - k, 9.0 - k * 0.6), ink)
+	_draw_shadow()
+	var tl := _box_tl()
+	var lit := _lit()
+	var piece := &"catchbox_lit" if lit else StringName("catchbox_%d" % (0 if _caught else frames_taken()))
+	if _caught:
+		piece = StringName("catchbox_%d" % BARS)
+	if HiveArt.has(piece):
+		HiveArt.draw(self, piece, to_canvas(tl))
+	else:
+		draw_rect(Rect2(to_canvas(tl + Vector2(36.0, 48.0)), Vector2(114.0, 67.0) * HiveArt.PIXEL), Color(0.6, 0.75, 0.9))
+	_draw_bar_bees(tl)
+	_draw_board(lit)
 	draw_wanderers()
-	# The bees in the air, back to front.
-	for b in _pos.size():
-		if _state[b] == Bee.IN:
+
+
+## The bees on the frames: each crowd shows from the count of frames it needs, dropping in the
+## first time; the far end of a bar in the box's shade; one half down a gap, its tail out.
+func _draw_bar_bees(tl: Vector2) -> void:
+	var taken := BARS if _caught else frames_taken()
+	for bee: Dictionary in _bar_bees:
+		var need := int(bee.get("from", 1))
+		if need > taken:
+			continue
+		var at := tl + Vector2(float(bee["x"]), float(bee["y"]))
+		var since := age - _frame_at[clampi(need, 0, BARS)] if _frame_at[clampi(need, 0, BARS)] >= 0.0 else DROP_TIME
+		var drop := clampf(since / DROP_TIME, 0.0, 1.0)
+		var left := bool(bee.get("left", false))
+		var turn := int(bee.get("turn", 0))
+		var ph := float(bee.get("frame", 0)) * 0.41
+		var tint := BACK_TINT if bool(bee.get("shade", false)) else Color.WHITE
+		if drop < 1.0:
+			var e := 1.0 - pow(1.0 - drop, 3.0)
+			bee_at(self, BeeArt.frame_name(&"worker_hover", BeeArt.frame_at(&"worker_hover", age + ph)),
+				at - Vector2(0.0, DROP_IN * (1.0 - e)), left, 0, tint)
+			continue
+		var anim := StringName("worker_" + String(bee.get("pose", "walk")))
+		var name := BeeArt.frame_name(anim, BeeArt.frame_at(anim, age + ph))
+		if bool(bee.get("half", false)):
+			_bee_half(name, at, left, turn)
+		else:
+			bee_at(self, name, at, left, turn, tint)
+
+
+## The landing board: a guard walking it, or, while the mouth is lit, two bees fanning on it,
+## tails to the entrance, wings a blur: the scent that tells a swarm where home is.
+func _draw_board(lit: bool) -> void:
+	var board := _on_box(&"board", BOX_BOARD)
+	if lit:
+		for j in 2:
+			var dx := -12.0 if j == 0 else 12.0
+			bee_at(self, BeeArt.frame_name(&"worker_hover", BeeArt.frame_at(&"worker_hover", age * 1.6 + j * 0.05)),
+				board + Vector2(dx, -6.0), j == 0)
+		return
+	var stroll := sin(age * 0.5) * 7.0
+	var left := cos(age * 0.5) < 0.0
+	bee_at(self, BeeArt.frame_name(&"worker_walk", BeeArt.frame_at(&"worker_walk", age)),
+		board + Vector2(-6.0 + stroll, -6.0), left)
+
+
+## A bee half down a gap: only the end still out is drawn (the top half on screen), the rest is
+## gone into the dark between the frames.
+func _bee_half(name: StringName, p: Vector2, left: bool, turn: int) -> void:
+	var sheet := BeeArt.sheet()
+	if sheet == null or not BeeArt.has(name):
+		return
+	var cut := BeeArt.region(name)
+	var scale := HiveArt.PIXEL
+	var at := to_canvas(p.floor())
+	var mark := BeeArt.anchor(name, left)
+	var box := Rect2(at - mark * scale, cut.size * scale)
+	var whole := sheet.get_size()
+	var u0 := cut.position.x / whole.x
+	var u1 := cut.end.x / whole.x
+	var v0 := cut.position.y / whole.y
+	var v1 := cut.end.y / whole.y
+	var ul := u1 if left else u0
+	var ur := u0 if left else u1
+	# Which side of the unturned picture ends up on top of the screen after the turn.
+	var keep_left := posmod(turn, 4) == 3
+	var split := at.x + scale * 0.5
+	var share := clampf((split - box.position.x) / box.size.x, 0.0, 1.0)
+	var um := lerpf(ul, ur, share)
+	var x0 := box.position.x if keep_left else split
+	var x1 := split if keep_left else box.end.x
+	var ua := ul if keep_left else um
+	var ub := um if keep_left else ur
+	var corners := [Vector2(x0, box.position.y), Vector2(x1, box.position.y), Vector2(x1, box.end.y), Vector2(x0, box.end.y)]
+	var points := PackedVector2Array()
+	for corner: Vector2 in corners:
+		points.append(at + BeeArt._turned(corner - at, turn))
+	draw_primitive(points, PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE]),
+		PackedVector2Array([Vector2(ua, v0), Vector2(ub, v0), Vector2(ub, v1), Vector2(ua, v1)]), sheet)
+
+
+## The swarm, on the CanvasGroup the outline shader reads: every bee not yet in the box, the
+## clouds back to front, a bee far off its place flying the way it goes, a pouring bee diving
+## head first between the frames.
+func _draw_swarm(ci: CanvasItem) -> void:
+	var order := range(_pos.size())
+	order.sort_custom(func(a: int, b: int) -> bool: return _pos[a].y < _pos[b].y)
+	for b: int in order:
+		var s := _state[b]
+		if s == Bee.IN:
 			continue
 		var move := _pos[b] - _was[b]
-		var left := move.x < -0.02 or (absf(move.x) <= 0.02 and sin(_phase[b]) < 0.0)
-		if move.length_squared() > 0.04:
-			var back := Vector2(3.0, 1.0) if left else Vector2(-3.0, 1.0)
-			for k in 3:
-				var whisk := WHISK
-				whisk.a = (110.0 - k * 30.0) / 255.0
-				HiveArt.px(self, to_canvas(_pos[b] + back + Vector2(k, 0.0) * (1.0 if left else -1.0)), whisk)
-		_bee(_pos[b], left, fmod(age * BEAT + _phase[b], 2.0) < 1.0)
-	_draw_marks()
-	draw_payoff()
-
-
-func _bee(at: Vector2, left: bool, wings: bool, alpha := 1.0) -> void:
-	var piece := &"bee_r" if wings else &"bee_r_rest"
-	var canvas := to_canvas(at.floor())
-	if HiveArt.has(piece):
-		HiveArt.draw(self, piece, canvas, &"c", left, alpha)
-	else:
-		draw_rect(Rect2(canvas, Vector2(3.0, 2.0) * HiveArt.PIXEL), Color(HiveArt.BEE_GOLD, alpha))
-
-
-## The shadow under the box: a solid core and a checkered fringe, along the sun.
-func _draw_shadow(feet: Vector2) -> void:
-	var ink := Shade.tint_on(null, Shade.On.LAND)
-	var at := Vector2(feet.x, feet.y - 1.0) + Shade.drop(null, CONTACT_RISE).round()
-	for y in range(floori(at.y - SHADE_FRINGE.y), ceili(at.y + SHADE_FRINGE.y)):
-		var outer := _row(at, SHADE_FRINGE, y)
-		if outer.y <= outer.x:
+		var c := _clump[b]
+		var ph := _phase[b]
+		var place := _gap_target(b) if s == Bee.POUR else _mid[c] + _home_off(b)
+		var far := _pos[b].distance_to(place)
+		if s == Bee.POUR and far < DIVE_FROM:
+			# Head first: hovering wings, turned so the head points down the screen.
+			var left := _pos[b].x > _mouth().x
+			var name := BeeArt.frame_name(&"worker_hover", BeeArt.frame_at(&"worker_hover", age + ph))
+			var tint := Color(0.75, 0.72, 0.7) if far < 6.0 else Color.WHITE
+			bee_at(ci, name, _pos[b], left, 1 if left else 3, tint)
 			continue
-		var inner := _row(at, SHADE_CORE, y)
-		for x in range(int(outer.x), int(outer.y)):
-			var core := inner.y > inner.x and x >= int(inner.x) and x < int(inner.y)
-			if core or (x + y) % 2 == 0:
-				draw_rect(Rect2(to_canvas(Vector2(x, y)), Vector2.ONE * HiveArt.PIXEL), ink)
+		if s != Bee.AIR or c == _held or far > FLYING or _role[b] == ROLE_LOOSE:
+			var going_left := move.x < -0.01 or (absf(move.x) <= 0.01 and _faces_left[b] == 1)
+			var fly := BeeArt.frame_name(&"worker_fly", BeeArt.frame_at(&"worker_fly", age + ph))
+			bee_at(ci, fly, _pos[b], going_left)
+			continue
+		var anim := _pose[b]
+		var name := BeeArt.frame_name(anim, BeeArt.frame_at(anim, age + ph))
+		var tint := BACK_TINT if _role[b] == ROLE_BACK else Color.WHITE
+		bee_at(ci, name, _pos[b], _faces_left[b] == 1, 0, tint)
 
 
-## Where an ellipse's row `y` runs, as (left, right); empty off it.
-static func _row(middle: Vector2, half: Vector2, y: int) -> Vector2:
-	var dy := (float(y) + 0.5 - middle.y) / half.y
-	if absf(dy) >= 1.0:
-		return Vector2.ZERO
-	var w := half.x * sqrt(1.0 - dy * dy)
-	return Vector2(roundf(middle.x - w), roundf(middle.x + w))
+## The shadow under the box, laid out once: the footprint swept along the sun, a solid core
+## and a checkered fringe round it.
+func _lay_shadow() -> void:
+	_shade_runs.clear()
+	var feet := BOX_FEET_AT
+	var fy := feet.y
+	var foot := [
+		Vector2(feet.x - FOOT_HALF, fy + 1.0), Vector2(feet.x + FOOT_HALF - 1.0, fy + 1.0),
+		Vector2(feet.x + FOOT_HALF - 1.0 - FOOT_INSET, fy - FOOT_DEPTH),
+		Vector2(feet.x - FOOT_HALF + FOOT_INSET, fy - FOOT_DEPTH),
+	]
+	var run := Shade.drop(null, SHADE_RISE).round()
+	var pts := PackedVector2Array()
+	for p: Vector2 in foot:
+		pts.append(p)
+		pts.append(p + run)
+	var hull := Geometry2D.convex_hull(pts)
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for p in hull:
+		lo = lo.min(p)
+		hi = hi.max(p)
+	var core := {}
+	for y in range(floori(lo.y) - 1, ceili(hi.y) + 2):
+		for x in range(floori(lo.x) - 1, ceili(hi.x) + 2):
+			if Geometry2D.is_point_in_polygon(Vector2(x + 0.5, y + 0.5), hull):
+				core[Vector2i(x, y)] = true
+	var fringe := {}
+	for cell: Vector2i in core:
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cell + d
+			if not core.has(n) and (n.x + n.y) % 2 == 0:
+				fringe[n] = true
+	for cell: Vector2i in core:
+		_shade_runs.append([Vector2(cell), true])
+	for cell: Vector2i in fringe:
+		_shade_runs.append([Vector2(cell), false])
+
+
+func _draw_shadow() -> void:
+	var ink := Shade.tint_on(null, Shade.On.LAND)
+	var soft := Color(ink, ink.a * FRINGE_SHARE)
+	for run: Array in _shade_runs:
+		draw_rect(Rect2(to_canvas(run[0]), Vector2.ONE * HiveArt.PIXEL), ink if run[1] else soft)
 
 
 ## The ring round each clump still in the air: dashes on an ellipse round where a press takes
 ## it, turning slowly and breathing in and out, a dark pixel under each so it reads on the sky.
 ## Not on the clump in hand, and none once the swarm is caught.
-func _draw_marks() -> void:
+func _draw_marks(ci: CanvasItem) -> void:
 	if _caught:
 		return
 	for c in CLUMPS:
@@ -598,54 +787,40 @@ func _draw_marks() -> void:
 		var half := Vector2(GRAB_REACH + breathe, (GRAB_REACH + breathe) / 1.6)
 		var steps := int(half.x * 2.4)
 		var turn := age * MARK_TURN + c
-		var glow := 0.65 + 0.25 * sin(age * MARK_RATE * 1.3 + c)
+		var glow := 0.55 + 0.2 * sin(age * MARK_RATE * 1.3 + c)
 		for s in steps:
 			var u := float(s) / steps
 			if fmod(u * 16.0 + turn, 2.0) > 1.1:
 				continue
 			var ang := TAU * u
 			var p := (_mid[c] + Vector2(cos(ang) * half.x, sin(ang) * half.y)).floor()
-			draw_rect(Rect2(to_canvas(p + Vector2(0.0, 1.0)), Vector2.ONE * HiveArt.PIXEL), Color(HiveArt.OUT, 0.35 * glow))
-			draw_rect(Rect2(to_canvas(p), Vector2.ONE * HiveArt.PIXEL), Color(HiveArt.HONEY_SHINE, glow))
+			ci.draw_rect(Rect2(to_canvas(p + Vector2(0.0, 1.0)), Vector2.ONE * HiveArt.PIXEL), Color(HiveArt.OUT, 0.3 * glow))
+			ci.draw_rect(Rect2(to_canvas(p), Vector2.ONE * HiveArt.PIXEL), Color(HiveArt.HONEY_SHINE, glow))
 
 
-## The five round comb cells on the box's front, centred on it: filled with bees one by one as
-## the box fills.
-func _draw_pips(feet: Vector2) -> void:
-	var tl := feet - (HiveArt.anchor(&"box", &"feet") if HiveArt.knows(&"box") else BOX_FEET)
-	var middle_x := feet.x
-	var lit := int(floorf(boxed_share() / ENOUGH * PIPS + 0.001))
-	for k in PIPS:
-		var at := Vector2(middle_x + (k - (PIPS - 1) * 0.5) * PIP_STEP, tl.y + PIP_Y)
-		var full := k < lit
-		_disc(at, PIP_R + 1.0, HiveArt.OUT)
-		_disc(at, PIP_R, HiveArt.HONEY if full else CELL_EMPTY)
-		if full:
-			_disc(at + Vector2(-1.0, -1.0), PIP_R - 2.0, HiveArt.HONEY_LIGHT)
-			_cell(at + Vector2(-3.0, -1.0), Vector2(6.0, 1.0), HiveArt.BEE_STRIPE)
-			_cell(at + Vector2(-3.0, 2.0), Vector2(6.0, 1.0), HiveArt.BEE_STRIPE)
-			_cell(at + Vector2(-2.0, -3.0), Vector2(2.0, 1.0), HiveArt.HONEY_SHINE)
-		else:
-			_disc(at + Vector2(1.0, 1.0), PIP_R - 2.0, Color(0.0, 0.0, 0.0, 0.25))
+## What the layer over the swarm draws: the rings and the shared ending.
+func _draw_front(ci: CanvasItem) -> void:
+	_draw_marks(ci)
+	draw_payoff(ci)
 
 
-## A filled round disc of whole painted px.
-func _disc(middle: Vector2, r: float, ink: Color) -> void:
-	_ellipse(middle + Vector2(0.5, 0.5), Vector2(r + 0.5, r + 0.5), ink)
+## The swarm's drawing, inside the CanvasGroup the outline shader reads.
+class SwarmLayer:
+	extends Node2D
+
+	var step: HiveStepCatch
+
+	func _draw() -> void:
+		if step != null:
+			step._draw_swarm(self)
 
 
-func _cell(at: Vector2, span: Vector2, ink: Color) -> void:
-	draw_rect(Rect2(to_canvas(at.floor()), span * HiveArt.PIXEL), ink)
+## Over the swarm: the rings round the clumps and the shared ending.
+class FrontLayer:
+	extends Control
 
+	var step: HiveStepCatch
 
-## A filled ellipse in whole painted-pixel rows.
-func _ellipse(middle: Vector2, half: Vector2, ink: Color) -> void:
-	var top := floori(middle.y - half.y)
-	for y in range(top, ceili(middle.y + half.y)):
-		var dy := (y + 0.5 - middle.y) / half.y
-		if absf(dy) >= 1.0:
-			continue
-		var w := half.x * sqrt(1.0 - dy * dy)
-		var from := roundf(middle.x - w)
-		draw_rect(Rect2(to_canvas(Vector2(from, y)), Vector2(roundf(middle.x + w) - from, 1.0) * HiveArt.PIXEL), ink)
-
+	func _draw() -> void:
+		if step != null:
+			step._draw_front(self)

@@ -49,7 +49,8 @@ const CHIPS := 3
 ## Sixteen verbs, five headings and the way back have to stand inside the 720-line design
 ## frame with the board's own wood round them, so the rows are shorter than the settings
 ## board's: at 28 and a 3 px gap the last plank fell off the bottom, and 26 went to 25 when
-## the camera's two verbs joined (2026-10-06).
+## the camera's two verbs joined (2026-10-06). With honey's verb (2026-10-16) the board wants
+## 678 of the 680: the next verb needs a row a pixel shorter, or a heading folded away.
 const ROW_TALL := 25.0
 const HEAD_TALL := 20.0
 const ROW_GAP := 2.0

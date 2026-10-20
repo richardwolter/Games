@@ -50,11 +50,9 @@ const OPEN_AT := 0.6
 const OPEN_CLEAR := 3.5
 ## Bees: at most this many, on the flowers whose rank is under this share of what has grown,
 ## one or two to a flower, circling its head. Tiny dots, drawn in one untextured batch.
-const BEES_MOST := 90
+## 50, down from 90 (2026-10-19, Richard: fewer bees in general).
+const BEES_MOST := 50
 const BEE_SHARE := 0.45
-const BEE_COLOR := Color(0.96, 0.8, 0.28)
-const BEE_BAND := Color(0.18, 0.13, 0.06)
-const BEE_WING := Color(0.93, 0.97, 0.98, 0.55)
 ## The plants a bee visits, by the start of the species' name.
 const BEE_HOSTS := ["flower_", "patch_", "tulip_", "daisies", "clover_", "shrub_flowering", "thrift", "beach_flower",
 	"pk_flower_", "pk_bed_"]
@@ -156,9 +154,9 @@ const STEM_WATER := [0.3, 0.48, 0.64]
 ## The flowers bees are circling, and each bee's seed. Parallel.
 var _bee_host := PackedInt32Array()
 var _bee_seed := PackedFloat32Array()
+## Where each bee was drawn last frame, the flora's own space (the ending's reel films one).
 var _bee_points := PackedVector2Array()
-var _bee_colors := PackedColorArray()
-var _bee_indices := PackedInt32Array()
+var _bee_batch := BeeBatch.new()
 ## The bees draw on a child of their own, so their frame-by-frame redraw does not send the
 ## whole plant batch again with them.
 var _bees: Bees
@@ -1018,7 +1016,9 @@ func cover(bodies: Array, front: bool = false) -> void:
 					var q := _quad_at[k]
 					if q < 0 or _foot[k].y <= feet_y:
 						continue
-					if Rect2(_points[q], _points[q + 2] - _points[q]).intersects(body):
+					var drawn := Rect2(_points[q], _points[q + 2] - _points[q])
+					# Not a plant behind a building: drawn again here it is over the building.
+					if drawn.intersects(body) and not Ground.behind_building(_foot[k], drawn):
 						seen[k] = true
 						picked.append(k)
 	picked.sort()
@@ -1106,16 +1106,15 @@ class BedShade:
 		)
 
 
-## Each bee circles its flower's head on a wobbling loop, on whole art pixels: a yellow dot,
-## a dark one behind it, and a pale wing pixel flicking over it. One untextured batch.
+## Each bee circles its flower's head on a wobbling loop: `BeeArt`'s mini bee (Richard, the
+## hive's overhaul 2026-10-18: "Bees A"), flapping, facing the way its loop carries it, on
+## whole world pixels. One textured batch off the bee sheet (`BeeBatch`).
 func _draw_bees(on: CanvasItem) -> void:
+	_bee_points.resize(0)
 	if _bee_host.is_empty():
 		return
-	_bee_points.resize(0)
-	_bee_colors.resize(0)
-	_bee_indices.resize(0)
+	_bee_batch.clear()
 	var now := float(Time.get_ticks_msec()) * 0.001
-	var flick := int(now * 18.0) % 2 == 0
 	var pulse := 0.0
 	if music != null:
 		var b := music.beat_clock()
@@ -1132,30 +1131,13 @@ func _draw_bees(on: CanvasItem) -> void:
 		var rx := 5.0 + fmod(seed, 5.0)
 		var ry := 3.0 + fmod(seed * 1.7, 3.0)
 		var a := now * (2.2 + fmod(seed, 1.3)) + seed + pulse
-		var at := head + Vector2(cos(a) * rx + sin(a * 2.3) * 2.0, sin(a * 1.6) * ry - 2.0)
-		at = (at / ART).floor() * ART
-		# The dark band trails the way it is flying.
-		var back := Vector2(signf(sin(a)), 0.0) * ART
-		_bee_quad(at, BEE_COLOR)
-		_bee_quad(at + back, BEE_BAND)
-		if flick:
-			_bee_quad(at + Vector2(0.0, -ART), BEE_WING)
-	if _bee_indices.is_empty():
-		return
-	RenderingServer.canvas_item_add_triangle_array(
-		on.get_canvas_item(), _bee_indices, _bee_points, _bee_colors
-	)
-
-
-func _bee_quad(at: Vector2, color: Color) -> void:
-	var base := _bee_points.size()
-	_bee_points.append(at)
-	_bee_points.append(at + Vector2(ART, 0.0))
-	_bee_points.append(at + Vector2(ART, ART))
-	_bee_points.append(at + Vector2(0.0, ART))
-	for n in 4:
-		_bee_colors.append(color)
-	_bee_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+		var at := head + Vector2(cos(a) * rx + sin(a * 2.3) * 2.0, sin(a * 1.6) * ry - 4.0)
+		# Which way the loop carries it across: the angle only ever climbs, so the sign of the
+		# x position's slope against it is the way the bee is going.
+		var going := -sin(a) * rx + cos(a * 2.3) * 4.6
+		_bee_batch.animate(&"mini_fly", now + seed, at, going < 0.0)
+		_bee_points.append(at.floor())
+	_bee_batch.flush(on)
 
 
 func _hash(x: float, y: float) -> float:

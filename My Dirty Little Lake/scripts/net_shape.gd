@@ -102,6 +102,23 @@ const BURST_TAIL := 1.2
 const BURST_FADE := 0.35
 const GLINT_WIDE := 0.24
 
+## A net under honey (2026-10-16, `/grill-me` with Richard; `Lake.HONEY_TIME`): the rim cord
+## and its beads go amber; the mesh stays tan, as a lucky net's does. **The gold wins** where a
+## cast is both: `push` says honey only for a net that is not gold, and the drips
+## (`CastNet.HoneyDrips`) still fall. **The hive's own honey** (2026-10-18, Richard's pick 2A
+## off `tools/hive_look/last_honey.png`): one honey for the rim, the jar, the coin and the
+## drips, a step down from the jar's (`HiveArt.HONEY_*`) so it is orange where the lucky rim is
+## yellow. The cord's lit row is the honey itself, its body the honey's mid, the beads the
+## honey's deep lit with the honey and shaded with the deep taken towards the outline, and the
+## shade under them that deep taken further. **Mirrored in `net_mesh.gdshader`'s defaults.**
+const AMBER_DEEP := Color8(115, 57, 13)
+const AMBER_LOW := Color8(150, 72, 12)
+const AMBER := Color8(206, 120, 22)
+const AMBER_LIT := Color8(238, 164, 38)
+const AMBER_SHADE := Color8(77, 41, 15)
+## The honeyed rim cord's depth either side of its line: the lucky rim's three pixels.
+const AMBER_RIM_HALF := 1.5
+
 ## Half-width of the mouth as drawn, in world px, and the open mouth the cells are cut for.
 var w: float = 40.0
 var w_open: float = 40.0
@@ -123,6 +140,8 @@ var flutter: float = 0.0
 var trail := Vector2(1.0, 0.0)
 var flap: float = 0.0
 var gold: bool = false
+## The net is honeyed: amber rim and beads, unless it is gold too (`push`).
+var honey: bool = false
 ## Seconds since a lucky net landed (the burst), and the glint's phase 0 to 1; -1 for none.
 var landed: float = -1.0
 var glint: float = -1.0
@@ -194,7 +213,14 @@ func push(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter(&"landed", landed)
 	mat.set_shader_parameter(&"glint", glint)
 	mat.set_shader_parameter(&"fade_cells", FADE_CELLS)
-	mat.set_shader_parameter(&"rim_half", GOLD_RIM_HALF if gold else 1.0)
+	mat.set_shader_parameter(&"rim_half", GOLD_RIM_HALF if gold else (AMBER_RIM_HALF if honey else 1.0))
+	# Honey only where the gold is not: the shader then needs no rule of its own for the two.
+	mat.set_shader_parameter(&"honey", 1.0 if honey and not gold else 0.0)
+	mat.set_shader_parameter(&"amber_deep", AMBER_DEEP)
+	mat.set_shader_parameter(&"amber_low", AMBER_LOW)
+	mat.set_shader_parameter(&"amber", AMBER)
+	mat.set_shader_parameter(&"amber_lit", AMBER_LIT)
+	mat.set_shader_parameter(&"amber_shade", AMBER_SHADE)
 	mat.set_shader_parameter(&"gold_deep", GOLD_DEEP)
 	mat.set_shader_parameter(&"gold_low", GOLD_LOW)
 	mat.set_shader_parameter(&"gold", GOLD)

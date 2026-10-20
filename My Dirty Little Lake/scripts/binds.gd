@@ -77,6 +77,13 @@ const ACTIONS := [
 		# switch verb was folded into it. On the pad in the house, A uses and Y picks up.
 		"contexts": [CONTEXT_LAKE, CONTEXT_SHED], "key": "key:69", "pad": "pad:0", "extra": [],
 	},
+	# A jar of honey eaten (2026-10-16, `Lake.HONEY_TIME`): H, and the D-pad's up, which is
+	# free on the bare lake (it only steps the focus while a board is up, and the lake will
+	# not eat under one). Among the net's verbs, as the honey is what the net's catch pays.
+	{
+		"action": &"eat_honey", "label": "VERB_EAT_HONEY", "group": "BIND_GROUP_NET",
+		"contexts": [CONTEXT_LAKE], "key": "key:72", "pad": "pad:11", "extra": [],
+	},
 	{
 		"action": &"open_shed", "label": "VERB_OPEN_SHED", "group": "BIND_GROUP_OPEN",
 		"contexts": [CONTEXT_LAKE], "key": "key:67", "pad": "pad:2", "extra": [],
@@ -312,6 +319,30 @@ static func load_from(cfg: ConfigFile) -> void:
 		var over: Dictionary = _set.get(action, {})
 		over[column] = written
 		_set[action] = over
+	_settle_new_defaults()
+
+
+## A default added since the file was written may land on a binding the player gave another
+## verb back then (2026-10-16: H and the D-pad's up went to `eat_honey`, where a player may
+## have put the house or a zoom), and the two would answer one press in one context. **The
+## player's choice stands** and the verb still on its default takes what the board's swap
+## would have handed it: the other verb's own default, if nobody else in its contexts holds
+## that, else nothing. Only a holder still on its default is moved; two overrides on one
+## event were the player's to make. Nothing is written back: it is worked out on every load.
+static func _settle_new_defaults() -> void:
+	for action: StringName in _set.keys():
+		var over: Dictionary = _set.get(action, {})
+		for column: String in over.keys():
+			var event := String(over[column])
+			# More than one verb's new default may sit on it; each is moved in turn.
+			for guard in ACTIONS.size():
+				var holder := holder_of(action, column, event)
+				if holder == &"" or (_set.get(holder, {}) as Dictionary).has(column):
+					break
+				var given := String(row_of(action).get(column, ""))
+				if given == event or holder_of(holder, column, given) != &"":
+					given = ""
+				_write(holder, column, given)
 
 
 static func save_to(cfg: ConfigFile) -> void:

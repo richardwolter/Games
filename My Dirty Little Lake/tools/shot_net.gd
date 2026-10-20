@@ -41,6 +41,10 @@ var _film := OS.get_environment("NET_FILM") == "1"
 var _film_frame := 0
 const FILM_SECONDS := 2.8
 const FILM_SIZE := Vector2i(560, 360)
+## NET_HONEY=1: every cast under honey (2026-10-16), the lake's own window held open each
+## frame, so the amber rim and the drips are photographed (the lucky casts show the gold
+## winning over it). Set on the lake, not the net: the lake tells the nets every frame.
+var _honey := OS.get_environment("NET_HONEY") == "1"
 
 
 func _ready() -> void:
@@ -62,6 +66,8 @@ func _say(line: String) -> void:
 
 func _physics_process(delta: float) -> void:
 	_frames += 1
+	if _honey and _main != null:
+		_main.set(&"_honey_left", 60.0)
 	if Time.get_ticks_msec() - _started > QUIT_AFTER_MS:
 		_say("FAIL out of time")
 		get_tree().quit(1)
@@ -77,6 +83,14 @@ func _physics_process(delta: float) -> void:
 		return
 	if _frames < 30:
 		return
+	# The view held on the net, every frame (2026-10-18): since the cast
+	# stopped following the net (`Lake.CAST_FOLLOW` false, 2026-10-11) a long throw at the near
+	# zoom lands off the window and the crops round it came out empty. Pinned once it drifted
+	# off with the free camera's edge scroll (the pointer sits wherever the desktop left it).
+	if not _film and _net.state != CastNet.State.IDLE:
+		_main.set(&"_mouse_inside", false)
+		_main.set(&"_free_view", true)
+		_main.set(&"_free_at", _net.draw_at())
 	if not _picture_saved:
 		var lent: Dictionary = (_main.get(&"_skin") as Node).get(&"sprites").get("net", {})
 		if lent.has("sheet"):
@@ -152,11 +166,17 @@ func _take(moment: String) -> void:
 	var middle := Vector2i(on_canvas * over)
 	var half := Vector2i(Vector2(_net.open_extent() * 1.8 + 60.0, _net.open_extent() + 60.0) * get_viewport().get_canvas_transform().get_scale() * over)
 	var rect := Rect2i(middle - half, half * 2).intersection(Rect2i(Vector2i.ZERO, shot.get_size()))
+	if rect.size.x <= 0 or rect.size.y <= 0:
+		# The first frames of the first throw, before the held view has caught up with it.
+		_say("%d %s: off screen, on canvas %s" % [_cast, moment, str(on_canvas)])
+		_shots.append(Image.create(maxi(half.x * 2, 1), maxi(half.y * 2, 1), false, Image.FORMAT_RGBA8))
+		return
 	var crop := shot.get_region(rect)
 	crop.save_png("res://tools/last_net_%d_%s.png" % [_cast, moment])
 	_shots.append(crop)
-	_say("%d %s: state %d, lean %.2f, catch %d, mouth %.1f" % [
-		_cast, moment, _net.state, float(_net.get(&"_lean")), _net.catch.size(), _net.mouth_extent()])
+	_say("%d %s: state %d, lean %.2f, catch %d, mouth %.1f, on canvas %s, crop %s" % [
+		_cast, moment, _net.state, float(_net.get(&"_lean")), _net.catch.size(), _net.mouth_extent(),
+		str(on_canvas), str(rect)])
 
 
 func _finish() -> void:

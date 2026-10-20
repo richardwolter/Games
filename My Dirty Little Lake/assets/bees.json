@@ -1,0 +1,416 @@
+{
+ "sheet": "res://assets/bees.png",
+ "variant": "A",
+ "canvas": {
+  "worker": [
+   16,
+   16
+  ],
+  "mini": [
+   12,
+   11
+  ],
+  "queen": [
+   21,
+   16
+  ]
+ },
+ "loops": {
+  "worker_fly": 6,
+  "worker_hover": 3,
+  "worker_walk": 2,
+  "worker_rest": 4,
+  "worker_walkback": 2,
+  "worker_restback": 4,
+  "mini_fly": 6,
+  "mini_rest": 1,
+  "queen_walk": 2,
+  "queen_lay": 1
+ },
+ "held": {
+  "worker_fly": 0.05,
+  "worker_hover": 0.05,
+  "worker_walk": 0.14,
+  "worker_rest": 0.45,
+  "worker_walkback": 0.14,
+  "worker_restback": 0.45,
+  "mini_fly": 0.05,
+  "mini_rest": 0.5,
+  "queen_walk": 0.28,
+  "queen_lay": 0.5
+ },
+ "frames": {
+  "worker_fly0": {
+   "rect": [
+    1,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_fly1": {
+   "rect": [
+    18,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_fly2": {
+   "rect": [
+    35,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_fly3": {
+   "rect": [
+    52,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    8
+   ]
+  },
+  "worker_fly4": {
+   "rect": [
+    69,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    8
+   ]
+  },
+  "worker_fly5": {
+   "rect": [
+    86,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    8
+   ]
+  },
+  "worker_hover0": {
+   "rect": [
+    103,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_hover1": {
+   "rect": [
+    120,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_hover2": {
+   "rect": [
+    137,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_walk0": {
+   "rect": [
+    154,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_walk1": {
+   "rect": [
+    171,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_rest0": {
+   "rect": [
+    188,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_rest1": {
+   "rect": [
+    205,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_rest2": {
+   "rect": [
+    222,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_rest3": {
+   "rect": [
+    239,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_walkback0": {
+   "rect": [
+    256,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_walkback1": {
+   "rect": [
+    273,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_restback0": {
+   "rect": [
+    290,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_restback1": {
+   "rect": [
+    307,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_restback2": {
+   "rect": [
+    324,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "worker_restback3": {
+   "rect": [
+    341,
+    1,
+    16,
+    16
+   ],
+   "anchor": [
+    8,
+    9
+   ]
+  },
+  "mini_fly0": {
+   "rect": [
+    1,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    7
+   ]
+  },
+  "mini_fly1": {
+   "rect": [
+    14,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    7
+   ]
+  },
+  "mini_fly2": {
+   "rect": [
+    27,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    7
+   ]
+  },
+  "mini_fly3": {
+   "rect": [
+    40,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    6
+   ]
+  },
+  "mini_fly4": {
+   "rect": [
+    53,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    6
+   ]
+  },
+  "mini_fly5": {
+   "rect": [
+    66,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    6
+   ]
+  },
+  "mini_rest0": {
+   "rect": [
+    79,
+    18,
+    12,
+    11
+   ],
+   "anchor": [
+    6,
+    7
+   ]
+  },
+  "queen_walk0": {
+   "rect": [
+    1,
+    30,
+    21,
+    16
+   ],
+   "anchor": [
+    10,
+    9
+   ]
+  },
+  "queen_walk1": {
+   "rect": [
+    23,
+    30,
+    21,
+    16
+   ],
+   "anchor": [
+    10,
+    9
+   ]
+  },
+  "queen_lay0": {
+   "rect": [
+    45,
+    30,
+    21,
+    16
+   ],
+   "anchor": [
+    10,
+    9
+   ]
+  }
+ }
+}

@@ -9,6 +9,13 @@
 ## `assets/sfx/hive_puff_1.wav` (or `hive_whirr.ogg`) into the folder is all a recording
 ## needs to win.
 ##
+## **The buzz is recorded now** (2026-10-18, Richard: the bees' buzz "grates most"):
+## `hive_hum.wav` and `hive_swarm_1..3.wav` are Nuven's bee fly-by layered by
+## `tools/build_sfx.py` (`colony`, `swarm`), so `_colony_buzz` and `_swarm` only run where
+## those files are missing. The knife's sizzle is a recording too since 2026-10-19
+## (`hive_sizzle.wav`, Clearwavsound's "Hot Knife in Butter", CC BY 3.0), so `_sizzle` is the
+## fallback; the crackle (`hive_crackle`) is still built here.
+##
 ## **Seeded, never rolled at boot.** `Sfx._rng` is randomised in its `_ready`, and a take drawn
 ## from it would be a different sound every session. Every builder makes its own generator off
 ## a fixed seed, so a take is the same take on every run and a harness hears what a player

@@ -58,6 +58,16 @@ uniform vec4 gold_lit : source_color = vec4(1.0, 0.886, 0.502, 1.0);
 uniform vec4 gold_pale : source_color = vec4(1.0, 0.957, 0.769, 1.0);
 uniform vec4 gold_shade : source_color = vec4(0.275, 0.157, 0.031, 1.0);
 
+// A net under honey (NetShape says why): the rim cord and the beads go amber; the mesh stays
+// tan. NetShape only sets `honey` on a net that is not lucky, and the gold is asked first
+// below as well, so the two never mix.
+uniform float honey = 0.0;
+uniform vec4 amber_deep : source_color = vec4(0.451, 0.224, 0.051, 1.0);
+uniform vec4 amber_low : source_color = vec4(0.588, 0.282, 0.047, 1.0);
+uniform vec4 amber : source_color = vec4(0.808, 0.471, 0.086, 1.0);
+uniform vec4 amber_lit : source_color = vec4(0.933, 0.643, 0.149, 1.0);
+uniform vec4 amber_shade : source_color = vec4(0.302, 0.161, 0.059, 1.0);
+
 // NetShape's burst and glint numbers, again.
 const float BURST_RUN = 0.4;
 const float BURST_TAIL = 1.2;
@@ -244,6 +254,7 @@ void fragment() {
 	int above = cls(up, gr, gt);
 	vec4 col;
 	bool luck = lucky > 0.5;
+	bool sweet = honey > 0.5 && !luck;
 	float shine = luck ? glint_at(floor(local) + 0.5) : 0.0;
 	if (c == STRAND) {
 		col = face > 0.5 ? cord : cord_back;
@@ -266,23 +277,25 @@ void fragment() {
 		if (luck) {
 			col = face < 0.5 ? gold_low : (top ? gold_lit : gold);
 			col = mix(col, vec4(1.0), max(burst_at(here.y), shine));
+		} else if (sweet) {
+			col = face < 0.5 ? amber_low : (top ? amber_lit : amber);
 		}
 	} else if (c == KNOT) {
 		col = cord_lit;
 	} else if (c == BEAD) {
 		float flash = luck ? max(burst_at(here.y), shine) : 0.0;
-		col = luck ? mix(gold_low, vec4(1.0), flash) : lead_mid;
+		col = luck ? mix(gold_low, vec4(1.0), flash) : (sweet ? amber_low : lead_mid);
 		if (above == RING) {
-			col = luck ? mix(gold_lit, vec4(1.0), flash) : lead_lit;
+			col = luck ? mix(gold_lit, vec4(1.0), flash) : (sweet ? amber_lit : lead_lit);
 		} else if (cls(down, gr, gt) == RING) {
-			col = luck ? mix(gold_deep, gold_lit, flash) : lead_dark;
+			col = luck ? mix(gold_deep, gold_lit, flash) : (sweet ? amber_deep : lead_dark);
 		}
 	} else if (c == RING) {
-		col = luck ? gold_shade : shade;
+		col = luck ? gold_shade : (sweet ? amber_shade : shade);
 	} else if (above == STRAND || above == KNOT) {
 		col = shade;
 	} else if (above == RIM) {
-		col = luck ? gold_shade : shade;
+		col = luck ? gold_shade : (sweet ? amber_shade : shade);
 	} else {
 		discard;
 	}

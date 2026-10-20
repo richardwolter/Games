@@ -154,6 +154,58 @@ const FERRY_BOAT_SINK := 3.0
 const FERRY_BOB := 1.3
 var _ferry_clock := 0.0
 
+## The jar plate (2026-10-16, `/grill-me` with Richard; `Lake.HONEY_TIME`): the hive's jars of
+## honey, eaten for a window of better pay. **A third slab in the top-left column**, under the
+## money plate, in the same oak border, shown only while there is a jar to eat or a window
+## running (never in the demo: the lake hands it nothing there). A click eats one
+## (`honey_pressed`).
+##
+## **The medallion slab** (2026-10-18, Richard's pick 1A off `tools/hive_look/last_honey.png`):
+## the money plate's grammar, the picture, the figure on its sunk panel, the key, and no word
+## (the jar says it, and it is one string fewer in eight languages). The face is the comb's
+## brown with a faint honeycomb pressed into it. Over the slab's left end, wood and all, a round
+## medallion with **the honey pot** standing in its well (`HoneyPot.draw_hud`, the one jar the
+## hive's rooms, the shelf and the cue card draw): lidded and full while it waits; eaten, the
+## same jar with its lid off and a dipper in it, its honey the time left, and the ring round the
+## well draining clockwise from twelve o'clock in gold (`_medal`). Idle the ring is an empty
+## groove. The count stands on a narrow sunk panel, the eat key in a 22 px box beside it (the
+## house's wood chip, or the pad's glyph alone in the same box), so the plate never moves
+## between devices. The slab is only as long as those three need.
+## The plate's height, the medallion's radius over the slab's left end, the count's panel.
+const HONEY_TALL := MONEY_TALL
+const HONEY_MEDAL := 20
+const HONEY_PANEL_WIDE := 44.0
+## The key's box, one size for both devices.
+const HONEY_CHIP := 22.0
+## The gaps: medallion to panel, panel to key, key to the right wall.
+const HONEY_GAPS := Vector3(5.0, 7.0, 5.0)
+## The ring: its thickness inside the medallion, and how many steps its drain is drawn in.
+const HONEY_RING := 3
+const HONEY_RING_STEPS := 96
+## Colours: the comb's browns (the hive's honey a long way down towards the outline, mixes of
+## in-game swatches), the ring's gold and its shine, the count's ink and drawn back with no jar
+## left (the window still running). Both inks clear 4.5:1 on `HONEY_PANEL`.
+const HONEY_OUTLINE := Color8(24, 18, 17)
+const HONEY_FACE := Color8(84, 44, 15)
+const HONEY_CELL := Color8(102, 51, 14)
+const HONEY_CELL_DIM := Color8(93, 48, 14)
+const HONEY_PANEL := Color8(57, 32, 16)
+const HONEY_WELL := Color8(74, 40, 15)
+const HONEY_INK := Color8(252, 204, 84)
+const HONEY_INK_DIM := Color(0.68, 0.53, 0.33)
+
+## Emitted when the jar plate is clicked. The lake decides whether a jar is eaten.
+signal honey_pressed
+## Jars held, seconds of honey left, and the whole window those seconds were eaten into (the
+## drain is `honey_left / honey_span`). Set by the lake every frame; 0 and 0 hide the plate.
+var honey_jars: int = 0
+var honey_left: float = 0.0
+var honey_span: float = 0.0
+var _honey_box := Rect2()
+## The plate's baked pictures: its comb face by size, its medallion by drain step.
+var _honey_combs := {}
+var _honey_medals := {}
+
 ## How many upgrades can be paid for right now. Drawn as a tag under the upgrades button:
 ## the money plate says what the player has and the shop says what things cost, and this is
 ## the one line that puts those two together without the shop being open.
@@ -359,6 +411,8 @@ func _lay_out() -> void:
 	_money_box = Rect2(
 		_stock_box.position.x, _stock_box.position.y + STOCK_TALL + GAP, stock_wide, MONEY_TALL
 	)
+	# And the jar plate under that, left edge on the column's, only as long as it needs.
+	_honey_box = Rect2(_money_box.position.x, _money_box.end.y + GAP, _honey_wide(), HONEY_TALL)
 	queue_redraw()
 
 
@@ -512,16 +566,44 @@ func _gui_input(event: InputEvent) -> void:
 			Sfx.ui(&"ui_click")
 			upgrades_pressed.emit()
 			accept_event()
+		&"honey":
+			# Taken here, so the click on the plate is never also a cast on the lake under it.
+			Sfx.ui(&"ui_click")
+			honey_pressed.emit()
+			accept_event()
 
 
 ## Which button, if any, is under a point. The money button is a readout rather than a
-## control, so it is not offered.
+## control, so it is not offered. The jar plate is, while it is shown.
 func _under(at: Vector2) -> StringName:
 	if _shed_box.has_point(at):
 		return &"shed"
 	if _upgrades_box.has_point(at):
 		return &"upgrades"
+	if honey_shown() and _honey_hit().has_point(at):
+		return &"honey"
 	return &""
+
+
+## What a press on the jar plate covers: the plate, and while a window runs the drain hung
+## under it as well, ringed seam and all. The bar reads as part of the control, so a press on
+## it eats rather than falling through to the lake and throwing the net at the corner.
+func _honey_hit() -> Rect2:
+	if honey_left <= 0.0:
+		return _honey_box
+	return _honey_box.merge(honey_bar_box().grow(1.0))
+
+
+## Whether the jar plate is drawn: a jar to eat or a window running, and not in the wash
+## room's two-plate view.
+func honey_shown() -> bool:
+	return not plates_only and (honey_jars > 0 or honey_left > 0.0)
+
+
+## The jar plate's box, in the skin's own pixels, or an empty one while it is not shown: what
+## the first jar's hint points at, and what the harness measures.
+func honey_box() -> Rect2:
+	return _honey_box if honey_shown() else Rect2()
 
 
 ## Ask for a repaint, but only when the picture would come out different.
@@ -545,8 +627,18 @@ func _paint_key() -> int:
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
 		stock, available, hint, _hovered, plates_only,
-		roundi(ferry_trip * 200.0), roundi(ferry_fill * 200.0), _ferry_bob()
+		roundi(ferry_trip * 200.0), roundi(ferry_fill * 200.0), _ferry_bob(),
+		_honey_key()
 	])
+
+
+## The jar plate's part of the picture: the count, the drain to the pixel, and what the key
+## chip says (read off the binds, not off `Binds.shown`, which asks the OS for a label).
+func _honey_key() -> Array:
+	if not honey_shown():
+		return [false]
+	return [honey_jars, roundi(_honey_share() * float(HONEY_RING_STEPS)), HoneyPot.hud_level(_honey_share()) if honey_left > 0.0 else -1,
+		Binds.bound(&"eat_honey", "key"), Binds.bound(&"eat_honey", "pad"), Pad.is_pad()]
 
 
 func _spent_key() -> int:
@@ -570,10 +662,12 @@ func _draw() -> void:
 	# wood — the plate itself does not move. See `HudButtons.draw_money`.
 	# Warmed rather than blown out: the coin is already the brightest thing on the plate, and
 	# multiplying it half again pushes it past white and out the other side into green.
+	# Its spend tags wait for the end: they fall across the jar plate under it (2026-10-16).
+	var money: Array = []
 	if not _purse_up():
-		_draw_money(
+		money = _draw_money(
 			self, _money_box, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()),
-			1.0 + SHINE_SWELL * _ease_shine()
+			1.0 + SHINE_SWELL * _ease_shine(), false
 		)
 	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
 	# is a wooden sign, not a web page.
@@ -591,6 +685,10 @@ func _draw() -> void:
 		(_motes[name] as HudButtons.Motes).draw(self)
 	_draw_stock()
 	_draw_ferry_bar()
+	# After the squash is put straight: the jar is fitted with `HudButtons.fit`, which reads it.
+	_draw_honey()
+	if not money.is_empty():
+		_draw_spent(self, money[0] as Rect2, int(money[1]), float(money[2]))
 	# The hint is its own node over the meter's sheets. See `HintLine`.
 	_place_hint()
 
@@ -1032,6 +1130,180 @@ func _ferry_bob() -> int:
 	return 1 if sin(_ferry_clock * TAU * FERRY_BOB) > 0.0 else 0
 
 
+## How much of the honey window is left, 1 just eaten to 0 run out.
+func _honey_share() -> float:
+	if honey_left <= 0.0:
+		return 0.0
+	return clampf(honey_left / maxf(honey_span, honey_left), 0.0, 1.0)
+
+
+## The plate's width: the medallion, the count's panel, the key and the wood round them.
+static func _honey_wide() -> float:
+	return (1.0 + float(HONEY_MEDAL * 2) + HONEY_GAPS.x + HONEY_PANEL_WIDE + HONEY_GAPS.y
+		+ HONEY_CHIP + HONEY_GAPS.z + float(Style.BORDER_WALL))
+
+
+## The medallion's middle: on a pixel corner, over the slab's left end.
+func _honey_medal_at(box: Rect2) -> Vector2:
+	return Vector2(floorf(box.position.x) + float(HONEY_MEDAL) + 1.0,
+		floorf(box.position.y) + floorf(box.size.y * 0.5))
+
+
+## Where the drain is drawn: the ring round the medallion, which is part of the plate.
+func honey_bar_box() -> Rect2:
+	var mid := _honey_medal_at(_honey_box)
+	var r := float(HONEY_MEDAL)
+	return Rect2(mid - Vector2(r, r), Vector2(r, r) * 2.0)
+
+
+## The jar plate: the comb face in the oak border, the medallion with the honey pot and its
+## draining ring, the count on its panel and the eat key.
+func _draw_honey() -> void:
+	if not honey_shown():
+		return
+	var box := _lifted(_honey_box, &"honey")
+	var hovered := _hovered == &"honey"
+	var tint := Style.HOVER_WASH if hovered else Color.WHITE
+	var face: Rect2
+	if Style.border_fits(box):
+		face = Style.border_inset(box)
+		var comb := _honey_comb(face.size)
+		draw_texture(comb, face.position - Vector2(2.0, 2.0), tint)
+		Style.meter_frame(self, box, tint)
+	else:
+		face = HudButtons.board(self, box, hovered, HONEY_FACE)
+	var mid := _honey_medal_at(box)
+	var running := honey_left > 0.0
+	var step := roundi(_honey_share() * float(HONEY_RING_STEPS)) if running else 0
+	var medal := _honey_medal(step)
+	draw_texture(medal, mid - Vector2(medal.get_size()) * 0.5, tint)
+	# The sealed jar stands centred in the well on its body, the same pot as the cue card's.
+	var feet := mid + Vector2(0.0, 9.0)
+	if HoneyPot.ready():
+		HoneyPot.draw_hud(self, feet, _honey_share() if running else -1.0)
+	else:
+		_draw_jar_cells(Rect2(mid - Vector2(10.0, 11.0), Vector2(20.0, 22.0)))
+	var panel := Rect2(
+		Vector2(mid.x + float(HONEY_MEDAL) + HONEY_GAPS.x, face.position.y + 2.0),
+		Vector2(HONEY_PANEL_WIDE, face.size.y - 4.0)
+	)
+	HudButtons.sunk(self, panel, HONEY_PANEL)
+	var size := Style.TEXT_HEAD
+	Style.write(
+		self, "%d" % honey_jars, size,
+		Vector2(0.0, panel.get_center().y + float(size) * 0.35),
+		HONEY_INK if honey_jars > 0 else HONEY_INK_DIM, HORIZONTAL_ALIGNMENT_CENTER, panel
+	)
+	var chip := Rect2(
+		Vector2(panel.end.x + HONEY_GAPS.y, floorf(box.position.y + (box.size.y - HONEY_CHIP) * 0.5)),
+		Vector2(HONEY_CHIP, HONEY_CHIP)
+	)
+	_draw_honey_chip(chip)
+
+
+## The eat key in its box: the house's own key chip (`ShedRoom._draw_key`: the wood at 0.85
+## over what is under it, a pale rim, the key in ink), or the pad's glyph standing alone in
+## the same box in pad mode, at whole screen pixels.
+func _draw_honey_chip(chip: Rect2) -> void:
+	var shown := Binds.shown(&"eat_honey", Pad.is_pad())
+	var glyph := Glyphs.lone(shown)
+	if glyph != null:
+		Glyphs.draw_centred(self, glyph, chip.get_center())
+		return
+	draw_rect(chip, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.85), true)
+	draw_rect(chip.grow(-0.5), Style.INK_DIM, false, 1.0)
+	var size := Style.TEXT_BODY
+	if Style.measure(shown, size).x > chip.size.x - 4.0:
+		size = Style.TEXT_SMALL
+	Style.write(
+		self, shown, size, Vector2(0.0, chip.get_center().y + float(size) * 0.36),
+		Style.INK, HORIZONTAL_ALIGNMENT_CENTER, chip
+	)
+
+
+## The plate's face, `size` of it, grown two pixels under the wood: the comb's brown with a
+## honeycomb pressed into it, hex cells six wide on rows four apart, whole pixels. Baked once.
+func _honey_comb(size: Vector2) -> Texture2D:
+	var key := Vector2i(size)
+	if _honey_combs.has(key):
+		return _honey_combs[key]
+	var w := key.x
+	var h := key.y
+	var image := Image.create(w + 4, h + 4, false, Image.FORMAT_RGBA8)
+	image.fill(HONEY_FACE)
+	var hexa := [".xx.", "x..x", "x..x", ".xx."]
+	for r in range(-1, h / 4 + 2):
+		for c in range(-1, w / 6 + 2):
+			var ox := c * 6 + (3 if posmod(r, 2) == 1 else 0)
+			var oy := r * 4 - 1
+			for j in hexa.size():
+				var row: String = hexa[j]
+				for i in row.length():
+					var x := ox + i
+					var y := oy + j
+					if row[i] == "x" and x >= 0 and x < w and y >= 0 and y < h:
+						image.set_pixel(x + 2, y + 2, HONEY_CELL_DIM)
+	var tex := ImageTexture.create_from_image(image)
+	_honey_combs[key] = tex
+	return tex
+
+
+## The medallion at drain step `step` of `HONEY_RING_STEPS` (0 is the empty groove): a disc in
+## the outline over the slab's end, the well the jar stands in, and the ring round the well,
+## its gold arc `step` of the way round clockwise from twelve o'clock, the leading pixel its
+## shine, the drained arc a dark groove. Baked once a step.
+func _honey_medal(step: int) -> Texture2D:
+	if _honey_medals.has(step):
+		return _honey_medals[step]
+	var outer := HONEY_MEDAL
+	var side := (outer + 2) * 2
+	var c := float(outer + 2)
+	var r_out := float(outer - 1)
+	var inner := r_out - float(HONEY_RING) - 1.0
+	var share := float(step) / float(HONEY_RING_STEPS)
+	var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
+	for y in side:
+		for x in side:
+			var dx := float(x) + 0.5 - c
+			var dy := float(y) + 0.5 - c
+			var r := sqrt(dx * dx + dy * dy)
+			if r >= float(outer) + 1.0:
+				continue
+			var col := HONEY_OUTLINE if r >= float(outer) else HONEY_FACE
+			if r < inner:
+				col = HONEY_WELL
+			if r >= r_out - float(HONEY_RING) and r < r_out:
+				var a := fposmod(atan2(dx, -dy) / TAU, 1.0)
+				if a < share:
+					if share - a < 0.045 and share < 0.999:
+						col = HiveArt.HONEY_SHINE
+					else:
+						col = HiveArt.HONEY_LIGHT if dy < 0.5 else HiveArt.HONEY
+				else:
+					col = Style.SEAM
+			elif (r >= r_out and r < r_out + 1.0) or (r >= inner and r < inner + 1.0):
+				col = HONEY_OUTLINE
+			image.set_pixel(x, y, col)
+	var tex := ImageTexture.create_from_image(image)
+	_honey_medals[step] = tex
+	return tex
+
+
+## A jar in whole pixels, for when the hive's sheet is not there to lend one: glass, honey to
+## the shoulder and a lid. Returns where it went.
+func _draw_jar_cells(room: Rect2) -> Rect2:
+	var cell := maxf(floorf(room.size.y / 11.0), 1.0)
+	var size := Vector2(7.0, 10.0) * cell
+	var at := (room.position + Vector2((room.size.x - size.x) * 0.5, room.size.y - size.y)).round()
+	draw_rect(Rect2(at + Vector2(cell, 0.0), Vector2(5.0, 2.0) * cell), Style.SEAM, true)
+	draw_rect(Rect2(at + Vector2(2.0, 0.5) * cell, Vector2(3.0, 1.0) * cell), Style.WOOD_PALE, true)
+	draw_rect(Rect2(at + Vector2(0.0, 2.0) * cell, Vector2(7.0, 8.0) * cell), Style.SEAM, true)
+	var ink := HiveArt.HONEY if honey_jars > 0 else Style.INK_DIM
+	draw_rect(Rect2(at + Vector2(1.0, 3.0) * cell, Vector2(5.0, 6.0) * cell), ink, true)
+	draw_rect(Rect2(at + Vector2(1.0, 3.0) * cell, Vector2(1.0, 4.0) * cell), HiveArt.HONEY_LIGHT, true)
+	return Rect2(at, size)
+
+
 func _draw_stock() -> void:
 	var box := _stock_box
 	# The meter's border round the box's own brown, the same wood the three buttons wear.
@@ -1172,8 +1444,11 @@ static func fitted_size(text: String, height: int, room: float) -> int:
 	return Style.TEXT_TINY
 
 
-## The money plate: the coin, the sunken panel, and the live figure on it.
-func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float) -> void:
+## The money plate: the coin, the sunken panel, and the live figure on it, and the spend tags
+## falling off it unless `tags` is false. Returns `[panel, size, baseline]` for a caller that
+## draws the tags itself later (`_draw_spent`): the corner plate does, after the jar plate,
+## which the tags fall across.
+func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float, tags := true) -> Array:
 	var plate := HudButtons.draw_money(on, box, wash, swell)
 	# The running figure, not the real one: the plate is meant to be watched climbing. It
 	# wears its "$" (2026-10-09, Richard), and drops a rung rather than run off the panel.
@@ -1202,6 +1477,14 @@ func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float) -> void:
 		HORIZONTAL_ALIGNMENT_CENTER,
 		plate
 	)
+	if tags:
+		_draw_spent(on, plate, height, baseline)
+	return [plate, height, baseline]
+
+
+## The red "-$X" tags dropping off the money plate's `plate` panel, written at `height` under
+## the figure's `baseline`.
+func _draw_spent(on: CanvasItem, plate: Rect2, height: int, baseline: float) -> void:
 	for tag: Dictionary in _spent:
 		var t := float(tag["age"]) / SPENT_LIFE
 		var fall := roundf(plate.size.y * SPENT_FALL * (1.0 - pow(1.0 - t, 2.0)))

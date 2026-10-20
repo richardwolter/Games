@@ -7137,6 +7137,8 @@ now only the defaults.
 An old hive on the island's lawn takes a swarm mid-run and makes honey. Build contract:
 `docs/hive/contract.md` (first pass; this section supersedes it where they differ). `Hive`
 (`scripts/hive.gd`), `HiveRoom`, one `HiveStep` script a step, art by `tools/build_hive.py`.
+**Superseded 2026-10-18 for the look** (The Beehive Redrawn): the catch's pips and heap, the
+smoke's rings, the queen's rest, the tin gutter, the `jar2_*` jars; the arc and hooks hold.
 - **The arc is split** (`Hive.PLAN_*`): a swarm visit is **Catch, Smoke, Queen**, and ends
   there: the colony goes `BUSY` on the ordinary refill clock (`_on_colony_settled`), the card
   reads `HIVE_HINT_SETTLED`. A colony caught and left before its queen is `SETTLE` (appended to
@@ -7171,7 +7173,8 @@ An old hive on the island's lawn takes a swarm mid-run and makes honey. Build co
     and runs, no penalty. Jars are the builder's `jar2_*` layers (blue-grey glass edge, faint
     tint, highlight streaks, small gingham lid), the honey drawn between them with a meniscus.
 - **Honey motion is drawn only** (the rope's bargain): springs and eases on whole art pixels,
-  nothing gameplay reads but the jar count.
+  nothing gameplay reads but the jar count. **The jars are eaten since 2026-10-16** (see
+  Honey Jars Are Eaten): they are no longer scenery.
 - Harness hooks per step, never gated on `awake` (see each script's header); `test_lake`'s
   `_stage_hive` drives them. Probe: `tools/shot_hive.tscn` (desktop build) saves
   `tools/last_hive_{empty,swarm,moment,ready,busy,honey}.png` and
@@ -7179,6 +7182,9 @@ An old hive on the island's lawn takes a swarm mid-run and makes honey. Build co
 - All numbers are first guesses for Richard's eye.
 
 ### Hive Fixes (2026-10-04, `/grill-me` with Richard)
+**Superseded 2026-10-18 for the look** (The Beehive Redrawn): the swarm specks, the rings and
+their arrow, the 18 by 7 queen, the tin gutter and its straps; the order, the drag and the
+stream hold.
 **Supersedes, above**: "Later refills show only in the world's ready mark" (the mark is over
 every actionable hive now), "Three rings ... any order", "the queen a subtly longer bee (no
 court)", "falls off the low end as a sprung rope", and the pour's glug.
@@ -7244,6 +7250,9 @@ court)", "falls off the low end as a sprung rope", and the pour's glug.
   back to the hive.
 
 ### Hive Fixes, Second Pass (2026-10-04, `/grill-me` with Richard, off `play_hive`)
+**Superseded 2026-10-18 for the look** (The Beehive Redrawn): the bucket's near wall is
+`HiveKitchenArt`'s, the catch's pips, marks and cracks, the 15 by 5 queen and `hive_well` are
+gone (queen B's `qwell_*`), and the hum and swarm are recordings.
 **Supersedes, above**: the queen at 18 by 7, the uncapping rest under the queen's frame, the
 catch box's glow, and each step's own crown and star burst.
 - **The bucket's near wall** (`build_hive.py` `bucket_front`, the bucket's pixels below the
@@ -7304,6 +7313,269 @@ catch box's glow, and each step's own crown and star burst.
     (`BUZZ_PITCH_PER` 0.0004, `BUZZ_PITCH_MOST` 1.08), speed makes it louder
     (`BUZZ_LOUDER`, `BUZZ_FAST`), and it wavers (`BUZZ_WAVER`). The chime is up to A5
     (`CHIME_HZ` 880, was E5).
+
+### Honey Jars Are Eaten (2026-10-16, `/grill-me` with Richard)
+The hive's jars are a consumable boost. **Supersedes "The jars are scenery"** in
+`docs/hive/contract.md` section 1. A first cut: a mockup sheet decides the final look.
+**Superseded 2026-10-18 for the look** (The Beehive Redrawn): the plate is a medallion slab
+(139 x 56, the drain a ring), the shelf rows are a cupboard of jars, the jar is `HoneyPot`'s,
+and the amber, drips, bees and coin are the picks; the window, pay, clock and bind hold.
+- **A jar is a window** (`Lake.HONEY_TIME` 15 s, `_eat_honey`): one off `Hive.jars`, 15 s
+  on `_honey_left`. Another eaten while it runs adds its 15 s; the bonus never stacks past
+  `HONEY_BONUS` (0.5). At most 12 jars a run (four harvests), so 180 s of honey.
+- **The pay** (`_honey_pay`, the one place): while it runs, every **rubbish** piece either
+  net takes pays `HONEY_BONUS` of its base price (`EconomyConfig.price_of`, **not**
+  `piece_pay`, which carries the Recycle Bonus) into the purse **at once**. Called off the
+  sweep's own pieces (`_on_net_swept`, the tail of the catch, `_catch_tail`) and off a
+  tornado hit's pour (`_on_tornado_netted`), so the double cast's net, lucky casts and the
+  storm all count. **Finds, pigeons and the dogs' deliveries get none** (keepsakes are passed
+  over; birds and dogs never reach it). The sale at the pier is unchanged, and nothing here
+  touches `catch`, the haul count or Great Net.
+- **One honey coin a sweep, not a piece** (`CoinFly.fly(from, honey, carry)`): amber
+  (`HONEY_WASH`) with a trail of drops (`HONEY_TRAIL*`), from the catch to the purse; at
+  `MOST` it joins the last coin **of its own kind** in the air. Not while the shed is up.
+- **The clock runs only while the lake is in play** (`_honey_runs`): frozen under every board
+  (`_panelled`), behind the menu and through the glides (`_fronted`), in the settings pause
+  and under the lost pad's card (`_world_paused`), through a moment, the arrival and the
+  ending. **Not the Recycle Bonus's gate**, which runs under the shop and the house.
+  **A standing clock pays nothing** (`_honey_pay` asks `_honey_runs` too): a net already
+  flying or reeling when a board comes up (the wash room never holds one) catches on, but no
+  honey is paid out of a window that is not running. Closed in code by the implementer, not
+  grilled: for Richard to say if he wants those pieces paid.
+- **Session only**: no save key, no `SAVE_VERSION` bump. The menu's pose (`_pose_world`)
+  and a load end the window; the jar stays eaten.
+- **Input**: `eat_honey` in `Binds.ACTIONS` (lake, `BIND_GROUP_NET`, after `interact`), H
+  (physical) and the D-pad's up (free on the bare lake: it only steps focus under a board).
+  Desk in `_unhandled_input`, pad in `_pad_buttons`. **One jar a press** (`_honey_ate_at`,
+  a frame either side): a keyboard H in pad mode reaches both paths. Nothing is eaten with no
+  jar, under a board or in the demo. The Controls board wants 678 of 680 with it.
+- **The jar plate** (`HudSkin`, `HONEY_*`, `_draw_honey`, `honey_box`, `honey_bar_box`):
+  **a third slab in the top-left column**, `GAP` under the money plate, as wide, the stock
+  plate's height (20, 148, about 206 x 54 in English), in the oak border round a comb-brown
+  face: the hive room's full jar (`HiveArt` `jar_full`, lent the first time the plate shows;
+  drawn in cells without the sheet), the eat key's chip (the house's wood chip, or the pad's
+  glyph), the count on a sunk panel, and the window draining along a 6 px groove under it in
+  the ferry bar's language (`honey_left / honey_span`). Shown only with a jar or a window,
+  never in the demo, not in the wash room's two-plate view. A click eats a jar
+  (`honey_pressed`) and is taken by the plate, never a cast; while a window runs the drain
+  under it is part of the plate's hit box (`_honey_hit`). Clear of everything at 1280x720
+  and 1280x800 (the meter's top is at 602 and 671). The spend tags under the money plate can
+  reach it only in the wash room, where it is not drawn.
+- **The net is amber** (`NetShape.AMBER*`, `AMBER_RIM_HALF`, `honey`; the shader's `honey`
+  and `amber_*` uniforms): the rim cord and the beads, redder and darker than the lucky gold;
+  the mesh stays tan. **The gold wins** on a lucky honeyed cast (`push` says honey only
+  without gold). **Drips** (`CastNet.HoneyDrips`, `HONEY_DRIP_*`): a bead gathers on the rim,
+  rides it, falls to the water and rings it, held to `HONEY_DRIP_SHARE` of the splash
+  layer's rings. Both nets, lucky or not.
+- **Bees round the angler** (`HoneyBees`, a child of the angler, Back and Front halves):
+  `ceil(BEES * left / HONEY_TIME)`, at most `BEES_MOST`, so they thin as the window runs
+  out; a bee leaving flies off up. Cute placeholders on whole art pixels.
+- **The first jar held owes a hint** (`honey_jar` in `HINT_TEXT` and `CUE_KINDS`,
+  `CUE_HONEY`), at the jar plate; eating ends it, and it ends itself if the plate goes. Its
+  own theme (`CueCard.THEMES[&"honey_jar"]`: a deeper amber tab, a jar whose lid pops
+  (`jar_open`, `jar_lid`), and the `ooze` entrance, lowered on strands of honey that part).
+  The first honey's moment keeps `&"honey"`. Owed off the shelf, so a save already holding
+  jars gets it.
+- **The shelf shows a row while any jar of it is left** (`Hive.shelf_frame`, rounded up):
+  rounded down, eating one of three emptied the shelf while the plate said two. A frame per
+  jar is a builder run (`build_hive.py` `JARS_SHOWN`), left for later.
+- **Strings**: `VERB_EAT_HONEY`, `CUE_HONEY`, machine drafts in all eight languages with
+  their back-translations (PT written as Richard's source would be). Unreviewed.
+- **Sound**: eating plays `hive_pop`; the honey coin chinks like any coin. No new recording.
+- All numbers are first guesses. `test_lake`'s `_check_honey` (end of `_stage_hive`) guards
+  eating, the second jar, the frame guard, the shelf, both nets told, the bees, the amber and
+  the gold winning, the pay and its coin (with the Recycle Bonus live on that yard, and none
+  under the shop), the helper net, a find, a bird and a dog getting nothing, the tornado's
+  pour, the clock under the shop, the settings and a moment, no eating under a board, the
+  plate's place, a real click on the plate and on its drain eating and casting nothing
+  (`_click_at`, pushed through the viewport), its going, the demo, the bind and H, the cue,
+  the words **read off the CSV** in every language (a blank cell falls back to English through
+  `Text.of`), no save key, a load and the menu's pose. `_stage_honey_pad`, the run's last
+  stage, presses the D-pad's up over two ticks and reads it through `_pad_tick`. Probes:
+  `tools/shot_cues.tscn` (the `honey_jar` card), `tools/shot_net.tscn` (`NET_HONEY=1`, every
+  cast honeyed).
+
+### The Beehive Redrawn (2026-10-18, `/grill-me` with Richard)
+The hive's whole look and the honey boost's look redrawn, mechanics untouched. **Supersedes**
+the look of every step in The Beehive, Hive Fixes and Hive Fixes, Second Pass (the pips and
+heap, the rings, the rest and the well, the tin gutter, `jar2_*`, the shrub and the jar shelf),
+and in Honey Jars Are Eaten the plate's slab and groove, the shelf rows, the jar picture, the
+amber, the drips, the bees and the coin.
+- **Mockups first, then six builders** (`tools/hive_look/`, the modules tracked, their sheets
+  and scratch folders git-ignored): every piece was picked off a sheet before a line of game
+  code, and **the builders call the mockups' own functions** rather than copying them, so what
+  shipped is what was picked. Picks: bee **A** (the coin bee), island **C** (the cupboard),
+  backdrop **low hedge** with **bark trunks**, catch **A** ("bees on the frames"), smoke **A**
+  with **C's ring of smoke**, queen **B** ("the well, deeper"), uncap **B** (oak V-flume and
+  oak bucket, the honey meeting every surface with gooey joins, no cut), pour **B** (the stand
+  built as a hive, a fence shelf, a rosette) **with the uncap's oak bucket and the shared jar**,
+  honey **1A / 2A / 3C / 4A / 5B** (the medallion plate, the hive's honey on the net with
+  teardrop drips, the buzzing escort, the honeycomb coin, the pot on the cue card).
+- **One bee everywhere** (`BeeArt`, `scripts/bee_art.gd`; `tools/build_bees.py` ->
+  `assets/bees.png`/`.json`, off `look.py` variant A): worker fly/hover/walk/rest (and from
+  behind), the lake's round `mini_*`, and the crowned queen (21 x 16), anchored on the body's
+  middle, facing right, mirrored by texture coordinates. The island's swarm and commuters and
+  the flowers' bees are one textured batch (`BeeBatch`); `Flora`'s bees are mini bees.
+- **One honey pot everywhere** (`HoneyPot`, `scripts/honey_pot.gd`; `tools/build_honey_pot.py`
+  -> `assets/honey_pot.*`): pour B's bottling jar, a lid means a label, drawn at four sizes,
+  each its own drawing: `room` (layered, `room_back<k>` the honey level), `hud` (sealed, or
+  open with a dipper and the time left as its level), `cue` (`cue_pop0..2`, the lid hopping)
+  and `shelf` (7 x 9, `shelf_shade` on the shaded face).
+- **The island hive is a cupboard** (`tools/build_hive_island.py` -> `assets/hive.*`; `Hive`
+  rewritten): the hive 1.4x on a sky-blue painted cupboard, two shelves a seen face, **the jars
+  held standing on them one by one** (`jar_slot(k)`, `jars_shown()`, twelve slots, lit face's
+  top shelf first; none while weathered). `Hive.shelf_frame` is deleted. The window is baked in
+  five levels (`hive_colony0..4`), `hive_full` with the drip. **A young flowering tree replaces
+  the shrub**, there from a new game, blossoming when the swarm comes, the swarm on a bough
+  (`tree_*`; `shrub_box`/`shrub_grown` keep their names for their callers); walkers north of
+  its foot sort behind the hive's layer. Footprint the cupboard's square, centre (0, 0) half
+  (0.4375, 0.4375). `tools/build_hive.py` builds the room only now: its island output is
+  retired so it cannot write over this (the island helpers stay; the mockups import them).
+- **The room's view is bare** (`WashBackdrop.bare`, `veil`; `HiveRoom.VEIL` 0.6): no rubbish,
+  boats, dogs or pigeons, the far bank and lake veiled towards the sky, and **a low hedge of
+  the island's flowers** at the window's foot with BeeArt workers on it (`HiveHedge`,
+  `tools/build_hive_hedge.py` -> `assets/hive_hedge.*`). The wash room keeps its full view
+  (`bare` false, no veil). **The far bank's trunks are bark and its dead trees gone**
+  (`tools/build_wash_backdrop.py` -> `assets/wash_bank.png`), in both rooms: a dead tree's roll
+  still rolls, so everything else stands where it did.
+- **The steps**: catch A (clumps of bee A breathing in the sky through `hive_swarm.gdshader`,
+  one ink outline and a soft brown between touching bees; the box front-on with five frames, the
+  boxed bees settling on the bars, the mouth glowing while a clump is over it); smoke A (a beard
+  of bee A, the band waiting whirring, a smoked band folding its wings and breathing Zs) with
+  C's scarf of smoke round the band in hand; queen B (`qwell_back`, `qframe`, `qwell_front`,
+  `WORKERS` 184, the lens `LENS_R` 44); uncap B and pour B on `HiveKitchenArt`
+  (`scripts/hive_kitchen_art.gd`; `tools/build_hive_kitchen.py` -> `assets/hive_kitchen.*`:
+  knife, oak bucket and its near wall, V-flume, stand, bench, gate, a lever picture a turn,
+  rosette); the pour's jars are `HoneyPot`'s room jar. The room's scenery and the mockups'
+  layouts are `tools/build_hive.py`'s `build_room()` (`HiveArt.data`).
+- **The honey look**: the jar plate is a **medallion slab** (`HudSkin`, `HONEY_MEDAL` 20 over
+  the slab's left end, 139 x 56): the pot in its well, sealed while it waits, open with the time
+  left as its honey, and the drain a **gold ring** round the well (`honey_bar_box` is the
+  medallion now, inside the plate's hit box); the net's amber **is the hive's honey**
+  (`NetShape.AMBER_*` = `HiveArt.HONEY_*` a step down, mirrored in `net_mesh.gdshader`), its
+  drips teardrops off beads that hang, stretch, fall and plop (`HoneyDrips`); the escort is 8
+  mini bees on loops of their own kept clear of the angler's pixels (`HoneyBees`); the honey
+  coin is struck by rule (`tools/build_honey_coin.py` -> `assets/honey_coin.*`, a comb cell,
+  nine turns, three trail drops); the cue card's icon is the pot (`cue_pop*`). The lake no
+  longer lends `sprites["jar"]`.
+- **Sound**: Nuven's `BeeFlyBy_BU01.26.wav` cut by `tools/build_sfx.py` (`bee_tile`, `colony`,
+  `swarm`, muffled) into `hive_hum` (six layers, the catch step's loop, `TARGETS` -14 LUFS) and
+  `hive_swarm_1..3`; they win over `HiveSounds`' built buzz, which stays the fallback. **The
+  knife's sizzle is a recording** (2026-10-19, Richard's pick of five): Clearwavsound's "Hot
+  Knife in Butter" (freesound 541034, CC BY 3.0, `art_source/SFX/Hot_Knife_In_Butter.wav`),
+  its steady second stroke cut by `build_sfx.py` to a 1.7 s WAV loop, `hive_sizzle.wav`;
+  `SIZZLE_DB` -13 to -10 by guess (the recording is softer than the built noise). Credited
+  "Clearwavsound" on the board under Music, Rainloaf and Pixeline sharing a row to make room.
+  The crackle stays built.
+- **Decisions taken in the build, by the agents**: no hands or glove anywhere (the pointer holds
+  every tool, as before); shadows follow One Sun (down-left), not the mockups' down-right;
+  **smoke draws no target rings** (the bees are the marks); the queen's find reach stays the
+  33-px glass's (`FIND_REACH`) at the bigger 44-px lens; the tree replaces the shrub; and, from
+  Honey Jars Are Eaten, a net already out when a board opens pays no honey.
+- **Strings**: `HIVE_HINT_SMOKE` reworded (no rings: "*Smoke* the buzzing bees until they
+  sleep"), machine drafts in seven languages with back-translations, all fitting at 20.
+- **Open**: numbers are first guesses for Richard's eye; the letter's
+  stills and the store shots predate the redraw. `tools/shot_net.tscn` now holds the free view
+  on the net while a cast is out (its crops missed the net since `CAST_FOLLOW` went false).
+- `test_lake`'s `_check_hive_look` guards BeeArt's and HoneyPot's sheets and frames, hive.json's
+  fields, the twelve slots and every jar held drawn, the kitchen's pieces, the room's bare view
+  and its hedge against the wash room's full one, the escort's count, the coin's sheet, the cue's
+  pot, the amber against the shader and the hive, and the bee recordings; `_stage_hive` the tree's
+  sorting, queen B and the oak bucket. Probes (desktop build, `--fixed-fps 60`):
+  `tools/shot_hive.tscn`, `shot_hive_island.tscn` (`tools/last_hive_island_*.png`),
+  `shot_hive_steps.tscn` (`tools/hive_look/_mine/`), `shot_hive_kitchen.tscn`
+  (`tools/last_kitchen_*.png`), `shot_hive_backdrop.tscn` (`tools/hive_look/_bd_work/`),
+  `shot_honey_look.tscn` (`tools/last_honey_look_*.png`).
+- **First look in play** (2026-10-19, Richard):
+  - **The hive room's view is the wash room's**: rubbish, ferries, dogs and pigeons lent as
+    `WashRoom.open` lends them, the same darkening and far bank. `bare`, `veil` and the slid
+    bank (`HiveRoom.DARKEN`/`BANK_OFFSET`/`VEIL`) are retired from the room; the backdrop keeps
+    the flags, unused. The hedge stays.
+  - **The tree is a tree, not a bush on a stick** (`island_mockup._crown`, `_trunk_px`,
+    `CROWN_CLUMPS`): a 56 x 42 dome of leaf clumps by rule, lit up and right, a dark seam where a
+    near clump overlaps a far one, over a flared trunk that forks into the crown; `TRUNK` 30,
+    the bough lower (`BOUGH`, `SWARM_ALONG` 20) and drawn over the foliage.
+  - **Uncap: no drip on a dry flume** (`hive_step_uncap.gd`): the flume runs slower
+    (`RUN_BASE` 50, `RUN_DEEP` 12, was 80 and 8; a curtain's honey ran off as fast as it came and
+    the crease under it read empty), honey shows from `SHOW_FROM` 0.06 (was 0.4), a curtain's
+    foot brings `CURTAIN_SEED` 4 of honey from the store the moment it meets the flume, a bead
+    off the blade brings `BEAD_HONEY` 1.2, a finished curtain's tail falls at `CURTAIN_FALL`
+    260 (was 120), and `DRAIN_WAIT` is 10 s, so the honey is seen sliding to the bucket.
+  - **The honey pot on the UI is always the sealed one**, label and gingham lid:
+    `HoneyPot.draw_hud` draws `hud_sealed` whatever the window (the medallion's ring is the
+    time), and the cue card draws `cue_sealed` hopping a pixel or two. `hud_open*` and
+    `cue_pop*` stay on the sheet, drawn by nothing.
+
+### A Play's Notes (2026-10-19, Richard)
+Fifteen notes off a play of the full game.
+- **The knife's sizzle is Clearwavsound's recording** (see The Beehive Redrawn's sound bullet).
+- **The honey coin is drawn on whole screen pixels** (`CoinFly._draw_honey`, `_grain`,
+  `_on_screen`): one sheet px a canvas px drew its pixels one and two screen px wide by turns at
+  1080p's 1.5 stretch. Its trail follows its own arc, each drop at the sheet's `drop_alpha`
+  (`HONEY_TRAIL_STEP`, which pushed the drops down and right whichever way the coin went, is
+  gone). Richard said only "not showing properly": the cause was guessed off the probe.
+- **The house's card in the full game** (`ShedRoom.half_played` emitted by the stage-ups too):
+  the first time the room is seen mending, `DEMO_HOUSE` ("As you clean the lake, your house
+  will fix itself") is owed, as the demo's half step owed it. Once, in `cues_seen`.
+- **The fireplace's bed 5 dB down** (`Sfx.FIRE_DB` -10.5). **Hose level 3 scrubs harder**
+  (`WashStand.HOSE_POWER` [1.0, 1.2, 1.9], apart from `HOSE_GROW`, the width, unchanged).
+- **Fewer bees**: `Flora.BEES_MOST` 50 (was 90), `Hive.COMMUTERS` 5 (was 8),
+  `HiveHedge.BEES_MOST` 9 (was 14), the honey escort `HoneyBees.BEES` 5 (was 8).
+- **A plant behind a building stays behind it** (`Ground.screens`, `Ground.behind_building`, read by `Flora.cover` too,
+  set every frame by `Lake._cover_walkers` off `_wildlife_buildings`): the covers that draw a
+  plant again over an animal or a walker skip one whose picture overlaps a building and whose
+  foot is above its ground line. Drawn again on the layer over the walkers it was over the hut.
+- **Driftwood: big logs only, a few, up the beach** (`Ground.DRIFTWOOD_PIECES` the 86 px
+  driftwood alone, `DRIFTWOOD_MOST` 4, `DRIFTWOOD_BAND` 2.0-4.2, `DRIFTWOOD_DRY` 1.2): the
+  small logs and sticks read as rubbish. The forest floor keeps them. **Supersedes** the
+  mixed pieces and the 7 of Six General Fixes.
+- **The led walk paths round the island** (`Angler.led_path`, `_led_aim`, `_build_grid`,
+  `PATH_RES` 4, `PATH_NEAR` 3, `PATH_SEE`, `PATH_NEXT`): an `AStarGrid2D` over the island's
+  box, solid where the angler may not stand (`_open`: the wade limit, the crate, the pump,
+  the hive, the hut), a step dearer next to anything, pulled straight in plain sight; planned
+  again whenever `walk_to` is set. **Supersedes "straight line, no path planning"** in The
+  Led Cast. `_slide` still takes a brush against a wall.
+- **The ending films every dog in turn** (`EndingReel._dog_turn`): each dogs shot the next of
+  the pack. **The closing words** are "Nature is back to the lake and appreciates your help."
+  / "Thanks for playing!" (`END_LINE_1/2`, machine drafts in seven languages).
+- **The fish come in gradually** (`Fish.TIERS` `at`/`full`, `ramp_of`, `members_from`/
+  `members_to`, `_arrive_one`, `ARRIVE_GAP`, `_grow_one`, `GROW_GAP`, `member_fade`,
+  `MEMBER_FADE`): each tier ramps from its share to its full (minnows 0.08 to 0.6, perch-sized
+  0.3 to 0.85, carp and tench 0.55 to 0.95, smoothstep), schools wanted `ceil(most x ramp)`
+  capped by `per_tiles`, school size growing with the ramp (minnows 2-3 to 3-6). At most one
+  school arrives every 2.5-4.5 s, the tier furthest behind first, and a swimming school grows
+  one fish every 1.2-2.4 s, each new fish fading in a whole art pixel at a time. A loaded run
+  still fills at once. End population unchanged (27/14/5). Was 19 schools on one frame at 17%
+  clean. **Supersedes** the tiers switching on whole in Nature Coming Back. Probe
+  `tools/probe_fish_growth.tscn` (headless).
+- **A frog on a lily pad rides the pad** (`Wildlife.pad_bob`, `_frog_ride`, frog keys
+  `ride_x`/`ride_off`): the sway shader's afloat offset worked out on the CPU term for term
+  (the packed x, `wave_time`, the swell and wander, Flora's own uniforms), taken up over the
+  jump onto the pad and let go over the jump off; the frog and its shadow move, `at` does not.
+- **Turtles froze on a walk frame**: in `_turtle_step` the walk's last line wrote WALK over the
+  BASK its arrival had just set, so the turtle "arrived" every frame and stood with its legs
+  still for good. It returns after the rest now, and a walk or swim making no ground gives up
+  after `TURTLE_STUCK` (1 s): a rest on land, a dive in the water.
+- **Capybaras keep room** (partly settled, judge in play): `CAPY_KEEP` 30 px from any other
+  animal and `CAPY_MATE_KEEP` 26 from the partner, on the ground plane (`_plane_gap`); only the
+  follower keeps the pair apart. Its place comes off the lead's eased heading, `CAPY_ASIDE` 1.1
+  rad off straight behind on a kept side, walkable and out of other animals' rooms, and it
+  walks on with a walking lead (`CAPY_EASE`). A resting lead walks off from an animal inside
+  `CAPY_KEEP` to `CAPY_KEEP_OFF` 56; a walk out of the way that gives up waits `ROOM_AGAIN`
+  2 s. **For every land animal**: `_round` no longer snaps one already inside a still walker's
+  room to its edge (`_slide_round`, `SLIDE_EDGE`), and `_step_to` keeps the side it sidestepped
+  to (`sidestep`) until a straight step works, where it took either side afresh each frame.
+  `CAPY_BEHIND_PULL` is gone. Probe `tools/probe_capy.tscn` (headless, ~90 s): island follower
+  facing flips 585-691 to 3-179 a run. **Open**: a follower sometimes sits against a bunny.
+ (`Flock._away_from`, `LEAVE_FAR` 1100, `LEAVE_STEP`
+  200, `LEAVE_MOST` 9000, `_drawn_last`, `_redraw_all`): a bird sent away flew a flat 1100 px
+  and was removed on arrival, often still over the lake; when it was the last bird the flock
+  stopped redrawing (it redraws only while it holds birds or splats), so that frame and its
+  shadow stayed for good. Now the flight is lengthened until it ends past the bank, and the
+  flock and its three children draw once more the frame it empties. Probe
+  `tools/probe_bird_left.tscn` (headless).
+- `test_lake` guards the house card's stage-up, the big driftwood off the water, the led paths
+  never cutting a building and bending round one, and the knife's recording.
 
 ### Steam Achievements (2026-10-06, `/grill-me` with Richard)
 Nine achievements on App **5375170**, through GodotSteam. The game runs exactly the same

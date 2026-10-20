@@ -37,8 +37,12 @@ const UI_VOICES := 3
 
 ## The colony's hum, as the hive room's catch step loops it (`HiveSounds`). The lake's own
 ## bed of it by the hive is gone (issue #29, 2026-10-06, Richard: "remove the constant
-## buzzing close to the beehive"); the name stays loaded for the room. A built loop,
-## peak-normalised rather than levelled, so this is by ear and not the builder's.
+## buzzing close to the beehive"); the name stays loaded for the room. **A recording since
+## 2026-10-18** (`assets/sfx/hive_hum.wav`, Nuven's bee layered six times by
+## `tools/build_sfx.py`'s `colony`). The catch step drives its own player at its own
+## `BUZZ_DB` and never reads this figure, so the file is levelled to sit where the step was
+## tuned (`TARGETS` in the builder, -14 LUFS asked, -15.5 got under the peak ceiling) rather
+## than to the house -22. Nothing plays it through `SOUNDS`; the figure is kept for the name.
 const HIVE_HUM_DB := -26.0
 
 ## Every recording: its loudness against the others in decibels, and how far its pitch is
@@ -119,7 +123,11 @@ const SOUNDS := {
 	## across the lawn and heard as it lands; the puff, the crackle and the lid are the player's
 	## own hands in the room; the crown and the flourish are the payoffs. The hum's figure is
 	## the bed's (`HIVE_HUM_DB`), written here so the name is loaded and checked with the rest.
-	&"hive_swarm": [-20.0, 0.03],
+	## The swarm and the hum are recordings since 2026-10-18 (Richard: the built buzz grated):
+	## Nuven's bee, layered (`colony` and `swarm` in `tools/build_sfx.py`), three takes of the
+	## swarm, levelled to -22 like everything above. -20 against the built take is -13 against
+	## the recording, 6.7 dB quieter as it plays, so the queen's miss sits where it sat.
+	&"hive_swarm": [-13.0, 0.03],
 	&"hive_hum": [HIVE_HUM_DB, 0.0],
 	&"hive_puff": [-15.0, 0.08],
 	&"hive_crackle": [-17.0, 0.12],
@@ -335,7 +343,8 @@ const CHIME_GAP := 6.0
 ## The two long beds. The lake's recording is quiet (it peaks at a fifth of full scale), so it
 ## sits up where the short sounds sit down.
 const AMBIENCE_DB := -21.1
-const FIRE_DB := -5.5
+## The fireplace's bed, 5 dB down from -5.5 (2026-10-19, Richard: "a bit too loud").
+const FIRE_DB := -10.5
 ## How long the wading water is silent between plays. Held as one loop it was water running
 ## without a break; this is a wash, a pause, and another wash.
 const WADE_EVERY := 1.0
@@ -439,7 +448,7 @@ var _ambience_at: float = SILENT
 var _fire_player: AudioStreamPlayer
 var _fire_on: bool = false
 var _fire_at: float = SILENT
-## The colony's hum: the level the lake last asked for and the level it has eased to.
+## The crickets' bed (late afternoon only, `CRICKET_*`).
 var _cricket_player: AudioStreamPlayer
 ## Where the day's sun is, pushed by the lake (`set_sun`); under nought, no day.
 var _sun: float = -1.0

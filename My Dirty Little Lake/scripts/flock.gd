@@ -49,6 +49,17 @@ const BANK_GONE := 1.12
 const FLY_SPEED := 150.0
 const ARC_HEIGHT := 34.0
 
+## How far a bird sent away flies: at least `LEAVE_FAR` world px, and further in steps of
+## `LEAVE_STEP` until the end of its flight is past the bank, where it is no longer drawn
+## (`_over_water` nought), up to `LEAVE_MOST`. The bird is taken out of the flock the frame it
+## gets there, so wherever that is, it vanishes. A flat 1100 px (2026-10-19, Richard's
+## screenshot) ended 44% of flights still over the lake, and the bird blinked out on the
+## water; when it was the last bird, its last frame stayed drawn there for good (see
+## `_drawn_last`).
+const LEAVE_FAR := 1100.0
+const LEAVE_STEP := 200.0
+const LEAVE_MOST := 9000.0
+
 ## How long a bird will sit before it fancies a different piece of rubbish, in seconds.
 const PERCH_MIN := 6.0
 const PERCH_MAX := 20.0
@@ -192,6 +203,14 @@ var _perched_shades: BirdShade
 
 ## Whether the flock that should already be here has been put here. See `settle`.
 var _settled: bool = false
+
+## Whether the last frame drew anything: a bird, a splat, a shadow or a rim. A canvas item
+## keeps its last drawing until it is drawn again, and the flock only asks to be redrawn while
+## it has something to show, so the frame the last bird or splat goes is drawn once more, empty.
+## Without it the last bird away (the end of a run, when the lake has nowhere left to perch)
+## stayed on the water with its shadow under it for the rest of the session (2026-10-19,
+## Richard's screenshot: a white dove lying on clean water among the lily pads).
+var _drawn_last: bool = false
 var _rng := RandomNumberGenerator.new()
 
 ## When wings were last heard, on this node's own clock.
@@ -457,14 +476,21 @@ func _process(delta: float) -> void:
 			birds.remove_at(i)
 	_fade_droppings(delta)
 	# Nothing on the water, nothing to repaint. Birds and their mess both animate, so a
-	# flock that has any is worth a frame; an empty sky over a clean lake is not.
-	if not birds.is_empty() or not droppings.is_empty():
-		queue_redraw()
-		# The rim is a child with its own drawing, and what it draws changes as the angler
-		# walks even when no bird has moved.
-		_rim.queue_redraw()
-		_shades.queue_redraw()
-		_perched_shades.queue_redraw()
+	# flock that has any is worth a frame; an empty sky over a clean lake is not — but the
+	# frame it empties is, or its last picture stays (`_drawn_last`).
+	var any := not birds.is_empty() or not droppings.is_empty()
+	if any or _drawn_last:
+		_redraw_all()
+	_drawn_last = any
+
+
+## The flock and the three children that draw with it. The rim is a child with its own
+## drawing, and what it draws changes as the angler walks even when no bird has moved.
+func _redraw_all() -> void:
+	queue_redraw()
+	_rim.queue_redraw()
+	_shades.queue_redraw()
+	_perched_shades.queue_redraw()
 
 
 ## Call birds in or send them away, so the flock matches the water it is over.
@@ -489,11 +515,20 @@ func _send_away(bird: Dictionary) -> void:
 	bird["state"] = State.LEAVING
 	bird["tile"] = -1
 	bird["from"] = bird["at"]
-	bird["to"] = bird["at"] + Vector2(
-		_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0)
-	).normalized() * 1100.0
+	bird["to"] = _away_from(bird["at"])
 	bird["travel"] = 0.0
 	bird["span"] = maxf((bird["from"] as Vector2).distance_to(bird["to"]), 1.0)
+
+
+## Where a bird leaving from `at` is going: a rolled direction, far enough that the end of
+## the flight is past the bank and nothing of the bird is drawn there (`LEAVE_FAR`).
+func _away_from(at: Vector2) -> Vector2:
+	var way := Vector2(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0))
+	way = way.normalized() if way.length() > 0.001 else Vector2.RIGHT
+	var far := LEAVE_FAR
+	while far < LEAVE_MOST and _over_water(at + way * far) > 0.0:
+		far += LEAVE_STEP
+	return at + way * far
 
 
 ## One bird, one frame. False means it is gone.

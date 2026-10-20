@@ -98,6 +98,8 @@ var _rebuilds_before: int = 0
 var _ending_at: int = -1
 ## Whether that stage has seen the run end, so the wait for it happens once.
 var _ending_done: bool = false
+## The hive's jars before `_stage_honey_pad` set its own, put back when it is done.
+var _honey_pad_jars: int = 0
 
 
 func _ready() -> void:
@@ -201,6 +203,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_first_steps()
 		37:
 			_stage_hive()
+		38:
+			_stage_honey_pad()
 		_:
 			pass
 
@@ -5441,6 +5445,13 @@ func _stage_net_behind() -> void:
 ## How the flock is drawn (2026-09-16): over the whole lake, standing on the piece it is
 ## actually sitting on, with a smudge for a splat and its own silhouette for a shadow.
 func _stage_pigeon_look() -> void:
+	# A bird sent away ends its flight past the bank (2026-10-19, Richard: a white dove left
+	# lying on the water), and the flock draws once more the frame it empties.
+	var leaving := {"state": Flock.State.PERCHED, "tile": -1,
+		"at": Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.5, Iso.CENTRE.y), "travel": 1.0, "span": 1.0}
+	_flock._send_away(leaving)
+	_check(_flock._over_water(leaving["to"]) <= 0.0 and _flock.has_method(&"_redraw_all"),
+		"a bird sent away ends its flight past the bank, not on the water", str(leaving["to"]))
 	_check(_flock.z_index > 12 and _flock.z_index > 20 and not _flock.z_as_relative,
 		"the flock is drawn over the hulls, the piers and the net",
 		"z %d" % _flock.z_index)
@@ -7276,7 +7287,7 @@ func _check_cues() -> void:
 	_check(parts_ok and worst >= 4.5, "every cue theme has a tab, a mark, an ink, an icon and an entrance; its ink reads",
 		"worst %.2f" % worst)
 	_check(bands.size() == CueCard.THEMES.size(), "no two cue themes share a tab colour", str(bands.size()))
-	for kind: StringName in [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry", &"meter"]:
+	for kind: StringName in [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry", &"meter", &"honey_jar"]:
 		_check(CueCard.THEMES.has(kind), "the %s cue has a theme" % kind, "")
 	# Marked words: the keyword is its own unit, no asterisk reaches the paper, and a hint
 	# wraps inside its card.
@@ -7295,7 +7306,7 @@ func _check_cues() -> void:
 		fits = fits and CueCard._row_wide(row, Style.TEXT_SMALL) <= CueCard.WIDE_HINT + 0.5
 	_check(narrow.size() >= 2 and fits, "a hint wraps inside its card", str(narrow.size()))
 	_check_cjk_wrap()
-	for key in ["TORNADO_FIRST", "CUE_LUCKY", "CUE_DOUBLE", "CUE_PIGEON", "CUE_FERRY", "CUE_METER", "WILDLIFE_BACK", "HIVE_SWARM", "HIVE_READY"]:
+	for key in ["TORNADO_FIRST", "CUE_LUCKY", "CUE_DOUBLE", "CUE_PIGEON", "CUE_FERRY", "CUE_METER", "CUE_HONEY", "WILDLIFE_BACK", "HIVE_SWARM", "HIVE_READY"]:
 		var words := Text.of(key)
 		_check(words != key and words.count("*") >= 2 and words.count("*") % 2 == 0,
 			"%s has words with its keywords marked" % key, words)
@@ -8514,6 +8525,13 @@ func _stage_nature() -> void:
 	for i in 240:
 		fish._process(1.0 / 60.0)
 	_check(fish.school_count() > 0, "fish schools arrived once the share allowed", "%d" % fish.school_count())
+	# Fish come in a school at a time (2026-10-19, Richard: "too sudden"): four seconds hold a
+	# couple of arrivals at most, whatever the share asks; and every tier ramps in from its share.
+	_check(fish.school_count() <= 3, "and they arrive a school at a time, not all at once",
+		"%d in four seconds" % fish.school_count())
+	_check(Fish.ramp_of(0, float(Fish.TIERS[0]["at"]) - 0.01) == 0.0
+		and Fish.ramp_of(0, float(Fish.TIERS[0]["full"])) == 1.0 and Fish.ramp_of(2, 0.5) == 0.0,
+		"each fish tier ramps in from its share to its full", "")
 	var foul_fish := 0
 	for s: Dictionary in fish.schools():
 		var at := Iso.world_to_tile(s["at"])
@@ -8808,6 +8826,28 @@ func _check_still_walkers(wild: Wildlife) -> void:
 		_check(Flora.is_host("pk_flower_3") and Flora.is_host("pk_bed_2"), "bees visit the pack's flowers", "")
 
 
+## Off Richard's play (2026-10-19): a frog on a pad rides the pad, a turtle arriving on the
+## sand basks rather than standing stuck on a walk frame, and capybaras keep room.
+func _check_play_wildlife(wild: Wildlife) -> void:
+	var f := {"ride_x": 300.0, "state": Wildlife.Frog.SIT, "t": 0.0}
+	_check(wild._frog_ride(f).is_equal_approx(wild.pad_bob(300.0)),
+		"a frog sitting on a lily pad rides the pad's bob", str(wild._frog_ride(f)))
+	f.erase("ride_x")
+	_check(wild._frog_ride(f) == Vector2.ZERO, "and a frog off a pad is not moved", "")
+	var turtles: Array = wild.get(&"_turtles")
+	if not turtles.is_empty() and (turtles[0] as Dictionary).has("spot"):
+		var tt: Dictionary = (turtles[0] as Dictionary).duplicate(true)
+		var land: Vector2 = (tt["spot"] as Dictionary)["land"]
+		tt["at"] = land + Vector2(0.01, 0.0)
+		tt["to"] = land
+		tt["state"] = Wildlife.Turtle.WALK
+		wild._turtle_step(tt, 1.0 / 60.0, PackedVector2Array())
+		_check(int(tt["state"]) == Wildlife.Turtle.BASK, "a turtle arriving on the sand basks, not stuck walking",
+			"state %d" % int(tt["state"]))
+	_check(Wildlife.CAPY_MATE_KEEP < Wildlife.CAPY_GAP and Wildlife.CAPY_KEEP < Wildlife.CAPY_KEEP_OFF,
+		"capybaras keep room from their partner and from other animals", "")
+
+
 func _check_wildlife() -> void:
 	var wild: Wildlife = _main.get(&"_wildlife")
 	_check(wild != null and wild.ready_to_live(), "the wildlife node is there with its art", "")
@@ -8824,6 +8864,7 @@ func _check_wildlife() -> void:
 	_check(wet_land == 0 and bad_side == 0, "every shore spot is sand behind and water in front",
 		"%d wet, %d dry" % [wet_land, bad_side])
 	_check_still_walkers(wild)
+	_check_play_wildlife(wild)
 	# A fresh lake has none of them; this one is half clean. Nobody on a dirty lake.
 	var saved_stage := wild.stage
 	wild.reset()
@@ -11389,9 +11430,43 @@ func _check_place_presses() -> void:
 	_angler.tile_pos = stood
 
 
+var _led_paths_checked := false
+
+
+## A led walk goes round the island's buildings (2026-10-19): across the island on eight
+## bearings, every stretch of the path is ground the angler may stand on, and a path that has
+## to go round something has more than one stretch.
+func _check_led_paths() -> void:
+	var bad := 0
+	var bent := 0
+	var tried := 0
+	for k in 8:
+		var dir := Vector2.RIGHT.rotated(TAU * float(k) / 8.0)
+		var a: Vector2 = Iso.ISLAND_CENTRE + dir * Iso.ISLAND_RADIUS * 0.6
+		var b: Vector2 = Iso.ISLAND_CENTRE - dir * Iso.ISLAND_RADIUS * 0.6
+		if not bool(_angler.call(&"_open", a)) or not bool(_angler.call(&"_open", b)):
+			continue
+		tried += 1
+		var path: PackedVector2Array = _angler.led_path(a, b)
+		if path.size() > 1:
+			bent += 1
+		# Each stretch is one the angler's own sight test passes: the grid's own rule.
+		var from := a
+		for p: Vector2 in path:
+			if not bool(_angler.call(&"_sees", from, p)):
+				bad += 1
+			from = p
+	_check(tried >= 4 and bad == 0, "a led walk across the island never cuts through a building",
+		"%d tried, %d bad points" % [tried, bad])
+	_check(bent >= 1, "and one that has something in its way bends round it", "%d" % bent)
+
+
 func _stage_led_cast() -> void:
 	match _led_step_n:
 		0:
+			if not _led_paths_checked:
+				_led_paths_checked = true
+				_check_led_paths()
 			if _net.state != CastNet.State.IDLE:
 				if _in_stage > 2400:
 					_check(false, "the net is home for the led cast", "state %d" % _net.state)
@@ -12020,15 +12095,17 @@ func _stage_hive() -> void:
 	_check(not bool(_angler.call(&"_can_stand", room_mid)), "the angler cannot stand in it", "")
 	_check(not bool(_main.call(&"_at_hive")), "an empty hive beside him is scenery: E is not the hive's", "")
 
-	# Who is drawn behind it: north of it under the picture, south of it over, at the stand
-	# and at the far end of the shelf.
-	var ends := {"the hive": Vector2(-0.3, 0.0), "the shelf's far end": Vector2(-1.45, 0.0)}
+	# Who is drawn behind it: north of it under the picture, south of it over, at the hive's
+	# cupboard and at the blossoming tree beside it (2026-10-18: drawn on the hive's layer).
+	var ends := {"the hive": [Iso.tile_to_world(Hive.tile.x - 0.1, Hive.tile.y - Hive.half.y - 0.35),
+		Iso.tile_to_world(Hive.tile.x, Hive.tile.y + Hive.half.y + 0.35)]}
+	var tree_box := Hive.shrub_box()
+	ends["the tree"] = [hive.position + Vector2(tree_box.get_center().x, tree_box.end.y - 4.0),
+		hive.position + Vector2(tree_box.get_center().x, tree_box.end.y + 14.0)]
 	for end: String in ends:
-		var along: Vector2 = ends[end]
-		var north := Iso.tile_to_world(Hive.tile.x + along.x, Hive.tile.y - Hive.half.y - 0.35)
-		var south := Iso.tile_to_world(Hive.tile.x + along.x + 0.1, Hive.tile.y + Hive.half.y + 0.35)
-		var under := int(_main.call(&"_walker_layer", north))
-		var over := int(_main.call(&"_walker_layer", south))
+		var pair: Array = ends[end]
+		var under := int(_main.call(&"_walker_layer", pair[0]))
+		var over := int(_main.call(&"_walker_layer", pair[1]))
 		_check(under < hive.z_index and over > hive.z_index,
 			"somebody north of %s is drawn behind it and somebody south in front" % end,
 			"%d / %d against %d" % [under, over, hive.z_index])
@@ -12094,7 +12171,7 @@ func _stage_hive() -> void:
 	_main.set(&"_hive_tick", 0.0)
 	_main.call(&"_hive_step", 0.1)
 	_check(hive.stage == Hive.Stage.SWARM and hive.shrub_grown() < 1.0,
-		"the gate passed, the swarm comes and its shrub grows in", str(hive.stage))
+		"the gate passed, the swarm comes and its tree blossoms in", str(hive.stage))
 	if flora != null:
 		flora.set(&"_age", ages_was)
 	# The moment: the swarm's own card, in words.
@@ -12333,8 +12410,11 @@ func _stage_hive() -> void:
 	_check(not bool(_main.get(&"_hive_open")) and not room.visible, "going to the menu closes the hive room", "")
 	_main.call(&"_begin_glide")
 	_main.call(&"_glide_step", Lake.GLIDE_TIME + 0.1)
+	_check_hive_look()
+	_check_honey()
 	_hive_restore(hive_was, play_was, stood)
-	_finish()
+	# The honey's pad press wants two ticks of its own (`_stage_honey_pad`), which ends the run.
+	_advance()
 
 
 ## Exactly `grown` of the island's bee flowers grown in, the rest of them not yet: the gate
@@ -12405,12 +12485,12 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 				_check(int(step.call(&"rings_done")) == 3, "the middle, then the entrance: every stop quiet", "")
 				step.call(&"settle")
 			&"queen":
-				var queen_long := HiveArt.size(&"queen_long").x / HiveArt.size(&"bee_r").x
-				_check(queen_long >= 1.5 and queen_long <= 2.0 and HiveArt.has(&"queen_lay"),
-					"the queen is half again a worker's length or more, with a laying pose", str(HiveArt.size(&"queen_long")))
-				_check(HiveArt.has(&"well_back") and HiveArt.has(&"well_front") and (step.get(&"_bars") as Array).size() > 3
-					and (step.get(&"_bar_bees") as Array).size() > 0,
-					"she is looked for down in the open hive, bees on its frame bars", "")
+				var queen_long := BeeArt.size(&"queen_walk0").x / maxf(BeeArt.size(&"worker_walk0").x, 1.0)
+				_check(queen_long >= 1.2 and BeeArt.has(&"queen_lay0") and BeeArt.length(&"queen_walk") >= 2,
+					"the queen is BeeArt's, longer than a worker, walking and with a laying pose",
+					"%s against %s" % [BeeArt.size(&"queen_walk0"), BeeArt.size(&"worker_walk0")])
+				_check(HiveArt.has(&"qwell_back") and HiveArt.has(&"qwell_front") and HiveArt.has(&"qframe"),
+					"she is looked for down in the open hive (queen B's well and frame)", "")
 				var q: Vector2 = step.call(&"queen_pos")
 				_check(not bool(step.call(&"find_at", q + Vector2(60.0, 0.0))), "a click off her finds nobody", "")
 				_check(int(step.call(&"flown")) >= 1, "and the bee clicked buzzes off", "")
@@ -12420,7 +12500,8 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 				var sizzle: AudioStreamPlayer = step.call(&"sizzle_player")
 				_check(sizzle != null and sizzle.bus == Prefs.BUS_SFX, "the knife's sizzle is on the SFX bus", "")
 				_check(is_zero_approx(float(step.call(&"bucket_level"))), "the bucket starts empty", "")
-				_check(HiveArt.has(&"bucket_front"), "and its near wall is drawn over what falls below the brim", "")
+				_check(HiveKitchenArt.has(&"bucket_front") and HiveKitchenArt.has(&"flume_front"),
+					"and the oak bucket's near wall is drawn over what falls below the brim", "")
 				var top: float = step.get(&"_knife")
 				step.set(&"_want", top + 150.0)
 				for k in 20:
@@ -12434,7 +12515,8 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 				var streamed := false
 				var drips_in_stream := 0
 				var level_seen := PackedFloat32Array()
-				for k in 60:
+				# The flume runs slow since 2026-10-19 (the honey is seen sliding), so ten seconds.
+				for k in 200:
 					step.call(&"_process", 0.05)
 					if bool(step.call(&"streaming")):
 						streamed = true
@@ -12482,6 +12564,527 @@ func _hive_restore(hive_was: Dictionary, play_was: float, stood: Vector2) -> voi
 	_main.call(&"save_game")
 
 
+## The beehive redrawn (2026-10-18, off the tools/hive_look/ mockups): the shared bee and honey
+## pot sheets, the island hive's cupboard of jars and its contract, the kitchen's pieces, the
+## room's bare view and its hedge (and the wash room's view not bare), the honey bees, the honey
+## coin, the cue card's pot, the net's honey against the shader's and the hive's, and the bee
+## recordings.
+func _check_hive_look() -> void:
+	var hive: Hive = _main.get(&"_hive")
+	# BeeArt: every loop's frames on the sheet, the queen longer than a worker.
+	var bees_contract: Variant = JSON.parse_string(FileAccess.get_file_as_string(BeeArt.CONTRACT))
+	var lost: Array[String] = []
+	if bees_contract is Dictionary:
+		for anim: String in (bees_contract as Dictionary).get("loops", {}):
+			var count := BeeArt.length(StringName(anim))
+			if count < 1:
+				lost.append(anim)
+			for k in count:
+				var frame := BeeArt.frame_name(StringName(anim), k)
+				if not BeeArt.has(frame) or BeeArt.size(frame).x < 1.0:
+					lost.append(String(frame))
+	_check(BeeArt.ready() and bees_contract is Dictionary and lost.is_empty()
+		and BeeArt.length(&"worker_fly") >= 3 and BeeArt.has(&"mini_fly0") and BeeArt.has(&"queen_walk0"),
+		"BeeArt's sheet loads with every loop's frames", str(lost))
+	# HoneyPot: the one jar in its four sizes, room levels and the HUD's open frames.
+	var pot_lost: Array[String] = []
+	for name: StringName in [&"room_full", &"room_empty", &"room_front", &"room_lid", &"hud_sealed",
+			&"hud_open0", &"cue_sealed", &"cue_open", &"cue_pop0", &"cue_pop1", &"cue_pop2", &"cue_lid",
+			&"shelf", &"shelf_shade"]:
+		if not HoneyPot.has(name) or HoneyPot.size(name).x < 1.0:
+			pot_lost.append(String(name))
+	for size_name: StringName in [&"room", &"hud", &"cue", &"shelf"]:
+		if HoneyPot.geometry(size_name).is_empty():
+			pot_lost.append("sizes/" + String(size_name))
+	_check(HoneyPot.ready() and pot_lost.is_empty() and HoneyPot.levels(&"room") > 4 and HoneyPot.levels(&"hud") > 4,
+		"HoneyPot's sheet loads: room, HUD, cue and shelf jars with their levels", str(pot_lost))
+	# The island hive: the contract's fields, twelve slots split between the faces, every jar
+	# held drawn up to twelve and none in the weathered cupboard.
+	var c := Hive.contract()
+	var frames: Dictionary = c.get("frames", {})
+	var missing: Array[String] = []
+	for name: String in ["hive_weathered", "hive_full", "tree_bare", "tree_bloom", "tree_swarm", "ready"]:
+		if not frames.has(name):
+			missing.append(name)
+	for k in int(c.get("levels", 0)) + 1:
+		if not frames.has("hive_colony%d" % k):
+			missing.append("hive_colony%d" % k)
+	for key: String in ["jar_slots", "entrance", "entrance_high", "ready_at", "tree_at", "tree_foot",
+			"tree_size", "swarm_px", "foot_tiles"]:
+		if not c.has(key):
+			missing.append(key)
+	_check(missing.is_empty() and int(c.get("levels", 0)) == 4 and not frames.has("shelf_0"),
+		"hive.json carries the cupboard's five window levels, the tree and the jar slots, no shelf frames",
+		str(missing))
+	var slots: Array = c.get("jar_slots", [])
+	var shaded := 0
+	for slot: Variant in slots:
+		if slot is Array and (slot as Array).size() > 2 and int(slot[2]) != 0:
+			shaded += 1
+	_check(slots.size() == Hive.JARS_PER * Hive.HARVESTS_MOST and shaded * 2 == slots.size()
+		and not hive.jar_slot(0).is_empty() and not hive.jar_slot(slots.size() - 1).is_empty()
+		and hive.jar_slot(slots.size()).is_empty() and hive.jar_slot(-1).is_empty(),
+		"twelve jar slots, half on each face of the cupboard", "%d slots, %d shaded" % [slots.size(), shaded])
+	_check(Hive.centre.is_equal_approx(Vector2.ZERO) and Hive.half.is_equal_approx(Vector2(0.4375, 0.4375)),
+		"the footprint is the cupboard's own square", "%s half %s" % [Hive.centre, Hive.half])
+	var stage_was := hive.stage
+	var jars_was := hive.jars
+	var drawn := []
+	hive.set_stage(Hive.Stage.BUSY)
+	for n: int in [0, 1, 5, 11, 12]:
+		hive.jars = n
+		drawn.append(hive.jars_shown())
+	hive.jars = 9
+	hive.set_stage(Hive.Stage.SWARM)
+	var weathered := hive.jars_shown()
+	hive.set_stage(stage_was)
+	hive.jars = jars_was
+	_check(drawn == [0, 1, 5, 11, 12] and weathered == 0,
+		"the cupboard draws every jar held, up to twelve, and none while it is weathered",
+		"%s, %d" % [drawn, weathered])
+	# The kitchen: the uncap's and the pour's pieces, a lever picture per turn.
+	var kitchen_lost: Array[String] = []
+	for name: StringName in [&"knife", &"bucket", &"bucket_front", &"bucket_open", &"bucket_rope",
+			&"flume_back", &"flume_front", &"gate", &"stand", &"bench", &"rosette", &"bead", &"wax_curl",
+			&"pool_scraped"]:
+		if not HiveKitchenArt.has(name):
+			kitchen_lost.append(String(name))
+	var turns := HiveKitchenArt.lever_turns()
+	for k in turns.size():
+		if not HiveKitchenArt.has(StringName("lever%d" % k)):
+			kitchen_lost.append("lever%d" % k)
+	var pour := HiveKitchenArt.data(&"pour")
+	_check(kitchen_lost.is_empty() and turns.size() > 4 and not HiveKitchenArt.data(&"uncap").is_empty()
+		and (pour.get("slots", []) as Array).size() == Hive.JARS_PER,
+		"the kitchen's sheet has the knife, the oak bucket, the flume, the stand, a lever a turn and three jar slots",
+		str(kitchen_lost))
+	# The hive room's view is the wash room's (2026-10-19): rubbish, boats and dogs, no veil,
+	# behind its hedge.
+	var room: HiveRoom = _main.get(&"_hive_room")
+	var wash: WashRoom = _main.get(&"_wash")
+	var view: WashBackdrop = room.backdrop() if room != null else null
+	if room != null:
+		room.open(true)
+		room.open(false)
+	var hedge: HiveHedge = room.hedge() if room != null else null
+	_check(view != null and not view.bare and is_zero_approx(view.veil)
+		and is_equal_approx(view.darken, WashBackdrop.DARKEN) and is_zero_approx(view.bank_offset)
+		and view.rubbish == room.rubbish and not room.rubbish.is_empty()
+		and not (view.get(&"_hulls") as Array).is_empty() and not (view.get(&"_dogs") as Array).is_empty(),
+		"the hive room's view is the wash room's: rubbish, boats and dogs, no veil",
+		"flotsam %d hulls %d dogs %d" % [(view.get(&"_flotsam") as Array).size() if view else -1,
+			(view.get(&"_hulls") as Array).size() if view else -1, (view.get(&"_dogs") as Array).size() if view else -1])
+	_check(hedge != null and hedge.is_painted() and hedge.get_parent() == room,
+		"and the low hedge stands at its foot, painted", "")
+	var wash_view: WashBackdrop = wash.get(&"_backdrop") if wash != null else null
+	_check(wash_view != null and not wash_view.bare and is_zero_approx(wash_view.veil),
+		"the wash room's view keeps its lake: not bare, no veil", "")
+	# The honey bees: as many as the window wants, gone when it runs out.
+	var bees: HoneyBees = _main.get(&"_honey_bees")
+	_check(bees != null, "the honey bees ride the angler", "")
+	if bees != null:
+		var left_was := bees.left
+		bees.left = Lake.HONEY_TIME * 0.5
+		bees._process(0.016)
+		var half_count := bees.orbiting()
+		bees.left = 0.0
+		for k in 3:
+			bees._process(HoneyBees.LEAVE)
+		var after := bees.orbiting()
+		var flying := (bees.get(&"_bees") as Array).size()
+		bees.left = left_was
+		_check(half_count == HoneyBees.wanted(Lake.HONEY_TIME * 0.5) and half_count == 3 and after == 0
+			and flying == 0, "the honey bees escort as many as the window wants and fly off when it ends",
+			"%d at half, %d after, %d still flying" % [half_count, after, flying])
+	# The honey coin's sheet: nine turns face to back and its trail drops.
+	var coin_data: Variant = JSON.parse_string(FileAccess.get_file_as_string(CoinFly.HONEY_DATA))
+	_check(bool(CoinFly._honey_art()) and coin_data is Dictionary and (coin_data["turns"] as Array).size() == 9
+		and (coin_data["drops"] as Array).size() == CoinFly.HONEY_TRAIL and CoinFly.honey_frame_of(1.0) == 0
+		and CoinFly.honey_frame_of(0.0) == 4,
+		"the honey coin's sheet loads: nine turns and its trail drops", "")
+	# The cue card's icon is the honey pot's own cue frames.
+	var cue_source := FileAccess.get_file_as_string("res://scripts/cue_card.gd")
+	var hud_source := FileAccess.get_file_as_string("res://scripts/honey_pot.gd")
+	_check(cue_source.contains("HoneyPot.draw(self, &\"cue_sealed\"") and not cue_source.contains("cue_pop%d")
+		and hud_source.contains("return draw(ci, &\"hud_sealed\", at, scale)") and not hud_source.contains("\"hud_open%d\" % hud_level"),
+		"the honey pot on the HUD and the cue card is always the sealed one: label and gingham lid", "")
+	# The net's honey is the hive's, and the shader's defaults say the same.
+	var shader_source := FileAccess.get_file_as_string("res://shaders/net_mesh.gdshader")
+	var off: Array[String] = []
+	var amber := {"amber_deep": NetShape.AMBER_DEEP, "amber_low": NetShape.AMBER_LOW, "amber": NetShape.AMBER,
+		"amber_lit": NetShape.AMBER_LIT, "amber_shade": NetShape.AMBER_SHADE}
+	for name: String in amber:
+		var col: Color = amber[name]
+		var at := shader_source.find("uniform vec4 %s :" % name)
+		var parts := PackedStringArray()
+		if at >= 0:
+			var open := shader_source.find("vec4(", at + 10)
+			var close := shader_source.find(")", open)
+			parts = shader_source.substr(open + 5, close - open - 5).split(",")
+		if parts.size() < 3 or absf(float(parts[0]) - col.r) > 0.003 or absf(float(parts[1]) - col.g) > 0.003 \
+				or absf(float(parts[2]) - col.b) > 0.003:
+			off.append(name)
+	_check(off.is_empty(), "the net shader's amber defaults are NetShape's", str(off))
+	_check(NetShape.AMBER_LOW.is_equal_approx(HiveArt.HONEY_DEEP) and NetShape.AMBER.is_equal_approx(HiveArt.HONEY_MID)
+		and NetShape.AMBER_LIT.is_equal_approx(HiveArt.HONEY),
+		"and the net's honey is the hive's honey", "")
+	# The bee recordings: Nuven's bee layered into the colony's hum and three swarm takes.
+	var sound_lost: Array[String] = []
+	for path: String in ["res://assets/sfx/hive_hum.wav", "res://assets/sfx/hive_swarm_1.wav",
+			"res://assets/sfx/hive_swarm_2.wav", "res://assets/sfx/hive_swarm_3.wav"]:
+		var stream: AudioStream = load(path) as AudioStream if ResourceLoader.exists(path) else null
+		if stream == null or stream.get_length() < 0.3:
+			sound_lost.append(path.get_file())
+	var sound := Sfx.main()
+	_check(sound_lost.is_empty() and (sound == null or (int(sound.call(&"_count", &"hive_swarm")) == 3
+		and int(sound.call(&"_count", &"hive_hum")) >= 1)),
+		"the hive's hum and three swarm takes are recordings and load", str(sound_lost))
+	# The knife's sizzle is Clearwavsound's recording (2026-10-19), a looping file the uncap
+	# step loads over the built one, and the licence's credit is on the board.
+	var knife := HiveSounds.loop_stream(&"hive_sizzle") as AudioStreamWAV
+	_check(ResourceLoader.exists("res://assets/sfx/hive_sizzle.wav") and knife != null
+		and knife.loop_mode == AudioStreamWAV.LOOP_FORWARD and knife.get_length() > 1.0
+		and CreditsBoard.LINES.has("Clearwavsound"),
+		"the knife's sizzle is the recording, looping, and its author is credited", "")
+
+## Honey jars are eaten (2026-10-16): a jar off the hive's shelf is `Lake.HONEY_TIME` seconds
+## in which every piece of rubbish a net takes pays `Lake.HONEY_BONUS` of its base price into
+## the purse at once. The eating, the pay and what is left out of it, the clock's holds, the
+## plate, the bind, the cue, the words and the save. Run on the hive stage's lake, in play
+## after its glide back from the menu; the stage's `_hive_restore` puts the hive back.
+func _check_honey() -> void:
+	var hive: Hive = _main.get(&"_hive")
+	var skin: HudSkin = _main.get(&"_skin")
+	var coins: CoinFly = _main.get(&"_coins")
+	var economy: EconomyConfig = _main.get(&"_economy")
+	var net2: CastNet = _main.get(&"_net2")
+	var sludge_was: float = _main.get(&"sludge")
+	var birds_was: int = _main.get(&"birds_caught")
+	var filth_was: float = _main.get(&"_filth_left")
+	var pollution_was: float = _main.pollution
+	var yard_was := _yard.held
+	var catch_was := _net.catch
+	var seen: Dictionary = _main.get(&"_cues_seen")
+	var seen_was := seen.duplicate()
+	var hints: Array = _main.get(&"_hints")
+	hints.clear()
+	_main.call(&"_end_hint", false)
+	_main.set(&"_honey_left", 0.0)
+	_main.set(&"_honey_span", 0.0)
+	_main.set(&"_honey_ate_at", -10)
+	_check(bool(_main.call(&"_honey_runs")), "the lake is in play for the honey after the glide", "")
+
+	# Eating: none with no jar, one jar for HONEY_TIME, a second adding its seconds.
+	hive.set_stage(Hive.Stage.BUSY)
+	hive.jars = 0
+	_check(not bool(_main.call(&"_eat_honey")) and is_zero_approx(float(_main.get(&"_honey_left"))),
+		"with no jar on the shelf, eating does nothing", "")
+	hive.jars = 2
+	var ate := bool(_main.call(&"_eat_honey"))
+	_check(ate and hive.jars == 1 and is_equal_approx(float(_main.get(&"_honey_left")), Lake.HONEY_TIME)
+		and Lake.HONEY_TIME == 15.0,
+		"a jar eaten: one off the shelf and fifteen seconds of honey", "jars %d, %.1f s" % [hive.jars, float(_main.get(&"_honey_left"))])
+	_check(not bool(_main.call(&"_eat_honey")) and hive.jars == 1,
+		"one press is one jar: a second in the same frame (H in pad mode, read twice) is refused", "")
+	_main.set(&"_honey_ate_at", -10)
+	_check(bool(_main.call(&"_eat_honey")) and hive.jars == 0
+		and is_equal_approx(float(_main.get(&"_honey_left")), Lake.HONEY_TIME * 2.0)
+		and is_equal_approx(float(_main.get(&"_honey_span")), Lake.HONEY_TIME * 2.0) and Lake.HONEY_BONUS == 0.5,
+		"a second jar adds its fifteen seconds; the bonus stays half the price", "%.1f s" % float(_main.get(&"_honey_left")))
+	# The cupboard shows every jar left, one honey pot a jar (2026-10-18: no shelf rows).
+	var shown := []
+	for n: int in [0, 1, 3, 4, 12]:
+		hive.jars = n
+		shown.append(hive.jars_shown())
+	_check(shown == [0, 1, 3, 4, 12], "the cupboard shows exactly the jars left", str(shown))
+	hive.jars = 0
+	_main.call(&"_honey_step", 0.0)
+	_check(_net.honey and (net2 == null or net2.honey), "both nets are told the honey is running", "")
+	var bees: HoneyBees = _main.get(&"_honey_bees")
+	_check(bees != null and bees.get_parent() == _angler and is_equal_approx(bees.left, Lake.HONEY_TIME * 2.0)
+		and HoneyBees.wanted(Lake.HONEY_TIME) == HoneyBees.BEES and HoneyBees.wanted(1.0) == 1
+		and HoneyBees.wanted(0.0) == 0 and HoneyBees.wanted(999.0) == HoneyBees.BEES_MOST,
+		"the bees ride the angler, more of them the more is left, one at the last", "")
+	# The net's look: amber rim for honey, the gold winning on a lucky honeyed cast.
+	var mat := ShaderMaterial.new()
+	mat.shader = NetShape.SHADER
+	var shape := NetShape.lying(60.0)
+	shape.honey = true
+	shape.push(mat)
+	var sweet := float(mat.get_shader_parameter(&"honey")) == 1.0 \
+		and Color(mat.get_shader_parameter(&"cord")).is_equal_approx(NetShape.CORD)
+	shape.gold = true
+	shape.push(mat)
+	_check(sweet and float(mat.get_shader_parameter(&"honey")) == 0.0 and float(mat.get_shader_parameter(&"lucky")) == 1.0
+		and not NetShape.AMBER.is_equal_approx(NetShape.GOLD) and _net.get_node_or_null(^"HoneyDrips") != null,
+		"a honeyed net is amber on its rim and keeps its tan cord; lucky as well, the gold wins", "")
+
+	# The pay: half the base price of every rubbish piece a sweep takes, at once, and a coin.
+	var rubbish := -1
+	var find := -1
+	for i in _grid.defs.size():
+		if _grid.defs[i].keepsake:
+			if find < 0:
+				find = i
+		elif rubbish < 0:
+			rubbish = i
+	var def := _grid.defs[rubbish]
+	var half := Lake.HONEY_BONUS * economy.price_of(def.material, def.tier)
+	var at := _net.world_pos()
+	# The Recycle Bonus live on this piece's own yard: the honey is half the base price, never
+	# half of `piece_pay`, which carries the boost.
+	var bonus_level_was: int = _main.get(&"recycle_bonus_level")
+	var bonus_kind_was: int = _main.get(&"_bonus_kind")
+	_main.set(&"recycle_bonus_level", maxi(bonus_level_was, 1))
+	_main.set(&"_bonus_kind", def.material)
+	var boosted := float(_main.call(&"piece_pay", rubbish, def.material)) > economy.price_of(def.material, def.tier)
+	coins.clear()
+	var before: float = _main.get(&"sludge")
+	_net.catch = PackedInt32Array([rubbish, rubbish])
+	_main.call(&"_on_net_swept", at, 2, 10, 30.0, _net)
+	var paid := float(_main.get(&"sludge")) - before
+	_check(is_equal_approx(paid, half * 2.0) and coins.honey_flying() == 1,
+		"a sweep under honey pays half each piece's base price at once, and a honey coin flies",
+		"%.2f against %.2f, %d honey coins" % [paid, half * 2.0, coins.honey_flying()])
+	_check(boosted, "with the Recycle Bonus on that piece's yard, and the honey not boosted by it", "")
+	_main.set(&"recycle_bonus_level", bonus_level_was)
+	_main.set(&"_bonus_kind", bonus_kind_was)
+	# A net still out when a board comes up catches on, but the window is standing still and
+	# pays nothing out of it.
+	_main.call(&"_set_menu", true)
+	before = _main.get(&"sludge")
+	_net.catch = PackedInt32Array([rubbish])
+	_main.call(&"_on_net_swept", at, 1, 10, 30.0, _net)
+	var under_board := float(_main.get(&"sludge")) - before
+	_main.call(&"_set_menu", false)
+	_check(is_zero_approx(under_board), "a sweep under the shop pays no honey: its clock is standing",
+		"%.2f" % under_board)
+	if net2 != null:
+		before = _main.get(&"sludge")
+		net2.catch = PackedInt32Array([rubbish])
+		_main.call(&"_on_net_swept", at, 1, 10, 30.0, net2)
+		_check(is_equal_approx(float(_main.get(&"sludge")) - before, half),
+			"the double cast's net pays it too", "")
+		net2.catch = PackedInt32Array()
+	before = _main.get(&"sludge")
+	_net.catch = PackedInt32Array([find])
+	_main.call(&"_on_net_swept", at, 1, 10, 30.0, _net)
+	_check(find >= 0 and is_equal_approx(float(_main.get(&"sludge")), before),
+		"a find in the net pays no honey", "")
+	before = _main.get(&"sludge")
+	var honey_coins := coins.honey_flying()
+	_main.call(&"_on_bird_caught", Vector2.ZERO)
+	_check(is_equal_approx(float(_main.get(&"sludge")) - before, float(_main.call(&"bird_pay")))
+		and coins.honey_flying() == honey_coins,
+		"a pigeon pays its own pay and no honey", "")
+	before = _main.get(&"sludge")
+	_main.call(&"_dog_brought_back", rubbish)
+	_check(is_equal_approx(float(_main.get(&"sludge")), before), "nor does what a dog fetches", "")
+	before = _main.get(&"sludge")
+	_net.catch = PackedInt32Array([rubbish, rubbish, rubbish])
+	_main.call(&"_on_tornado_netted", _net, 3)
+	_check(is_equal_approx(float(_main.get(&"sludge")) - before, half * 3.0),
+		"what a tornado hit pours into the net pays honey too", "%.2f" % (float(_main.get(&"sludge")) - before))
+	_net.catch = catch_was
+	coins.clear()
+	_main.set(&"sludge", sludge_was)
+	_main.set(&"birds_caught", birds_was)
+	_yard.held = yard_was
+	_main.set(&"_filth_left", filth_was)
+	_main.pollution = pollution_was
+
+	# The clock: still under a board, the settings pause and a moment; running on the lake.
+	var left: float = _main.get(&"_honey_left")
+	_main.call(&"_set_menu", true)
+	_main.call(&"_honey_step", 1.0)
+	var under_shop := is_equal_approx(float(_main.get(&"_honey_left")), left)
+	_main.call(&"_set_menu", false)
+	_main.call(&"_set_settings", true)
+	_main.call(&"_honey_step", 1.0)
+	var under_pause := is_equal_approx(float(_main.get(&"_honey_left")), left)
+	_main.call(&"_set_settings", false)
+	_main.set(&"_moment", 0.0)
+	_main.call(&"_honey_step", 1.0)
+	var under_moment := is_equal_approx(float(_main.get(&"_honey_left")), left)
+	_main.set(&"_moment", -1.0)
+	_check(under_shop and under_pause and under_moment, "the honey's clock stands under the shop, the settings and a moment",
+		"%s %s %s" % [under_shop, under_pause, under_moment])
+	_main.call(&"_honey_step", 1.0)
+	_check(is_equal_approx(float(_main.get(&"_honey_left")), left - 1.0), "and runs on the lake", "")
+	hive.jars = 2
+	_main.call(&"_set_menu", true)
+	_main.set(&"_honey_ate_at", -10)
+	_check(not bool(_main.call(&"_eat_honey")) and hive.jars == 2, "no jar is eaten under a board", "")
+	_main.call(&"_set_menu", false)
+
+	# The plate: shown with a jar or a window, gone with neither, never in the demo.
+	_main.call(&"_update_hud")
+	var box := skin.honey_box()
+	var money := skin.money_drawn_box()
+	var clear := box.size.x > 0.0 and box.position.y >= money.end.y and not box.intersects(skin.stock_box()) \
+		and not box.intersects(skin.meter_box()) and not box.intersects(skin.upgrades_box()) \
+		and not box.intersects(skin.shed_box()) and not skin.honey_bar_box().intersects(skin.meter_box())
+	_check(skin.honey_shown() and clear and skin.call(&"_under", box.get_center()) == &"honey",
+		"the jar plate stands under the money plate, clear of the meter and the buttons, and takes its click",
+		str(box))
+	# A real press, through the viewport as the mouse sends it: on the plate, then on the drain
+	# hung under it, each eats a jar and is taken there, never also a cast or a led walk on the
+	# lake under the HUD's corner.
+	var bar := skin.honey_bar_box()
+	var bar_spot := Vector2(bar.get_center().x, bar.end.y - 1.0)
+	_check(float(skin.honey_left) > 0.0 and skin.call(&"_under", bar_spot) == &"honey"
+		and skin.call(&"_under", bar.get_center()) == &"honey" and box.encloses(bar.grow(-1.0)),
+		"while a window runs, the medallion's draining ring is part of the plate", str(bar))
+	# The glide this check runs after was struck in the same tick, so the menu is still fading
+	# out over the window and would take the press (it does for its FADE in play as well).
+	var menu: MainMenu = _main.get(&"_menu")
+	if menu != null and not menu.live():
+		menu.put_away(true)
+	for spot: Vector2 in [box.get_center(), bar.get_center(), bar_spot]:
+		hive.jars = maxi(hive.jars, 1)
+		_main.set(&"_honey_ate_at", -10)
+		_main.call(&"_stop_led_cast")
+		var walk_was := _angler.walk_to
+		var led_was: Vector2 = _main.get(&"_led_cast")
+		var jars := hive.jars
+		var press_at := skin.get_global_transform_with_canvas() * spot
+		var under: Array[String] = []
+		_controls_at(get_tree().root, press_at, under)
+		var taken := _click_at(press_at)
+		_check(hive.jars == jars - 1 and taken and _net.state == CastNet.State.IDLE
+			and _main.get(&"_led_cast") == led_was and _angler.walk_to == walk_was,
+			"a click on the jar plate eats a jar and is no cast", "%s: jars %d, taken %s, net %d, led %s, under %s"
+			% [spot, hive.jars, taken, _net.state, _main.get(&"_led_cast"), under])
+	hive.jars = 0
+	_main.call(&"_honey_step", 999.0)
+	_main.call(&"_update_hud")
+	_check(not skin.honey_shown() and skin.honey_box().size.x <= 0.0 and not _net.honey,
+		"no jar and no window: the plate is gone and the nets are plain", "")
+	hive.jars = 3
+	Demo.forced = true
+	_main.call(&"_update_hud")
+	var demo_hidden := not skin.honey_shown()
+	_main.set(&"_honey_ate_at", -10)
+	var demo_ate := bool(_main.call(&"_eat_honey"))
+	Demo.forced = false
+	_main.call(&"_update_hud")
+	_check(demo_hidden and not demo_ate and skin.honey_shown(), "never in the demo: no plate and nothing eaten", "")
+
+	# The bind: H and the D-pad's up, the lake's alone, pressed through the desk.
+	var row := Binds.row_of(&"eat_honey")
+	var others := 0
+	for other: Dictionary in Binds.rows():
+		if other["action"] != &"eat_honey" and Binds.CONTEXT_LAKE in other["contexts"] \
+				and (other["pad"] == "pad:11" or other["key"] == "key:72"):
+			others += 1
+	var physical := false
+	for event: InputEvent in InputMap.action_get_events(&"eat_honey"):
+		var key := event as InputEventKey
+		if key != null and key.physical_keycode == KEY_H:
+			physical = true
+	_check(row.get("key") == "key:%d" % KEY_H and row.get("pad") == "pad:%d" % JOY_BUTTON_DPAD_UP
+		and others == 0 and physical and String(row.get("group")) == "BIND_GROUP_NET",
+		"eat_honey is H and the D-pad's up, held by no other lake verb, among the net's", str(row))
+	_main.set(&"_honey_ate_at", -10)
+	_press_action(&"eat_honey")
+	_check(hive.jars == 2, "H on the lake eats a jar", str(hive.jars))
+
+	# The first jar's cue: owed by a jar on the shelf, at the plate, gone when one is eaten.
+	seen.erase(&"honey_jar")
+	var hint: CueCard = _main.get(&"_hint_card")
+	if hint != null:
+		hint._process(CueCard.FADE + 0.05)
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	hint = _main.get(&"_hint_card")
+	var plate_at := (skin.get_global_transform() * skin.honey_box()).get_center()
+	_check(hint != null and StringName(_main.get(&"_hint_up")) == &"honey_jar" and hint.kind == &"honey_jar"
+		and hint.text == Text.of("CUE_HONEY") and hint.target.get_center().distance_to(plate_at) < 1.0
+		and seen.has(&"honey_jar") and &"honey_jar" in Lake.CUE_KINDS,
+		"the first jar held owes its cue, pointed at the jar plate", str(hint.target) if hint != null else "")
+	_main.set(&"_honey_ate_at", -10)
+	_main.call(&"_eat_honey")
+	_check(StringName(_main.get(&"_hint_up")) == &"", "eating a jar takes the cue down", "")
+	_check(CueCard.THEMES.has(&"honey_jar") and CueCard.THEMES[&"honey_jar"][&"entrance"] == &"ooze",
+		"the honey jar's cue has a theme of its own", "")
+
+	# The words, read off the CSV rather than through `Text.of`: the fallback locale is English,
+	# so a blank cell reads back as the English line and would pass (the pack finds' names did,
+	# 2026-10-04). Every language written, its back-translation beside it, not English left in
+	# place, and the cue saying the window and the bonus the game uses.
+	var rows := {}
+	var csv := FileAccess.open("res://locale/translations.csv", FileAccess.READ)
+	var head := PackedStringArray()
+	if csv != null:
+		head = csv.get_csv_line()
+		while not csv.eof_reached():
+			var cells := csv.get_csv_line()
+			if cells.size() >= head.size() and cells[0] in ["CUE_HONEY", "VERB_EAT_HONEY"]:
+				rows[cells[0]] = cells
+		csv.close()
+	var missing: Array[String] = []
+	var figures := [str(int(Lake.HONEY_TIME)), str(int(Lake.HONEY_BONUS * 100.0))]
+	for key: String in ["CUE_HONEY", "VERB_EAT_HONEY"]:
+		if not rows.has(key):
+			missing.append("%s: no row" % key)
+			continue
+		var cells: PackedStringArray = rows[key]
+		var english := cells[head.find("en")].strip_edges()
+		for entry: Dictionary in Prefs.LANGUAGES:
+			var locale := String(entry["locale"])
+			var col := head.find(locale)
+			var words := cells[col].strip_edges() if col >= 0 else ""
+			if words.is_empty():
+				missing.append("%s/%s blank" % [key, locale])
+				continue
+			if locale != "en":
+				var back := head.find("_back_" + locale)
+				if back < 0 or cells[back].strip_edges().is_empty():
+					missing.append("%s/%s no back-translation" % [key, locale])
+				if words == english:
+					missing.append("%s/%s left in English" % [key, locale])
+			if key == "CUE_HONEY":
+				if words.count("*") != 4:
+					missing.append("%s/%s marks" % [key, locale])
+				for figure: String in figures:
+					if not words.contains(figure):
+						missing.append("%s/%s without %s" % [key, locale, figure])
+	var generated := FileAccess.get_file_as_string("res://scripts/text.gd")
+	_check(csv != null and Prefs.LANGUAGES.size() == 8 and missing.is_empty()
+		and generated.contains("static var CUE_HONEY") and generated.contains("static var VERB_EAT_HONEY"),
+		"CUE_HONEY and VERB_EAT_HONEY are written in all eight languages, the cue with the window and the bonus",
+		", ".join(missing.slice(0, 8)))
+	_check(Lake.HONEY_TIME == 15.0 and Lake.HONEY_BONUS == 0.5 and Text.of("CUE_HONEY").contains("50%"),
+		"and the numbers they say are the game's", Text.of("CUE_HONEY"))
+
+	# Session only: no key in the save, a load keeps none, and the menu's pose ends it.
+	_main.set(&"_honey_left", 10.0)
+	_main.call(&"save_game")
+	var saved := Lake._read_save(SAVE_PATH)
+	var honey_keys: Array[String] = []
+	for key: Variant in saved:
+		if String(key).contains("honey"):
+			honey_keys.append(String(key))
+	for key: Variant in saved.get("hive", {}) as Dictionary:
+		if String(key).contains("honey"):
+			honey_keys.append("hive." + String(key))
+	_check(honey_keys.is_empty() and Lake.SAVE_VERSION == int(saved.get("version", -1)),
+		"the honey writes no key of its own to the save", str(honey_keys))
+	_main.call(&"load_game")
+	hive = _main.get(&"_hive")
+	_check(is_zero_approx(float(_main.get(&"_honey_left"))), "a load brings no honey back", "")
+	_main.set(&"_honey_left", 10.0)
+	_main.call(&"_enter_menu", false)
+	_check(is_zero_approx(float(_main.get(&"_honey_left"))), "the menu's pose ends the window", "")
+	_main.call(&"_begin_glide")
+	_main.call(&"_glide_step", Lake.GLIDE_TIME + 0.1)
+	_main.call(&"_honey_step", 0.0)
+	hints.clear()
+	_main.call(&"_end_hint", false)
+	seen.clear()
+	seen.merge(seen_was)
+	_main.set(&"sludge", sludge_was)
+
+
 ## A key the player has bound to `action`, pressed, as the lake's desk sees it. The
 ## player's own binds are read rather than assumed: `settings.cfg` may have moved it.
 func _press_action(action: StringName) -> void:
@@ -12491,6 +13094,67 @@ func _press_action(action: StringName) -> void:
 			key.pressed = true
 			_main.call(&"_unhandled_input", key)
 			return
+
+
+## A left press and its release at a point of the canvas, pushed through the viewport as the
+## mouse sends them (`_input`, the GUI, then `_unhandled_input`). Returns whether the press was
+## taken before the lake's `_unhandled_input` could see it.
+func _click_at(at: Vector2) -> bool:
+	var view := get_viewport()
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.button_mask = MOUSE_BUTTON_MASK_LEFT
+	press.pressed = true
+	press.position = at
+	press.global_position = at
+	view.push_input(press, true)
+	var taken := view.is_input_handled()
+	var release := press.duplicate() as InputEventMouseButton
+	release.pressed = false
+	release.button_mask = 0
+	view.push_input(release, true)
+	return taken
+
+
+## Every Control a press at `at` (canvas pixels) could land on, with its layer: the detail
+## for a click that went somewhere else.
+func _controls_at(node: Node, at: Vector2, into: Array[String]) -> void:
+	var control := node as Control
+	if control != null and control.is_visible_in_tree() and control.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+		var box := control.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, control.size)
+		if box.has_point(at):
+			var layer := control.get_canvas_layer_node()
+			into.append("%s@%d" % [control.name, layer.layer if layer != null else 0])
+	for child in node.get_children():
+		_controls_at(child, at, into)
+
+
+## The pad's way to a jar, the D-pad's up read where the pad's buttons are (`_pad_tick`), over
+## two ticks: `Input` counts a press made inside a physics tick from the next one, so
+## `is_action_just_pressed` cannot be asked in the tick that pressed it. Pressed on the first,
+## read on the second, exactly one jar gone whichever of the lake's own tick and this one got
+## there first (`_honey_ate_at`). The last stage: it ends the run.
+func _stage_honey_pad() -> void:
+	var hive: Hive = _main.get(&"_hive")
+	var pad := get_node(^"/root/Pad")
+	if _in_stage == 1:
+		_honey_pad_jars = hive.jars
+		hive.jars = 2
+		_main.set(&"_honey_ate_at", -10)
+		pad.call(&"set_mode", 1)
+		Input.action_press(&"eat_honey")
+		return
+	_main.call(&"_pad_tick", 1.0 / 60.0)
+	Input.action_release(&"eat_honey")
+	_check(hive.jars == 1 and float(_main.get(&"_honey_left")) > 0.0,
+		"the pad's D-pad up eats one jar on the bare lake", str(hive.jars))
+	pad.call(&"set_mode", 0)
+	_main.call(&"_pad_tick", 1.0 / 60.0)
+	hive.jars = _honey_pad_jars
+	_main.set(&"_honey_left", 0.0)
+	_main.set(&"_honey_span", 0.0)
+	_main.call(&"_honey_step", 0.0)
+	_finish()
 
 
 func _stage_new_tracks() -> void:
@@ -13382,7 +14046,7 @@ func _check_oct11_fixes() -> void:
 		if ground.layer == Ground.Layer.OUTSIDE:
 			bank = ground
 	if bank != null:
-		_check(bank.driftwood.size() >= 5 and bank.driftwood.size() <= Ground.DRIFTWOOD_MOST,
+		_check(bank.driftwood.size() >= 3 and bank.driftwood.size() <= Ground.DRIFTWOOD_MOST,
 			"the bank's beach has a few pieces of driftwood", str(bank.driftwood.size()))
 		var near_twin := 0
 		var names: Array = bank.get(&"_drift_names")
@@ -13398,13 +14062,23 @@ func _check_oct11_fixes() -> void:
 		var kinds_laid := {}
 		for n: String in names:
 			kinds_laid[n] = true
-		_check(kinds_laid.size() >= 3, "and they are not all the one picture", str(kinds_laid.keys()))
+		# Big ones only (2026-10-19): the small logs and sticks read as rubbish on the sand.
+		_check(kinds_laid.keys() == ["driftwood"], "and they are all the big driftwood", str(kinds_laid.keys()))
+		var wet_log := 0
+		for box: Rect2 in bank.driftwood:
+			for corner: Vector2 in [box.position, Vector2(box.end.x, box.position.y), box.end,
+					Vector2(box.position.x, box.end.y)]:
+				var t := Iso.world_to_tile(corner)
+				if bank.out_of_water(t.x, t.y) < Ground.DRIFTWOOD_DRY:
+					wet_log += 1
+		_check(wet_log == 0, "and they lie up the beach, off the water", str(wet_log))
 		# Round the bank, not along one stretch of it.
 		var sides := {}
 		for box: Rect2 in bank.driftwood:
 			var tile := Iso.world_to_tile(box.get_center())
 			sides[int(floor((Vector2(tile.x, tile.y) - Iso.CENTRE).angle() / (PI * 0.5)))] = true
-		_check(sides.size() >= 3, "and the logs lie round the bank", str(sides.keys()))
+		# Only a few since 2026-10-19, so two sides of the bank at least.
+		_check(sides.size() >= 2, "and the logs lie round the bank", str(sides.keys()))
 		var under := []
 		for index in _grid.stacks.size():
 			var tx := index % Iso.COLS
@@ -13820,4 +14494,17 @@ func _check_oct15_notes() -> void:
 	room.half_seen = true
 	(room.get(&"_house_playing") as Array).clear()
 	var hints: Array = _main.get(&"_hints")
+	hints.erase(&"demo_house")
+	# The full game's first stage-up owes the same card (2026-10-19, Richard).
+	room.house_stage = 2
+	room.house_seen = 1
+	played[0] = false
+	room.half_played.connect(on_played)
+	room.call(&"_house_shown")
+	room.half_played.disconnect(on_played)
+	_check(played[0] and (room.get(&"_house_playing") as Array).has("u12"),
+		"and the full game's stage-up owes the house's card too", "")
+	room.house_stage = stage_was
+	room.house_seen = seen_was
+	(room.get(&"_house_playing") as Array).clear()
 	hints.erase(&"demo_house")

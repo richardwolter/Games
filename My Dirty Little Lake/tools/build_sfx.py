@@ -195,6 +195,39 @@ PLAN = {
     # double's recording is a run of whooshes and then a hit; only the hit, from 1.6 s.
     "lucky_cast": ("../Lucky_Net_Cast.mp3", ("trim", 1.9)),
     "double_cast": ("../DoubleNet_Cast.wav", ("span", 1.6, 3.92, 0.4)),
+    # The hive's buzz, out of Nuven's own bee (2026-10-18, Richard: the built buzz "grates
+    # most"). These take the names `HiveSounds` builds, so the files win over the code. The
+    # bee is one fly-by, 3.1 s, mono, about 122 Hz with its harmonics stacked 500-1300 Hz;
+    # `colony` below cuts its steady stretch, evens out the fly-by's swell, makes it a tile
+    # that runs round into itself and lays it over itself at a few pitches, places and pans,
+    # each layer breathing on its own. Muffled (`MUFFLE`): the wing fizz over 4 kHz is what
+    # grated once there were six of it.
+    #   hive_hum: the colony in the box, the catch step's drag loop. Layers are
+    #   (pitch, offset_s, gain, pan -1..1, breaths per loop).
+    "hive_hum": (NEW + "BeeFlyBy_BU01.26.wav", ("colony", 0.3, 3.05, 6.0, 0.6, [
+        (0.86, 0.00, 0.55, -0.45, 2),
+        (0.94, 0.71, 0.85, 0.30, 3),
+        (1.00, 1.37, 1.00, -0.10, 1),
+        (1.05, 0.33, 0.85, 0.50, 4),
+        (1.12, 2.05, 0.65, -0.60, 3),
+        (1.26, 1.62, 0.40, 0.20, 5),
+    ])),
+    #   hive_swarm: a swell of bees, one-shot, three takes (`hive_swarm_1`..3, never the one
+    #   played last). Each take is (length_s, layers), a layer (pitch, offset_s, gain, pan,
+    #   in_s): in at in_s, the whole swelling up and let go over its last `SWARM_OUT`.
+    "hive_swarm": (NEW + "BeeFlyBy_BU01.26.wav", ("swarm", 0.3, 3.05, [
+        (1.4, [(1.00, 0.20, 1.0, -0.2, 0.00), (1.08, 1.30, 0.8, 0.4, 0.18),
+               (0.93, 2.10, 0.7, -0.5, 0.35), (1.19, 0.90, 0.5, 0.6, 0.55)]),
+        (1.3, [(1.04, 1.05, 1.0, 0.2, 0.00), (0.96, 0.15, 0.8, -0.4, 0.12),
+               (1.13, 1.80, 0.6, 0.5, 0.30), (0.89, 2.40, 0.5, -0.6, 0.50)]),
+        (1.5, [(0.98, 1.85, 1.0, 0.0, 0.00), (1.10, 0.60, 0.8, -0.5, 0.22),
+               (1.02, 2.55, 0.7, 0.5, 0.40), (1.22, 1.20, 0.5, -0.2, 0.62)]),
+    ])),
+    # The hot knife through the comb (2026-10-19, Richard picked it): Clearwavsound's "Hot
+    # Knife in Butter" (freesound 541034, CC-BY 3.0, credited). Two strokes; the second is
+    # the steady one, -30 dB flat from 5.25 to 7.5 s, so the loop is cut out of it. It takes
+    # the name `HiveSounds` builds, so the file wins over the code. The crackle stays built.
+    "hive_sizzle": ("Hot_Knife_In_Butter.wav", ("loop", 5.3, 1.7, 0.4)),
 }
 
 ## Names whose low end is rolled off and whose start is eased in: brought up to level, the
@@ -203,12 +236,14 @@ PLAN = {
 ## editor's inspector however often it was reimported, renamed or had its UID rebuilt, while
 ## every other .ogg in the project did (2026-09-15); as a WAV it is one of the ordinary sounds.
 ## The long beds stay OGG — the lake's four minutes would be 41 MB of WAV.
-LOOP_WAV = {"wading"}  # also a plain sound now: the game leaves a gap between plays
+LOOP_WAV = {"wading", "hive_hum", "hive_sizzle"}  # also a plain sound now: the game leaves a gap between plays
 SMOOTH = {"step_water"}
 ## Names muffled by a low pass at this many Hz (two one-pole passes): the crate's and the
 ## hold's thud, softened (2026-09-28, Richard: "softer thump, muffle it a little bit").
 ## (`pop` was here at 2500 Hz for Object_in_box; Thump_Plastic is not muffled, 2026-10-06.)
-MUFFLE = {}
+## The hive's buzz (2026-10-18): six layers of a bee's wing fizz is a hiss; muffled it is a
+## box of bees.
+MUFFLE = {"hive_hum": 4500.0, "hive_swarm": 6000.0}
 SMOOTH_HZ = 500.0
 SMOOTH_IN = 0.03
 ## The faintest onset in a footstep take that is still a footstep, against the loudest.
@@ -224,6 +259,12 @@ STEP_LEAST = 0.25
 TARGET_LUFS = -22.0
 BED_LUFS = -20.0
 BEDS = {"lake_ambient", "fireplace", "rain"}
+## Names levelled somewhere other than TARGET_LUFS. The colony's hum is played on the catch
+## step's own player at the step's own `BUZZ_DB`, not through `SOUNDS`, and that figure was
+## set against the built hum it replaces (peak-normalised, about -11 LUFS as it plays). Put
+## at -22 it would sit eleven decibels under where the step was tuned; here it plays about
+## three under the built one. Retune the step's `BUZZ_DB` and this together, or neither.
+TARGETS = {"hive_hum": -14.0}
 ## Carried from the left ear to the right over the take, baked into the file: a player has
 ## no pan, and one bee is one pass.
 PAN_SWEEP = {"bee"}
@@ -518,6 +559,121 @@ def loop(samples, start_s, len_s, cross_s=None):
     return body
 
 
+## The colony's tile: how long the swell of the fly-by is measured over when it is evened
+## out, the most and least it may be pulled up or down by doing so, and how much of the
+## stretch's end is crossed into its start so the tile runs round into itself.
+EVEN_WIN = 0.12
+EVEN_MOST = 6.0
+EVEN_LEAST = 0.25
+TILE_CROSS = 0.35
+## A swarm take's way out, and how fast it flutters as it swells (the built swarm's 9 Hz).
+SWARM_OUT = 0.35
+SWARM_FLUTTER = 9.0
+
+
+def bee_tile(samples, start_s, end_s):
+    """One buzz, mono floats, that runs round into itself.
+
+    The stretch is the recording's steady buzz (it is dual mono, so the channels are
+    averaged); its level is evened out against a running RMS, so the fly-by's swell does not
+    beat through every layer laid off it; then its last `TILE_CROSS` is crossed into its
+    start at equal power, the way `loop` does a bed."""
+    clip = cut(samples, start_s, end_s)
+    mono = [(clip[f * 2] + clip[f * 2 + 1]) * 0.5 for f in range(len(clip) // 2)]
+    hop = int(0.01 * RATE)
+    half = int(EVEN_WIN * RATE) // 2
+    marks = []
+    for at in range(0, len(mono), hop):
+        part = mono[max(0, at - half):at + half]
+        marks.append(math.sqrt(sum(v * v for v in part) / max(1, len(part))) + 1e-6)
+    ref = sorted(marks)[len(marks) // 2]
+    for i in range(len(mono)):
+        k = i / hop
+        a = int(k)
+        b = min(a + 1, len(marks) - 1)
+        env = marks[a] + (marks[b] - marks[a]) * (k - a)
+        mono[i] *= max(EVEN_LEAST, min(EVEN_MOST, ref / env))
+    cross = int(TILE_CROSS * RATE)
+    body = mono[cross:]
+    tail_at = len(body) - cross
+    for f in range(cross):
+        t = f / cross
+        body[tail_at + f] = (body[tail_at + f] * math.cos(t * math.pi / 2)
+                             + mono[f] * math.sin(t * math.pi / 2))
+    return body
+
+
+def _lay(acc, tile, frames, pitch, offset_s, gain, pan, shape):
+    """One layer of `tile` into the stereo float list `acc`, read round and round at `pitch`
+    from `offset_s` in, panned (-1 left, 1 right, equal power), times `shape(frame)`."""
+    size = len(tile)
+    angle = (pan + 1.0) * math.pi / 4.0
+    left = gain * math.cos(angle) * math.sqrt(2.0)
+    right = gain * math.sin(angle) * math.sqrt(2.0)
+    at = (offset_s * RATE) % size
+    for f in range(frames):
+        a = int(at)
+        frac = at - a
+        v = tile[a] + (tile[(a + 1) % size] - tile[a]) * frac
+        g = shape(f)
+        acc[f * 2] += v * left * g
+        acc[f * 2 + 1] += v * right * g
+        at += pitch
+        if at >= size:
+            at -= size
+
+
+def _to_shorts(acc):
+    loudest = max(abs(v) for v in acc) or 1.0
+    scale = 30000.0 / loudest
+    return array.array("h", (int(v * scale) for v in acc))
+
+
+def colony(samples, start_s, end_s, len_s, cross_s, layers, muffle_hz=None):
+    """A held loop of many bees out of one: the tile laid over itself once a layer, each at
+    its own pitch, place in the tile and pan, its level breathing a whole number of times a
+    loop. Made `cross_s` long and seamed like a bed (`loop`): the layers' places in the tile
+    do not come back round together at the loop's end, and the crossfade is what joins them.
+    Muffled here, before the seam, rather than after it as `MUFFLE` does a cut: a filter run
+    over the finished loop starts from silence and would put a click on the join."""
+    tile = bee_tile(samples, start_s, end_s)
+    frames = int((len_s + cross_s) * RATE)
+    loop_frames = int(len_s * RATE)
+    acc = [0.0] * (frames * 2)
+    for k, (pitch, offset_s, gain, pan, breaths) in enumerate(layers):
+        phase = k * 1.7
+        def shape(f, breaths=breaths, phase=phase):
+            return 0.78 + 0.22 * math.sin(2.0 * math.pi * breaths * f / loop_frames + phase)
+        _lay(acc, tile, frames, pitch, offset_s, gain, pan, shape)
+    shorts = _to_shorts(acc)
+    if muffle_hz:
+        low_pass(shorts, muffle_hz)
+    return loop(shorts, 0.0, len_s, cross_s)
+
+
+def swarm(samples, start_s, end_s, spec):
+    """One-shot swells of bees, a take per entry: each layer comes in at its own time over a
+    third of a second, the whole rises, flutters as it grows, and is let go over SWARM_OUT."""
+    tile = bee_tile(samples, start_s, end_s)
+    out = []
+    for len_s, layers in spec:
+        frames = int(len_s * RATE)
+        acc = [0.0] * (frames * 2)
+        for pitch, offset_s, gain, pan, in_s in layers:
+            def shape(f, in_s=in_s, len_s=len_s):
+                t = f / RATE
+                come = min(1.0, max(0.0, (t - in_s) / 0.3))
+                come = come * come * (3.0 - 2.0 * come)
+                rise = min(1.0, t / 0.9)
+                rise = 0.35 + 0.65 * rise * rise * (3.0 - 2.0 * rise)
+                shut = min(1.0, max(0.0, (len_s - t) / SWARM_OUT))
+                flutter = 1.0 + 0.12 * math.sin(2.0 * math.pi * SWARM_FLUTTER * t) * rise
+                return come * rise * shut * shut * flutter
+            _lay(acc, tile, frames, pitch, offset_s, gain, pan, shape)
+        out.append(fade(_to_shorts(acc), 0.03, FADE_OUT))
+    return out
+
+
 def sweep(samples):
     """Left ear to right, in place, equal power."""
     frames = len(samples) // 2
@@ -632,12 +788,18 @@ def main():
         elif kind == "loop":
             bed = loop(samples, how[1], how[2], how[3] if len(how) > 3 else None)
             cuts = [(name, bed, "wav" if name in LOOP_WAV else "ogg")]
+        elif kind == "colony":
+            bed = colony(samples, *how[1:], muffle_hz=MUFFLE.get(name))
+            cuts = [(name, bed, "wav" if name in LOOP_WAV else "ogg")]
+        elif kind == "swarm":
+            cuts = [("%s_%d" % (name, i + 1), s, "wav")
+                    for i, s in enumerate(swarm(samples, *how[1:]))]
         else:
             sys.exit("unknown cut %s" % kind)
 
-        target = BED_LUFS if name in BEDS else TARGET_LUFS
+        target = TARGETS.get(name, BED_LUFS if name in BEDS else TARGET_LUFS)
         for out_name, clip, how_write in cuts:
-            if name in MUFFLE:
+            if name in MUFFLE and kind != "colony":
                 low_pass(clip, MUFFLE[name])
             was = loudness(clip)
             gain = level(clip, target)
