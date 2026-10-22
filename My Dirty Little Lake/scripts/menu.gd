@@ -290,7 +290,9 @@ func _lay_out() -> void:
 	for door: Dictionary in DOORS:
 		var key: StringName = door["key"]
 		var plank: PlankButton = _planks[key]
-		plank.visible = key != &"continue" or has_run
+		# A browser tab cannot close itself (2026-10-20, the web demo): Quit would only stop
+		# the page dead, so the web build leaves it off and the tab's own cross is the way out.
+		plank.visible = (key != &"continue" or has_run) and (key != &"quit" or not OS.has_feature("web"))
 		plank.accent = key == (&"continue" if has_run else &"new")
 		plank.queue_redraw()
 		if plank.visible:

@@ -265,6 +265,12 @@ func _plan() -> Array:
 		{"kind": &"gap"},
 		{"kind": &"button", "key": &"controls", "label": CONTROLS_LABEL},
 	]
+	# In a browser the page decides the window, its size and its sync (2026-10-20, the web
+	# demo): the three rows would be choices that change nothing. Fullscreen is the page's own
+	# button. The frame cap still holds.
+	if OS.has_feature("web"):
+		plan = plan.filter(func(row: Dictionary) -> bool:
+			return not row.get("key", &"") in [&"window_mode", &"window_size", &"vsync"])
 	if menu_mode:
 		return plan
 	plan.append({"kind": &"gap"})

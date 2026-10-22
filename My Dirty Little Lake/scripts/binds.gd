@@ -443,8 +443,9 @@ static func standing_label(action: StringName, column: String) -> String:
 static func key_name(physical: Key) -> String:
 	var shown := physical
 	# Only a real display server has a keyboard layout to ask about; the harness and the
-	# headless probes run under the dummy one, which answers with an error in the log.
-	if DisplayServer.get_name() != "headless":
+	# headless probes run under the dummy one, which answers with an error in the log. So
+	# does the browser's (the web demo), which names the key by its US position instead.
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("web"):
 		var label := DisplayServer.keyboard_get_label_from_physical(physical)
 		if label != KEY_NONE:
 			shown = label

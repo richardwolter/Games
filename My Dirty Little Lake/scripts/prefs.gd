@@ -408,8 +408,10 @@ func _bus(bus: StringName, level: float, on: bool) -> void:
 ## Whether there is a window at all. The test harness and the headless probes run under the
 ## dummy display server, which has no window to size and no vsync to set, and asking it
 ## prints an error a reader has to learn to ignore.
+## A browser's page is not a window the game may move, size or sync (2026-10-20, the web demo),
+## so the web build keeps its hands off it as the headless one does. The frame cap still holds.
 func _has_window() -> bool:
-	return DisplayServer.get_name() != "headless"
+	return DisplayServer.get_name() != "headless" and not OS.has_feature("web")
 
 
 func is_fullscreen() -> bool:

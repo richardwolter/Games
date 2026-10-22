@@ -7796,6 +7796,37 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   - One wording everywhere: `DEMO_LOCKED`, "Not in the demo", no new key.
   - `test_lake`'s `_check_loobas` guards the four, the three locked, the fit, no end song and
     the seven rows; `_check_demo` the two shop rows and `_check_demo_hive` the chip and card.
+- **The itch.io build** (2026-10-20, Richard: to promote the demo): the same "Windows Demo"
+  export into `build/itch_demo/`, plus `GodotSteam_LICENSE.md`, zipped to
+  `Games/_builds/itch/MyDirtyLittleLake_Demo_v1.0.0_Windows.zip` (72 MB, files at the zip's
+  root). The GodotSteam DLLs ride along unused: the demo makes no Steam calls, and a 900-frame
+  run from the folder logged no errors and left the user folder untouched. Wishlist still
+  opens the Steam page. Rebuild after any demo change by re-running the export and the zip.
+- **The web demo** (2026-10-20, Richard: "a web playable build", for itch.io). **Supersedes
+  "Desktop only"** in The Pre-Release Cleanup and The Music, for the demo alone; the full game
+  stays desktop. The **Web Demo** preset (`custom_features` demo, `demo.flag` packed,
+  `addons/godotsteam/*` left out: GodotSteam is Windows only and the web build loads no
+  GDExtension) exports to `build/web_demo/index.html`, zipped with `index.html` at the root to
+  `Games/_builds/itch/MyDirtyLittleLake_Demo_v1.0.0_Web.zip` (45 MB). **Threaded, by decision**:
+  the filth remap (~9.6 ms a cast) and the tornado's cloud (~45 ms a frame) run on
+  `WorkerThreadPool`, and a no-threads build would put both on the one thread. The cost: the page
+  needs SharedArrayBuffer, so on itch **"SharedArrayBuffer support" must be ticked** (it sends
+  the COOP/COEP headers), and Safari and iOS may not run it. Web-only changes in the game:
+  the main menu has no Quit door (a tab cannot close itself, `menu.gd`), the settings board drops
+  Window, Resolution and VSync (`SettingsSkin._plan`), and `Prefs._has_window` is false, so no
+  window setting is ever applied. The save lives in the browser's own storage.
+  **The web plays sound as a stream** (`audio/general/default_playback_type.web=0` in
+  `project.godot`): Godot's web default is "sample" playback, and in it the first export
+  was silent (sources built, nothing reached the speakers, measured with an analyser on
+  the page). Stream mode is the desktop's own mixer, which the threads allow. And
+  `Binds.key_name` asks no keyboard layout on the web (the browser's display server has
+  none and logged an error a call). **Test at
+  home** with `python tools/serve_web.py` (the "My Dirty Little Lake web build" launch entry):
+  it sends the two headers, which `python -m http.server` does not. Checked: boots isolated and
+  multi-threaded, menu, settings, a new game to the first steps, no console errors. **Not
+  checked: speed** — the browser pane throttled the page to one frame a second. Known: the
+  project's fullscreen start logs a harmless "requestFullscreen ... user gesture" warning, and
+  the music is silent until the first click (the browser's autoplay rule).
 - **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
