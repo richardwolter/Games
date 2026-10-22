@@ -4754,6 +4754,16 @@ func _check_shed_rest(room: ShedRoom) -> void:
 	for pose in ["sit_south", "sit_north", "lie_south", "read_south"]:
 		_check(poses.has(pose), "the angler's sheet has %s" % pose, "")
 	_check((poses.get("sit_south", []) as Array).size() == 2, "sitting breathes, two frames", "")
+	# Sitting every way, and getting down onto the seat (2026-10-22): every sitting strip
+	# carries the pixel that goes on the seat.
+	var anchored := true
+	for dir in ["south", "north", "west", "east"]:
+		for pose in ["sit_" + dir, "sitdown_" + dir]:
+			var frames: Array = poses.get(pose, [])
+			_check(not frames.is_empty(), "the angler's sheet has %s" % pose, "")
+			for frame: Dictionary in frames:
+				anchored = anchored and frame.has("anchor")
+	_check(anchored, "every sitting frame carries its seat anchor", "")
 	# Every face of a bed is lain in, the head on that face's pillow (2026-10-03).
 	for pose in ["lie_north", "lie_west", "lie_east"]:
 		_check(poses.has(pose), "the angler's sheet has %s" % pose, "")
@@ -4791,10 +4801,32 @@ func _check_shed_rest(room: ShedRoom) -> void:
 				bad.append(str(view))
 		_check(faces > 0 and bad.is_empty(), "every face of %s is lain in, its pillow on the picture" % bed,
 			"bad views %s" % ",".join(bad))
-	# Side views offer nothing, by decision.
+	# The old PSD seats keep front and back only (no new game hands them out).
 	for piece: StringName in [&"decor_sofa", &"decor_loveseat", &"decor_dining_chair"]:
 		_check(room.rest_of(piece, 1).is_empty() and room.rest_of(piece, 3).is_empty(),
 			"%s side on is no seat for the player" % piece, "")
+	# Every face of every pack seat is sat on (2026-10-22), its spot on its own picture.
+	var seats_bad := PackedStringArray()
+	for piece: StringName in ShedRoom.RESTS:
+		var views: Dictionary = ShedRoom.RESTS[piece]
+		var kinds := {}
+		for view: int in views:
+			var spec: Array = views[view]
+			if not ShedRoom.SITS.has(StringName(spec[0])):
+				continue
+			kinds[StringName(spec[0])] = true
+			if sheets.has(piece):
+				var size: Vector2 = sheets.view_region_of(piece, view).size
+				if not Rect2(Vector2.ZERO, size + Vector2.ONE).has_point(Vector2(spec[1], spec[2])):
+					seats_bad.append("%s/%d" % [piece, view])
+		if String(piece).begins_with("decor_pk_") and not kinds.is_empty() \
+				and sheets.has(piece) and kinds.size() != sheets.view_count(piece):
+			seats_bad.append("%s faces" % piece)
+	_check(seats_bad.is_empty(), "every face of every pack seat is a seat, its spot on the picture",
+		", ".join(seats_bad))
+	for case: Array in [[1, &"west"], [3, &"east"]]:
+		_check(StringName(room.rest_of(&"decor_pk_armchair", case[0])[0]) == case[1],
+			"the armchair's side view %d sits facing %s" % case, "")
 	_check(StringName(room.rest_of(&"decor_sofa", 2)[0]) == &"front",
 		"the sofa's cushion view faces the room", "")
 	_check(StringName(room.rest_of(&"decor_sofa", 0)[0]) == &"back",
@@ -4820,6 +4852,23 @@ func _check_shed_rest(room: ShedRoom) -> void:
 		room.switch_near()
 		_check(room.resting() == &"" and room.get(&"_you_at") == you,
 			"and E again gets up where the player stood", "")
+	# Getting up off a seat plays the sit-down frame, the player held still meanwhile
+	# (2026-10-22).
+	if sheets.has(&"decor_pk_armchair"):
+		decor.clear()
+		var arm_span: Vector2i = room.span_of(&"decor_pk_armchair", 1)
+		room.place(&"decor_pk_armchair", Vector2i(int(you.x * ShedRoom.CELL) - arm_span.x / 2,
+			int(you.y * ShedRoom.CELL) - arm_span.y - 4), 1)
+		room.set(&"_you_at", you)
+		room.rest_on(0)
+		_check(room.resting() == &"west" and room.get(&"_you_facing") == Vector2(-1.0, 0.0),
+			"sitting on the armchair's side faces left", String(room.resting()))
+		room.stand_up()
+		_check(room.resting() == &"" and float(room.get(&"_rise_left")) > 0.0,
+			"getting up plays the sit-down frame", "")
+		room.call(&"_walk_you", 1.0)
+		_check(is_zero_approx(float(room.get(&"_rise_left"))) and room.get(&"_you_at") == you,
+			"and the player stands where they stood, after it", "")
 	# A dog on the armchair hops off; on the sofa it stays.
 	var dogs: Array = room.dogs()
 	if dogs.is_empty():

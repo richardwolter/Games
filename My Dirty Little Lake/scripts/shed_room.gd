@@ -212,48 +212,64 @@ const PICK_OUT := 0.15
 ## How far apart the interact key and the pick-up chip stand when they share a piece.
 const PICK_BESIDE := 22.0
 
-## Resting on the furniture (2026-09-29, `/grill-me` with Richard, picked off
-## `tools/last_pose_mockup.png`): E at a seat sits the player on it, at a bed lies them in it,
-## at a bookcase they reach up for a book and read it facing the room. Per piece, per view:
-## the kind, the hips' height in the drawing's own pixels up from its bottom edge, and how far
-## off the drawing's middle the player sits, in the same pixels. A view that is not listed
-## offers nothing: **side views are left out by decision** (Richard, after three passes at a
-## side-on sit). `front` faces the room and is drawn over the piece; `back` turns away from it,
-## sits **over the seat and under the backrest** (2026-10-03, Richard; it used to be drawn
-## behind the whole piece and read as standing behind it): drawn over the piece, and then the
-## piece's rows from the fourth number down (the drawing's own rows from its top, by eye off
-## each back view) drawn again over the player. A chair's back view draws its seat cushion
-## below the backrest, and the player sits **on** it: the fifth number is where the backrest
-## ends, and only the rows between are drawn over him (second pass the same day, Richard: "it
-## should be between cushion and back rest"), with the hips raised to the cushion. A sofa or
-## an armchair from behind is all backrest and has no fifth. The sixth is the cushion's foot:
-## the player is not drawn below it, since a sitter's legs go forward under the seat. The
-## basket is put down for a back sit (`build_pose_mockup.drop_basket`).
+## Resting on the furniture (2026-09-29, `/grill-me` with Richard): E at a seat sits the
+## player on it, at a bed lies them in it, at a bookcase they reach up for a book and read it
+## facing the room. A view that is not listed offers nothing.
 ##
-## The sofa's view 0 is its back and its view 2 its cushion: the catalogue's labels are the
-## wrong way round for the sofa only (`SOFA_CUSHION` in the harness), and the rests follow the
-## pictures, not the labels. On the sofa the player sits left of middle so a dog can have the
-## other half. Numbers by eye off the mockup; retune here.
+## **Sitting is every face of every pack seat** (2026-10-22, `/grill-me` with Richard, picked
+## off four rounds of `tools/seat_look/seat_mockup.py`; supersedes "side views are left out by
+## decision"). He is a short man, so nothing bends: facing the room his legs lie straight out
+## on the seat and show the soles of his boots (`sit_south`), from the side they lie out level
+## with the boot on its heel (`sit_west`, `sit_east` its mirror), and with his back to the room
+## he is cut at the seat of his trousers, which rest on the cushion (`sit_north`). Each strip
+## carries the pixel that goes on the seat's spot (`anchor`, `tools/build_seat_poses.py`).
+##
+## A seat is [kind, x, y, over], the spot in the view's own source pixels from its top left
+## (`Sheets.view_region_of`), and what of the piece is drawn back over him:
+## - `front`: an optional list of [x0, y0, x1, y1] rects, the arms of an armchair or a sofa.
+##   The spot is the middle of the seat's back edge.
+## - `back`: the backrest's bottom row. The backrest whole and every post (whatever stands in
+##   the view's bottom rows) all the way up are drawn over him; -1 draws the whole piece over
+##   him, for a sofa or an armchair, which from behind is all backrest. The spot is where the
+##   seat of his trousers rests on the cushion.
+## - `west` / `east`: the row where the piece's near side begins (a near arm, the near legs),
+##   drawn over him from there down. The spot is the back of his seat against the backrest,
+##   half way down the seat's depth. `west` faces left, a backrest on the right (the pack's
+##   `side` view); `east` faces right (its mirrored `side_r`).
+##
+## The sofa's catalogue labels are the wrong way round for the old PSD sofa only (view 0 is its
+## back, `SOFA_CUSHION` in the harness): the rests follow the pictures. The old PSD seats keep
+## front and back only; no new game hands them out. Numbers by eye off the gridded views.
 const RESTS := {
-	&"decor_sofa": {0: [&"back", 10, 0, 5], 2: [&"front", 12, -10]},
-	&"decor_loveseat": {0: [&"front", 13, 0], 2: [&"back", 11, 0, 6]},
-	&"decor_dining_chair": {0: [&"front", 12, 0], 2: [&"back", 10, 0, 2, 9, 14]},
+	&"decor_sofa": {0: [&"back", 24, 18, -1], 2: [&"front", 24, 19]},
+	&"decor_loveseat": {0: [&"front", 16, 19], 2: [&"back", 16, 17, -1]},
+	&"decor_dining_chair": {0: [&"front", 8, 15], 2: [&"back", 8, 12, 9]},
 	&"decor_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0]},
 	&"decor_bookcase_tall": {0: [&"read", 0, 0]},
 	&"decor_bookcase_drawers": {0: [&"read", 0, 0]},
 	&"decor_tiny_bookcase": {0: [&"read", 0, 0]},
 	# The 0_mem0ry pack's pieces (2026-10-01): their views run front, side, back, so the
 	# back is view 2 on every one. First guesses, drawn at 0.74; retune by eye.
-	&"decor_pk_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0, 5]},
-	&"decor_pk_white_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0, 6]},
-	&"decor_pk_armchair": {0: [&"front", 12, 0], 2: [&"back", 10, 0, 4]},
-	&"decor_pk_old_seat": {0: [&"front", 12, 0], 2: [&"back", 10, 0, 4]},
-	&"decor_pk_chair": {0: [&"front", 11, 0], 2: [&"back", 18, 0, 2, 9, 18]},
-	&"decor_pk_diner_chair": {0: [&"front", 11, 0], 2: [&"back", 14, 0, 2, 13, 18]},
-	&"decor_pk_green_chair": {0: [&"front", 11, 0], 2: [&"back", 13, 0, 2, 10, 16]},
-	&"decor_pk_wood_chair": {0: [&"front", 11, 0], 2: [&"back", 13, 0, 2, 10, 15]},
-	&"decor_pk_carved_chair": {0: [&"front", 11, 0], 2: [&"back", 13, 0, 2, 12, 17]},
-	&"decor_pk_diner_seat": {0: [&"front", 11, 0]},
+	&"decor_pk_sofa": {0: [&"front", 26, 21, [[0, 12, 10, 36], [43, 12, 52, 36]]],
+		1: [&"west", 16, 28, 39], 2: [&"back", 26, 15, -1], 3: [&"east", 10, 28, 39]},
+	&"decor_pk_white_sofa": {0: [&"front", 27, 17, [[0, 15, 9, 34], [46, 15, 54, 34]]],
+		1: [&"west", 20, 30, 38], 2: [&"back", 27, 16, -1], 3: [&"east", 6, 30, 38]},
+	&"decor_pk_armchair": {0: [&"front", 15, 20, [[0, 20, 7, 42], [23, 20, 30, 42]]],
+		1: [&"west", 20, 26, 28], 2: [&"back", 15, 16, -1], 3: [&"east", 7, 26, 28]},
+	&"decor_pk_old_seat": {0: [&"front", 15, 19, [[0, 17, 7, 42], [23, 17, 30, 42]]],
+		1: [&"west", 17, 23, 25], 2: [&"back", 15, 16, -1], 3: [&"east", 9, 23, 25]},
+	&"decor_pk_chair": {0: [&"front", 8, 15], 1: [&"west", 11, 23, 24], 2: [&"back", 8, 17, 10],
+		3: [&"east", 5, 23, 24]},
+	&"decor_pk_diner_chair": {0: [&"front", 8, 15], 1: [&"west", 11, 21, 22],
+		2: [&"back", 8, 15, 10], 3: [&"east", 5, 21, 22]},
+	&"decor_pk_green_chair": {0: [&"front", 9, 14], 1: [&"west", 12, 23, 24],
+		2: [&"back", 9, 15, 9], 3: [&"east", 4, 23, 24]},
+	&"decor_pk_wood_chair": {0: [&"front", 9, 13], 1: [&"west", 12, 22, 23],
+		2: [&"back", 9, 14, 10], 3: [&"east", 4, 22, 23]},
+	&"decor_pk_carved_chair": {0: [&"front", 8, 17], 1: [&"west", 12, 21, 22],
+		2: [&"back", 8, 16, 12], 3: [&"east", 4, 21, 22]},
+	&"decor_pk_diner_seat": {0: [&"front", 21, 19], 1: [&"west", 15, 30, 33],
+		2: [&"east", 9, 30, 33]},
 	&"decor_pk_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0], 2: [&"lie", 0, 0]},
 	&"decor_pk_fancy_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0], 2: [&"lie", 0, 0],
 		3: [&"lie", 0, 0]},
@@ -291,9 +307,14 @@ const LIES := {
 }
 ## Half the width of the body's folds under the blanket, in the bed's drawn pixels.
 const LIE_FOLD := 5.0
-## How far above the ink's foot the hips are in each sitting strip, in the figure's own
-## pixels. What `tools/build_rest_frames.py` draws: move them together.
-const SIT_HIP := {&"south": 7, &"north": 8}
+## Getting down onto a seat and up off it (2026-10-22): the `sitdown_*` frame shown this long
+## at each end, `SIT_DROP` figure pixels lower than the seated pose, the player held still.
+const SIT_DOWN := 0.14
+const SIT_DROP := 2.0
+## How far under the seat's spot, in figure pixels, the feet of a dog lying across the
+## player's lap go: on his thighs, short of his boots (Richard: "over player, not over his
+## feet").
+const LAP_BELOW := 3.0
 ## Pieces a dog and the player cannot share: a dog lying on one hops off when the player sits.
 ## The sofa and the bed are shared, and the dog keeps to the middle of either: moved over on
 ## the sofa it lay on the arm (Richard, 2026-09-29: "just middle").
@@ -888,6 +909,12 @@ var _rest_key := ""
 var _rest_kind: StringName = &""
 var _rest_age: float = 0.0
 var _rest_from := Vector2.ZERO
+## Getting up off a seat: how long is left of the `sitdown_*` frame, and the seat and the kind
+## of sit it is drawn on. The rest itself is over the moment the player gets up.
+var _rise_left: float = 0.0
+var _rise_key := ""
+var _rise_kind: StringName = &""
+var _posts := {}
 ## Which of the `BOOKS` came off the shelf this time.
 var _read_book := 0
 
@@ -992,6 +1019,7 @@ func _room_shown() -> void:
 	_you_step = 0.0
 	_you_age = 0.0
 	_rest_key = ""
+	_rise_left = 0.0
 
 	_dogs.clear()
 	if not DogArt.ready():
@@ -1129,8 +1157,8 @@ func _load_you() -> void:
 			var ink: Array = cell["ink"]
 			var cut := Rect2(region[0], region[1], region[2], region[3])
 			var frame := {"region": cut, "ink": Rect2(ink[0], ink[1], ink[2], ink[3])}
-			if name.begins_with("sit_"):
-				frame["axis"] = _body_axis(image, cut)
+			if cell.has("anchor"):
+				frame["anchor"] = Vector2(float(cell["anchor"][0]), float(cell["anchor"][1]))
 			frames.append(frame)
 		_you_poses[StringName(name)] = frames
 
@@ -1144,28 +1172,6 @@ func _load_you() -> void:
 		var ink: Rect2 = first["ink"]
 		_you_ink_tall = maxf(ink.size.y, 1.0)
 		_you_ink_foot = ink.position.y + ink.size.y
-
-
-## Where the figure's body stands across its cell, in the cell's own pixels: the median of
-## every row's middle (2026-10-03, Richard: a back sit stood off the chair's middle). Its ink
-## box is not it: sitting with his back to the room the hand hangs out on one side and puts
-## the box's middle a pixel and a half off the body's, which is what a narrow chair shows.
-static func _body_axis(image: Image, cell: Rect2) -> float:
-	var middles: Array[float] = []
-	for y in range(int(cell.position.y), int(cell.end.y)):
-		var low := -1
-		var high := -1
-		for x in range(int(cell.position.x), int(cell.end.x)):
-			if image.get_pixel(x, y).a > 0.0:
-				if low < 0:
-					low = x
-				high = x
-		if low >= 0:
-			middles.append(float(low + high) * 0.5 + 0.5 - cell.position.x)
-	if middles.is_empty():
-		return cell.size.x * 0.5
-	middles.sort()
-	return middles[middles.size() / 2]
 
 
 ## A copy of the sheet with the game's own light on it. See Style.figure_tone.
@@ -1289,6 +1295,11 @@ func _walk_you(delta: float) -> void:
 	if record_up():
 		_you_step = 0.0
 		return
+	# Getting up: held still until the frame has run.
+	if _rise_left > 0.0:
+		_rise_left = maxf(_rise_left - delta, 0.0)
+		_you_step = 0.0
+		return
 	# Resting: any walk input gets up, and so does the piece going away under the player.
 	if not _rest_key.is_empty():
 		_you_step = 0.0
@@ -1357,6 +1368,11 @@ func _draw_you(floor_box: Rect2) -> void:
 		return
 	if not _rest_key.is_empty() and _rest_kind != &"read":
 		_draw_resting(floor_box)
+		return
+	if _rise_left > 0.0:
+		var rise := _row_of_key(_rise_key)
+		if rise >= 0:
+			_draw_seated(floor_box, decor[rise], _rise_kind, true)
 		return
 	var shown := _you_shown(floor_box)
 	if shown.is_empty():
@@ -2096,6 +2112,14 @@ func _slid(from: Vector2, step: Vector2, may: Callable) -> Vector2:
 func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 	var step := CELL * _zoom()
 	var at := floor_box.position + dog.at * float(step)
+	# Lying across the lap of a player sitting on its seat: on his thighs, over him, not on
+	# the seat's front at his feet (2026-10-22, Richard).
+	if _rest_kind == &"front" and dog.seat == _rest_key and not _rest_key.is_empty():
+		var spot := _seat_spot(floor_box)
+		if spot.is_finite():
+			var tall := YOU_TALL * float(CELL) * _zoom()
+			var scale := maxf(1.0, roundf(tall / _you_ink_tall / YOU_STEP) * YOU_STEP)
+			at = Vector2(spot.x, minf(at.y, spot.y + LAP_BELOW * scale))
 	var tall := DOG_TALL * float(step)
 	DogArt.stamp(
 		self, dog.state, DogArt.frame_at(dog.state, _dog_clock(dog), dog.breed), at, tall, dog.left,
@@ -3887,7 +3911,7 @@ func _paint_walker_shades(pen: CanvasItem) -> void:
 			DOG_TALL * step, dog.left, 0.0, Color.WHITE, dog.breed
 		)
 	pen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	if not _rest_key.is_empty() and _rest_kind != &"read":
+	if (not _rest_key.is_empty() and _rest_kind != &"read") or _rise_left > 0.0:
 		return
 	var shown := _you_shown(floor_box)
 	if shown.is_empty():
@@ -4343,7 +4367,7 @@ func _piece_box(index: int) -> Rect2:
 
 ## Resting on the furniture (see `RESTS`). -----------------------------------------------
 
-## What resting on this view of this piece offers, [kind, hip lift, sideways], or empty.
+## What resting on this view of this piece offers (see `RESTS`), or empty.
 func rest_of(piece: StringName, view: int) -> Array:
 	var views: Dictionary = RESTS.get(piece, {})
 	return views.get(view, [])
@@ -4398,6 +4422,15 @@ func _rest_near() -> int:
 ## The row the player is resting on, or -1 when it has gone: picked up, or turned to a face
 ## with a different rest or none. Asked every frame, since the player can do both while
 ## sitting there.
+## The row standing at this key ("piece@x,y"), or -1.
+func _row_of_key(key: String) -> int:
+	for i in decor.size():
+		var row: Dictionary = decor[i]
+		if "%s@%d,%d" % [row["piece"], int(row["cell"][0]), int(row["cell"][1])] == key:
+			return i
+	return -1
+
+
 func _rest_row() -> int:
 	for i in decor.size():
 		var row: Dictionary = decor[i]
@@ -4427,7 +4460,10 @@ func rest_on(index: int) -> void:
 	_rest_age = 0.0
 	_rest_from = _you_at
 	_you_step = 0.0
-	_you_facing = Vector2(0.0, -1.0) if _rest_kind == &"back" else Vector2(0.0, 1.0)
+	_rise_left = 0.0
+	_you_facing = {
+		&"back": Vector2(0.0, -1.0), &"west": Vector2(-1.0, 0.0), &"east": Vector2(1.0, 0.0),
+	}.get(_rest_kind, Vector2(0.0, 1.0))
 	if _rest_kind == &"read":
 		_read_book = _dog_rng.randi_range(0, BOOKS - 1)
 		return
@@ -4461,6 +4497,10 @@ func rest_on(index: int) -> void:
 func stand_up() -> void:
 	if _rest_key.is_empty():
 		return
+	if SITS.has(_rest_kind) and _rest_row() >= 0:
+		_rise_left = SIT_DOWN
+		_rise_key = _rest_key
+		_rise_kind = _rest_kind
 	_rest_key = ""
 	_you_at = _rest_from
 	_you_facing = Vector2(0.0, 1.0)
@@ -4471,6 +4511,8 @@ func stand_up() -> void:
 ## round (a back sit draws the backrest over them itself, `_draw_resting`), and by their
 ## feet otherwise.
 func _you_key(rows: Array) -> float:
+	if _rise_left > 0.0 and _row_of_key(_rise_key) >= 0:
+		return _foot_of(decor[_row_of_key(_rise_key)]) + OVER_PIECE
 	var at := _rest_row()
 	if at < 0 or _rest_kind == &"read":
 		return _walker_key(_you_at, rows)
@@ -4483,10 +4525,22 @@ func _draw_resting(floor_box: Rect2) -> void:
 	var at := _rest_row()
 	if at < 0:
 		return
-	var row: Dictionary = decor[at]
+	_draw_seated(floor_box, decor[at], _rest_kind, _rest_age < SIT_DOWN)
+
+
+## The pose each kind of sit is drawn in.
+const SITS := {&"front": "south", &"back": "north", &"west": "west", &"east": "east"}
+
+
+## The player on this row's piece, in this kind of rest: lying, or seated (`crouch` is the
+## `sitdown_*` frame of getting on or off). The figure's `anchor` goes on the seat's spot,
+## then whatever of the piece stands nearer the room is drawn back over him (`RESTS`).
+func _draw_seated(floor_box: Rect2, row: Dictionary, kind: StringName, crouch: bool) -> void:
 	var piece := StringName(row["piece"])
 	var view := _row_view(row)
 	var spec := rest_of(piece, view)
+	if spec.is_empty():
+		return
 	var zoom := _zoom()
 	var drawn := sheets.scale_of(piece) * zoom
 	var box := Rect2(
@@ -4496,55 +4550,105 @@ func _draw_resting(floor_box: Rect2) -> void:
 	)
 	var tall := YOU_TALL * float(CELL) * zoom
 	var scale := maxf(1.0, roundf(tall / _you_ink_tall / YOU_STEP) * YOU_STEP)
-	if _rest_kind == &"lie":
+	if kind == &"lie":
 		_draw_lying(piece, view, box, drawn, scale)
 		return
-	var pose := &"sit_south"
-	if _rest_kind == &"back":
-		pose = &"sit_north"
+	if not SITS.has(kind) or spec.size() < 3:
+		return
+	var pose := StringName(("sitdown_%s" if crouch else "sit_%s") % SITS[kind])
 	if not _you_poses.has(pose):
 		return
 	var frames: Array = _you_poses[pose]
 	var index := 0
-	if fmod(_rest_age, BREATH) > BREATH * (1.0 - BREATH_IN):
+	if not crouch and fmod(_rest_age, BREATH) > BREATH * (1.0 - BREATH_IN):
 		index = mini(1, frames.size() - 1)
 	var region: Rect2 = (frames[index] as Dictionary)["region"]
 	var ink: Rect2 = (frames[0] as Dictionary)["ink"]
-	var middle := box.get_center().x + float(spec[2]) * drawn
-	# Sitting, the body's own axis goes on the seat's middle, not the ink box's (`_body_axis`).
-	var axis: float = (frames[0] as Dictionary).get("axis", ink.position.x + ink.size.x * 0.5)
-	var origin := Vector2(middle - axis * scale, 0.0)
-	var hip: int = SIT_HIP[&"north" if _rest_kind == &"back" else &"south"]
-	var foot := box.end.y - float(spec[1]) * drawn + float(hip) * scale
-	origin.y = foot - (ink.position.y + ink.size.y) * scale
+	var anchor: Vector2 = (frames[0] as Dictionary).get(
+		"anchor", Vector2(ink.position.x + ink.size.x * 0.5, ink.end.y)
+	)
+	var spot := box.position + Vector2(float(spec[1]), float(spec[2])) * drawn
+	var origin := spot - anchor * scale
+	if crouch:
+		origin.y += SIT_DROP * scale
 	origin = origin.round()
 	var size := region.size * scale
-	if _rest_kind == &"front":
+	if kind == &"front":
 		var away := _room_away(origin + size * 0.5)
 		draw_texture_rect_region(
 			_you_sheet, Rect2(origin + (away * SIT_SHADE_REACH).round() * scale, size), region,
 			Shade.tint(_room_ink())
 		)
-	var shown_region := region
-	var shown_size := size
-	if _rest_kind == &"back" and spec.size() > 5:
-		# Not below the cushion's foot: the legs go forward under the seat.
-		var floor_at := box.position.y + float(int(spec[5])) * drawn
-		var keep := clampf((floor_at - origin.y) / scale, 0.0, region.size.y)
-		shown_region = Rect2(region.position, Vector2(region.size.x, roundf(keep)))
-		shown_size = shown_region.size * scale
-	draw_texture_rect_region(_you_sheet, Rect2(origin, shown_size), shown_region)
-	if _rest_kind == &"back" and spec.size() > 3:
-		# The backrest over the player: the piece's rows from the cut down, drawn again.
-		var piece_region := sheets.view_region_of(piece, view)
-		var cut := float(int(spec[3]))
-		var end := piece_region.size.y if spec.size() < 5 else minf(float(int(spec[4])), piece_region.size.y)
-		if cut < end:
-			draw_texture_rect_region(
-				sheets.atlas,
-				Rect2(box.position + Vector2(0.0, cut * drawn), Vector2(box.size.x, (end - cut) * drawn)),
-				Rect2(piece_region.position + Vector2(0.0, cut), Vector2(piece_region.size.x, end - cut))
-			)
+	draw_texture_rect_region(_you_sheet, Rect2(origin, size), region)
+	var piece_region := sheets.view_region_of(piece, view)
+	for over: Rect2 in _over_rects(piece, view, kind, spec, piece_region.size):
+		draw_texture_rect_region(
+			sheets.atlas, Rect2(box.position + over.position * drawn, over.size * drawn),
+			Rect2(piece_region.position + over.position, over.size)
+		)
+
+
+## The seat's spot on the screen for the row the player sits on, or (INF, INF) when they are
+## not sitting: where a dog lying across their lap is laid (`_draw_dog`).
+func _seat_spot(floor_box: Rect2) -> Vector2:
+	var at := _rest_row()
+	if at < 0 or not SITS.has(_rest_kind):
+		return Vector2.INF
+	var row: Dictionary = decor[at]
+	var piece := StringName(row["piece"])
+	var spec := rest_of(piece, _row_view(row))
+	var zoom := _zoom()
+	return (
+		floor_box.position + Vector2(float(int(row["cell"][0])), float(int(row["cell"][1]))) * zoom
+		+ Vector2(float(spec[1]), float(spec[2])) * sheets.scale_of(piece) * zoom
+	)
+
+
+## The parts of the piece nearer the room than a sitter, in the view's own source pixels
+## (`RESTS`): an armchair's arms from the front, the backrest and the posts from behind, the
+## near arm or the near legs from the side.
+func _over_rects(piece: StringName, view: int, kind: StringName, spec: Array, size: Vector2) -> Array:
+	var out := []
+	if kind == &"front":
+		if spec.size() > 3:
+			for r: Array in spec[3]:
+				var x0 := minf(float(r[0]), size.x)
+				var y0 := minf(float(r[1]), size.y)
+				out.append(Rect2(x0, y0, minf(float(r[2]), size.x) - x0, minf(float(r[3]), size.y) - y0))
+	elif kind == &"back":
+		var bottom := int(spec[3]) if spec.size() > 3 else -1
+		if bottom < 0:
+			out.append(Rect2(Vector2.ZERO, size))
+		else:
+			out.append(Rect2(0.0, 0.0, size.x, minf(float(bottom + 1), size.y)))
+			for x: int in _posts_of(piece, view):
+				out.append(Rect2(float(x), 0.0, 1.0, size.y))
+	elif kind == &"west" or kind == &"east":
+		var near := minf(float(spec[3]) if spec.size() > 3 else size.y, size.y)
+		out.append(Rect2(0.0, near, size.x, size.y - near))
+	return out
+
+
+## The columns of a back view that reach its bottom rows: the posts and legs a chair stands
+## on, nearer the room than a man sitting on it. Read off the atlas once a view.
+func _posts_of(piece: StringName, view: int) -> Array:
+	var key := "%s/%d" % [piece, view]
+	if _posts.has(key):
+		return _posts[key]
+	var cols := []
+	if _atlas_image == null and sheets.atlas != null:
+		_atlas_image = sheets.atlas.get_image()
+	if _atlas_image != null:
+		var r := sheets.view_region_of(piece, view)
+		var x0 := int(r.position.x)
+		var y0 := int(r.position.y)
+		for x in int(r.size.x):
+			for y in range(int(r.size.y) - 3, int(r.size.y)):
+				if _atlas_image.get_pixel(x0 + x, y0 + y).a >= 0.5:
+					cols.append(x)
+					break
+	_posts[key] = cols
+	return cols
 
 
 ## Lying in bed (`LIES`): the head on the pillow, the bed's own picture drawn back over it

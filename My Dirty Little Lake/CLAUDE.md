@@ -8242,7 +8242,8 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
   picture's bottom, sideways offset): sofa, armchair and dining chair **front** (facing the
   room, drawn over the piece) and **back** (turned away); both beds' colours **lie**; the
   three bookcases' front
-  **read**. **No side views, by decision** (Richard, after three passes: "looks really bad,
+  **read**. **Superseded 2026-10-22** (see Sitting Every Way): every face of every pack seat
+  is sat on. **No side views, by decision** (Richard, after three passes: "looks really bad,
   lets not work with it"). The sofa's rests follow its pictures, not its swapped labels:
   view 0 is the back, view 2 the cushion. On the sofa the player sits left of middle.
 - **A back sit is over the seat and under the backrest** (2026-10-03, Richard; it was drawn
@@ -8321,12 +8322,46 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
   fancy_side_r}.png`). All numbers first guesses for Richard's eye.
 - **The chew toy blocks nothing** (`ShedRoom.WALK_OVER`, Richard, same day): stepped over,
   like the pet bed and the rugs.
-- **Out of scope, by decision**: side sitting, get-up frames, sounds, a carried book,
+- **Out of scope, by decision** (side sitting and get-up frames superseded 2026-10-22): side sitting, get-up frames, sounds, a carried book,
   reading anywhere else, the lake.
 - `test_lake`'s `_check_shed_rest` guards the strips, no side-view rest, E resting and E
   standing up where the player stood, the dog hopping off the armchair and staying on the
   sofa, and the seat going away. Probe: `tools/shot_rest.tscn` (desktop build, own save,
   whole pack forced) saves `tools/last_rest_{sofa,sofa_back,armchair,chair_back,bed,read}.png`.
+
+### Sitting Every Way (2026-10-22, `/grill-me` with Richard)
+The angler sits on every face of every pack seat, looking seated on each. Picked off four
+rounds of `tools/seat_look/seat_mockup.py` (scratch, not shipped). **Supersedes**, in Sitting,
+Lying and Reading: "no side views", the per-view hip lift and sideways numbers, `SIT_HIP`, the
+body axis read off the sheet, the back sit's cut/end/foot rows, the sofa's left-of-middle spot
+and "get-up frames" out of scope.
+- **A short man, nothing bends** (Richard: bending the knees "stretches its size"): facing the
+  room his legs lie straight out on the seat and show the soles of his boots, hands on his
+  knees (`sit_south`); from the side they lie out level, the boot on its heel, toe up
+  (`sit_west`, `sit_east` its mirror, feather and all); with his back to the room he is cut at
+  the seat of his trousers, which rest on the cushion (`sit_north`). The basket is put down
+  every way.
+- **Built by rule** in `tools/build_seat_poses.py`, written by `tools/build_rest_frames.py`
+  with a `<strip>_anchor.json` each: the pixel of the cell that goes on the seat's spot, which
+  `tools/slice_character.gd` hands on as each frame's `anchor`. Re-run both, then reimport.
+  Richard may polish the strips; a re-run overwrites them.
+- **`RESTS` is [kind, x, y, over]**, the spot in the view's own source pixels: `front` (the
+  middle of the seat's back edge, optional arm rects drawn over him), `back` (where his
+  trousers rest; the backrest's bottom row, the backrest and every post drawn over him, or -1
+  for a sofa or armchair, the whole piece), `west`/`east` (the back of his seat against the
+  backrest, half way down the seat; the piece's near side drawn over him from that row down).
+  `_draw_seated`, `_over_rects`, `_posts_of` (columns that reach the view's bottom rows).
+- **Middle of the sofa on every face**; a dog already on a sofa's front lies across his lap,
+  drawn over him, its feet `LAP_BELOW` figure px under the spot (`_draw_dog`). Everywhere else a
+  dog hops off, as before.
+- **Sit-down and stand-up**: the `sitdown_*` frame for `SIT_DOWN` (0.14 s) at each end,
+  `SIT_DROP` px low; getting up holds the player still for it (`_rise_left`).
+- **Known**: from the front a small chair is half his width and hides behind him.
+- The old PSD seats keep front and back only (no new game deals them). All numbers by eye.
+- Probe: `REST_SEATS=1` on `tools/shot_rest.tscn` (desktop build) photographs every seat face,
+  `tools/last_rest_<seat>_<kind>.png`. `test_lake`'s `_check_shed_rest` guards the strips and
+  anchors, every pack face being a seat with its spot on the picture, the side facing, and the
+  get-up frame holding the player.
 
 ### The Shed's Cues (2026-10-02, `/grill-me` with Richard)
 A carried piece says it can turn, and a switch nobody has tried points at itself.

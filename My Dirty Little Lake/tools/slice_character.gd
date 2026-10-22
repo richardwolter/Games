@@ -42,10 +42,12 @@ const ANIMS := [
 	{"prefix": "pet2", "slug": "pet2", "frames": 6, "ink_first": true},
 	{"prefix": "pet3", "slug": "pet3", "frames": 6, "ink_first": true},
 	# Resting in the shed, built by rule (tools/build_rest_frames.py, 2026-09-29). Only the
-	# directions each was drawn in: sitting faces the room or turns its back on it, and lying
-	# and reading face the room. Measured against the first frame's ink, so a breath moves the
-	# body and never the anchor.
-	{"prefix": "sit", "slug": "sit", "frames": 2, "ink_first": true, "dirs": ["south", "north"]},
+	# directions each was drawn in: lying and reading face the room. Measured against the
+	# first frame's ink, so a breath moves the body and never the anchor. Sitting is drawn
+	# every way and carries the pixel that goes on the seat (`<strip>_anchor.json`, written
+	# with the strip, 2026-10-22), as does the one frame of getting down onto it.
+	{"prefix": "sit", "slug": "sit", "frames": 2, "ink_first": true},
+	{"prefix": "sitdown", "slug": "sitdown", "frames": 1, "ink_first": true},
 	# Lying is two frames, awake and asleep with the eyes shut (2026-10-11).
 	{"prefix": "lie", "slug": "lie", "frames": 2, "ink_first": true,
 		"dirs": ["south", "north", "west", "east"]},
@@ -63,6 +65,8 @@ const DIRS := ["south", "north", "east", "west"]
 ## not off the pixels: east's basket reaches the ground row, and a toe measured there was the
 ## basket's.
 const FEET_SUFFIX := "_feet.json"
+## Beside a sitting strip: the pixel of its cell that goes on the seat's spot, `[x, y]`.
+const ANCHOR_SUFFIX := "_anchor.json"
 
 ## The run rows are read off Richard's flat sheet instead (2026-09-28, the repainted run):
 ## `art_source/character.png` holds all twelve rows stacked, touching, so each run row is cut
@@ -120,6 +124,7 @@ func _init() -> void:
 				"ink_first": bool(anim.get("ink_first", false)),
 				"pin_boots": dir in (anim.get("pin_boots", []) as Array),
 				"feet": _feet_of(SOURCE_DIR + slug + FEET_SUFFIX),
+				"anchor": _feet_of(SOURCE_DIR + slug + ANCHOR_SUFFIX),
 				"cell_w": cell_w,
 				"cell_h": image.get_height(),
 			})
@@ -172,7 +177,7 @@ func _init() -> void:
 					first[0] + box.position.x + moved.x, first[1] + box.position.y + moved.y,
 					first[2], first[3]
 				)
-			frames.append({
+			var frame := {
 				"region": [box.position.x, box.position.y, box.size.x, box.size.y],
 				"ink": (
 					[
@@ -180,7 +185,10 @@ func _init() -> void:
 						ink.size.x, ink.size.y,
 					] if ink.size.x > 0 else [0, 0, box.size.x, box.size.y]
 				),
-			})
+			}
+			if not (strip["anchor"] as Array).is_empty():
+				frame["anchor"] = strip["anchor"]
+			frames.append(frame)
 		poses[strip["pose"]] = frames
 		y += cell_h
 

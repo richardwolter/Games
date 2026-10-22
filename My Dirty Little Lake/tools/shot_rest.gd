@@ -40,7 +40,29 @@ var _shot := 0
 var _log: FileAccess
 
 
+## The shots this run takes: `SHOTS`, or with REST_SEATS=1 every face of every pack seat
+## (2026-10-22, sitting every way), the sofas' fronts with a dog on the lap.
+var _shots: Array = SHOTS
+
+
+func _seat_shots() -> Array:
+	var out := []
+	for piece: StringName in ShedRoom.RESTS:
+		if not String(piece).begins_with("decor_pk_"):
+			continue
+		var views: Dictionary = ShedRoom.RESTS[piece]
+		for view: int in views:
+			var kind := StringName((views[view] as Array)[0])
+			if not ShedRoom.SITS.has(kind):
+				continue
+			var name := "%s_%s" % [String(piece).trim_prefix("decor_pk_"), kind]
+			out.append([name, piece, view, 0.5, String(piece).ends_with("sofa") and kind == &"front"])
+	return out
+
+
 func _ready() -> void:
+	if OS.get_environment("REST_SEATS") == "1":
+		_shots = _seat_shots()
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_log = FileAccess.open(LOG, FileAccess.WRITE)
 	if FileAccess.file_exists(SAVE):
@@ -69,10 +91,10 @@ func _physics_process(_delta: float) -> void:
 			_room().call(&"_room_shown")
 		return
 	var phase := (_frames - 11) % 12
-	if _shot >= SHOTS.size():
+	if _shot >= _shots.size():
 		get_tree().quit()
 		return
-	var shot: Array = SHOTS[_shot]
+	var shot: Array = _shots[_shot]
 	# REST_ONLY=bed,fancy: only the shots whose name holds one of the words.
 	var only := OS.get_environment("REST_ONLY")
 	var wanted := only.is_empty()
