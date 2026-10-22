@@ -18,7 +18,7 @@ extends Node
 ## Writes `tools/last_wrap.log`; exits 1 on anything but SPACES-in-CJK notes. The widths are
 ## the boards' own constants at a 1280x720 window, written here once: re-read them if a
 ## board is resized (letter text 678, letter blurb 214, shop blurb 250, tour/note 184, cue
-## hint 236, moment 760, farewell 1100, credits 430).
+## hint 236, moment 760, farewell 1100, credits 430, the Donation Bank's board 474).
 
 const Style := preload("res://scripts/style.gd")
 
@@ -47,6 +47,7 @@ const SPECS := {
 	"END_LINE": ["lines", 1100.0, [26, 20], 1.0],
 	"DEMO_LINE": ["lines", 1100.0, [26, 20], 1.0],
 	"CREDITS_": ["lines", 430.0, [16, 13], 0.0],
+	"BANK_": ["lines", 474.0, [16, 13], 4.0],
 }
 
 

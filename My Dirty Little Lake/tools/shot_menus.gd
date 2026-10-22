@@ -1,6 +1,6 @@
 extends Node
 ## Opens each of the three menus on a real window in turn — settings, upgrades, the shed's
-## shelf — and saves a picture of each. A probe, not a test: where a title plank crosses its
+## shelf, and the Donation Bank's board — and saves a picture of each. A probe, not a test: where a title plank crosses its
 ## board's frame, and where the close cross is nailed to it, are things to look at close up.
 ##
 ## Run it with the desktop build, not --headless: nothing renders under the dummy driver.
@@ -14,6 +14,9 @@ const SHOTS := {
 	&"upgrades": "res://tools/last_menu_upgrades.png",
 	&"upgrades_help": "res://tools/last_menu_upgrades_help.png",
 	&"shed": "res://tools/last_menu_shed.png",
+	&"bank": "res://tools/last_menu_bank.png",
+	&"bank_confirm": "res://tools/last_menu_bank_confirm.png",
+	&"bank_done": "res://tools/last_menu_bank_done.png",
 }
 
 var _main: Node
@@ -92,7 +95,22 @@ func _physics_process(_delta: float) -> void:
 			_main.call(&"_set_shed", true)
 		70:
 			_save(&"shed")
-		74:
+			# The Donation Bank's board as the farewell's door lays it, on a cleaned lake with a
+			# purse to give: the door, the question, and the thanks. The probe's lake keeps a
+			# ledger of its own (`Lake.bank`), so nothing reaches the player's.
+			_main.call(&"_set_shed", false)
+			_main.set(&"_farewell_shown", true)
+			_main.set(&"sludge", 43210.0)
+			_main.call(&"_open_bank")
+		78:
+			_save(&"bank")
+			(_main.get(&"_bank_board") as DonationBoard).ask()
+		84:
+			_save(&"bank_confirm")
+			(_main.get(&"_bank_board") as DonationBoard).call(&"_give")
+		90:
+			_save(&"bank_done")
+		94:
 			get_tree().quit()
 
 

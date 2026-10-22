@@ -1,0 +1,187 @@
+"""One-off: the Donation Bank's strings (2026-10-22) appended to locale/translations.csv.
+
+Machine drafts in every language but PT and EN, written from the PT. Run once; a second run
+refuses, the keys being there already.
+
+    python tools/l10n_bank_rows.py
+    python tools/build_translations.py
+"""
+import csv
+import io
+
+CSV_PATH = "locale/translations.csv"
+NB = " "
+
+# key, _where, _size, _least, _width, _note, en, pt_BR, es, de, fr, ja, zh_CN, ko,
+# then the back-translations of pt_BR, es, de, fr, ja, zh_CN, ko.
+ROWS = [
+    ("BANK_TITLE", "donation_board.gd", "20", "13", "196",
+     "The Donation Bank: the main menu's corner plank, the board's title plank and the farewell's door. A name, no full stop.",
+     "Donation Bank", "Banco de Doações", "Banco de Donaciones", "Spendenbank", "Banque de dons",
+     "寄付バンク", "捐赠银行", "기부 은행",
+     "Donation Bank", "Donations Bank", "Donation bank", "Bank of donations", "Donation bank", "Donation bank", "Donation bank"),
+    ("BANK_LEAD", "donation_board.gd", "16", "13", "0",
+     "The board's first sentence. Every player can give the money left in the game's purse once their lake is clean; it is all added up. Wraps.",
+     "Players everywhere pool the money left over once their lake is clean.",
+     "Jogadores do mundo todo juntam aqui o dinheiro que sobrou depois de limpar o lago.",
+     "Jugadores de todo el mundo juntan aquí el dinero que les sobra al limpiar su lago.",
+     "Spielende aus aller Welt legen hier das Geld zusammen, das übrig bleibt, wenn ihr See sauber ist.",
+     "Dans le monde entier, chacun verse ici l'argent qui lui reste une fois son lac propre.",
+     "世界中のプレイヤーが、湖をきれいにしたあとに残ったお金をここに集めます。",
+     "世界各地的玩家把清理完湖泊后剩下的钱都汇集到这里。",
+     "전 세계 플레이어들이 호수를 깨끗하게 한 뒤 남은 돈을 이곳에 모아요.",
+     "Players from the whole world gather here the money that was left after cleaning the lake.",
+     "Players from all over the world gather here the money they have left when cleaning their lake.",
+     "Players from all over the world pool here the money that is left over when their lake is clean.",
+     "In the whole world, everyone pours here the money they have left once their lake is clean.",
+     "Players all over the world gather here the money left over after cleaning the lake.",
+     "Players from all over the world pool here the money left after cleaning the lake.",
+     "Players all over the world gather here the money left after making the lake clean."),
+    ("BANK_PLEDGE", "donation_board.gd", "16", "13", "0",
+     "The pledge. First %s is the goal in the game's money ($5,000,000), second %s is the charity's name (BANK_CHARITY). Real money is written in words, never with $: the game paints $ green as its own money. *Asterisks* mark the two words drawn in the head ink. Wraps.",
+     "When the bank reaches *%s*, we will donate 100 US dollars in real money to *%s*.",
+     "Quando o banco chegar a *%s*, vamos doar 100 dólares de verdade para a *%s*.",
+     "Cuando el banco llegue a *%s*, donaremos 100 dólares estadounidenses reales a *%s*.",
+     "Wenn die Bank *%s* erreicht, spenden wir 100 echte US-Dollar an *%s*.",
+     "Quand la banque atteindra *%s*, nous donnerons 100 vrais dollars américains à *%s*.",
+     "バンクが*%s*に届いたら、*%s*に本物のお金で100米ドルを寄付します。",
+     "当银行达到*%s*时，我们将向*%s*捐赠100美元真钱。",
+     "은행이 *%s*에 도달하면 *%s*에 실제 돈 100달러를 기부할게요.",
+     "When the bank reaches *%s*, we will donate 100 real dollars to *%s*.",
+     "When the bank reaches *%s*, we will donate 100 real US dollars to *%s*.",
+     "When the bank reaches *%s*, we donate 100 real US dollars to *%s*.",
+     "When the bank reaches *%s*, we will give 100 real American dollars to *%s*.",
+     "When the bank reaches *%s*, we will donate 100 US dollars in real money to *%s*.",
+     "When the bank reaches *%s*, we will donate 100 dollars of real money to *%s*.",
+     "When the bank reaches *%s*, we will donate 100 dollars of real money to *%s*."),
+    ("BANK_CHARITY", "donation_board.gd", "16", "13", "0",
+     "The charity, inside BANK_PLEDGE. Its own name: NOT translated. Swapped for a generic name if the charity does not agree to be named.",
+     "The Nature Conservancy Brasil", "The Nature Conservancy Brasil", "The Nature Conservancy Brasil",
+     "The Nature Conservancy Brasil", "The Nature Conservancy Brasil", "The Nature Conservancy Brasil",
+     "The Nature Conservancy Brasil", "The Nature Conservancy Brasil",
+     "The Nature Conservancy Brasil", "The Nature Conservancy Brasil", "The Nature Conservancy Brasil",
+     "The Nature Conservancy Brasil", "The Nature Conservancy Brasil", "The Nature Conservancy Brasil",
+     "The Nature Conservancy Brasil"),
+    ("BANK_PROGRESS", "donation_board.gd", "20", "11", "474",
+     "Under the bar: every player's gifts so far, then the goal. Both %s are sums of the game's money ($1,234,567).",
+     "%s of %s", "%s de %s", "%s de %s", "%s von %s", "%s sur %s", "%s / %s", "%s / %s", "%s / %s",
+     "%s of %s", "%s of %s", "%s of %s", "%s out of %s", "%s / %s", "%s / %s", "%s / %s"),
+    ("BANK_DONORS", "donation_board.gd", "13", "11", "474",
+     "How many players have given. %s is the number. Gender-neutral wording.",
+     "Donors: %s", "Doadores: %s", "Donantes: %s", "Spenden: %s", f"Dons{NB}: %s", "寄付した人：%s", "捐赠人数：%s", "기부한 사람: %s",
+     "Donors: %s", "Donors: %s", "Donations: %s", "Donations: %s", "People who donated: %s", "Number of donors: %s", "People who donated: %s"),
+    ("BANK_ASKING", "donation_board.gd", "13", "11", "0",
+     "Under the figures while the game asks Steam for every player's total. Wraps.",
+     "Asking Steam for the total...", "Buscando o total no Steam...", "Consultando el total en Steam...",
+     "Gesamtsumme wird von Steam abgefragt...", "Demande du total à Steam...",
+     "Steamに合計を問い合わせています…", "正在向Steam查询总额…", "Steam에서 총액을 불러오는 중...",
+     "Fetching the total on Steam...", "Checking the total on Steam...", "The total is being asked from Steam...",
+     "Asking Steam for the total...", "Asking Steam for the total...", "Asking Steam for the total...",
+     "Loading the total from Steam..."),
+    ("BANK_OFFLINE", "donation_board.gd", "13", "11", "0",
+     "Under the figures when Steam cannot be reached and a total was seen before. Wraps.",
+     "Can't reach Steam. Showing the last total.", "Sem conexão com o Steam. Mostrando o último total.",
+     "No se puede conectar con Steam. Se muestra el último total.",
+     "Steam ist nicht erreichbar. Die letzte Summe wird angezeigt.",
+     "Steam est injoignable. Dernier total affiché.",
+     "Steamにつながりません。前回の合計を表示しています。",
+     "无法连接Steam。显示上次的总额。",
+     "Steam에 연결할 수 없어요. 마지막 총액을 보여 줘요.",
+     "No connection to Steam. Showing the last total.", "Can't connect to Steam. The last total is shown.",
+     "Steam can't be reached. The last sum is shown.", "Steam can't be reached. Last total shown.",
+     "Can't connect to Steam. Showing the previous total.", "Can't connect to Steam. Showing the last total.",
+     "Can't connect to Steam. Showing the last total."),
+    ("BANK_NEVER", "donation_board.gd", "13", "11", "0",
+     "Under the figures when Steam cannot be reached and no total was ever seen. Wraps.",
+     "Open the game through Steam to see the total.", "Abra o jogo pelo Steam para ver o total.",
+     "Abre el juego desde Steam para ver el total.", "Starte das Spiel über Steam, um die Summe zu sehen.",
+     "Lance le jeu depuis Steam pour voir le total.",
+     "合計を見るには、Steamからゲームを起動してください。",
+     "通过Steam启动游戏即可查看总额。",
+     "총액을 보려면 Steam에서 게임을 실행하세요.",
+     "Open the game through Steam to see the total.", "Open the game from Steam to see the total.",
+     "Start the game via Steam to see the sum.", "Launch the game from Steam to see the total.",
+     "To see the total, please start the game from Steam.", "Launch the game through Steam to see the total.",
+     "To see the total, run the game in Steam."),
+    ("BANK_REACHED", "donation_board.gd", "13", "11", "0",
+     "Under the figures once the goal is reached. Wraps.",
+     "Goal reached! Thank you, everyone.", "Meta atingida! Obrigado, pessoal.",
+     "¡Meta alcanzada! ¡Gracias a todo el mundo!", "Ziel erreicht! Danke an alle!",
+     f"Objectif atteint{NB}! Merci à tout le monde{NB}!",
+     "目標達成！みなさん、ありがとう！", "目标达成！谢谢大家！", "목표 달성! 모두 고마워요!",
+     "Goal reached! Thanks, everyone.", "Goal reached! Thanks to everyone!", "Goal reached! Thanks to all!",
+     "Goal reached! Thanks to everyone!", "Goal achieved! Thank you, everyone!", "Goal achieved! Thank you all!",
+     "Goal achieved! Thank you, everyone!"),
+    ("BANK_LOCKED", "donation_board.gd", "16", "13", "0",
+     "The player's part of the board before their lake is clean. Wraps.",
+     "Clean your lake to donate the money you have left.", "Limpe o seu lago para doar o dinheiro que sobrar.",
+     "Limpia tu lago para donar el dinero que te sobre.", "Mach deinen See sauber, um dein übriges Geld zu spenden.",
+     "Nettoie ton lac pour donner l'argent qui te reste.",
+     "湖をきれいにすると、残ったお金を寄付できます。",
+     "把你的湖清理干净，就能捐出剩下的钱。",
+     "호수를 깨끗하게 하면 남은 돈을 기부할 수 있어요.",
+     "Clean your lake to donate the money left over.", "Clean your lake to donate the money you have left.",
+     "Make your lake clean to donate your leftover money.", "Clean your lake to give the money you have left.",
+     "When you clean the lake, you can donate the leftover money.", "Clean up your lake and you can donate the leftover money.",
+     "If you make the lake clean, you can donate the leftover money."),
+    ("BANK_EMPTY", "donation_board.gd", "16", "13", "0",
+     "The player's part when the lake is clean but the purse is empty. Wraps.",
+     "You have no money to donate.", "Você não tem dinheiro para doar.", "No tienes dinero para donar.",
+     "Du hast kein Geld zum Spenden.", "Tu n'as pas d'argent à donner.",
+     "寄付できるお金がありません。", "你没有可以捐赠的钱。", "기부할 돈이 없어요.",
+     "You have no money to donate.", "You have no money to donate.", "You have no money to donate.",
+     "You have no money to give.", "There is no money you can donate.", "You have no money to donate.",
+     "There is no money to donate."),
+    ("BANK_DONATE", "donation_board.gd", "16", "11", "312",
+     "The door that gives the purse. %s is the purse in the game's money ($43,210). A button, no full stop.",
+     "Donate %s", "Doar %s", "Donar %s", "%s spenden", "Donner %s", "%sを寄付", "捐赠%s", "%s 기부하기",
+     "Donate %s", "Donate %s", "Donate %s", "Give %s", "Donate %s", "Donate %s", "Donate %s"),
+    ("BANK_DONE", "donation_board.gd", "16", "13", "0",
+     "The player's part once this Steam account has given. %s is what it gave ($43,210). Wraps.",
+     "You donated %s. Thank you!", "Você doou %s. Obrigado!", "Donaste %s. ¡Gracias!",
+     "Du hast %s gespendet. Danke!", f"Tu as donné %s. Merci{NB}!",
+     "%sを寄付しました。ありがとう！", "你捐赠了%s。谢谢！", "%s 기부 완료! 고마워요!",
+     "You donated %s. Thank you!", "You donated %s. Thank you!", "You donated %s. Thanks!",
+     "You gave %s. Thank you!", "You donated %s. Thank you!", "You donated %s. Thank you!",
+     "%s donation complete! Thank you!"),
+    ("BANK_SURE", "donation_board.gd", "20", "16", "358",
+     "The question before giving, on the confirm board's title plank. %s is the purse ($43,210).",
+     "Donate %s?", "Doar %s?", "¿Donar %s?", "%s spenden?", f"Donner %s{NB}?",
+     "%sを寄付しますか？", "要捐赠%s吗？", "%s 기부할까요?",
+     "Donate %s?", "Donate %s?", "Donate %s?", "Give %s?", "Will you donate %s?", "Donate %s?", "Shall I donate %s?"),
+    ("BANK_ONCE", "menu_confirm.gd", "16", "13", "358",
+     "The line under BANK_SURE: a gift cannot be made twice. One line, never wrapped.",
+     "You can only donate once.", "Você só pode doar uma vez.", "Solo puedes donar una vez.",
+     "Du kannst nur einmal spenden.", "Tu ne peux donner qu'une seule fois.",
+     "寄付できるのは一回だけです。", "你只能捐赠一次。", "기부는 한 번만 할 수 있어요.",
+     "You can only donate once.", "You can only donate once.", "You can only donate once.",
+     "You can only give one single time.", "You can donate only one time.", "You can only donate once.",
+     "You can donate only once."),
+    ("BANK_YES", "menu_confirm.gd", "16", "13", "160",
+     "A button: gives the purse.",
+     "Donate", "Doar", "Donar", "Spenden", "Donner", "寄付する", "捐赠", "기부하기",
+     "Donate", "Donate", "Donate", "Give", "Donate", "Donate", "Donate"),
+    ("BANK_NOT_YET", "menu_confirm.gd", "16", "13", "160",
+     "A button: keeps the purse, nothing given.",
+     "Not yet", "Agora não", "Ahora no", "Jetzt nicht", "Pas maintenant", "あとで", "以后再说", "나중에",
+     "Not now", "Not now", "Not now", "Not now", "Later", "Later", "Later"),
+]
+
+with open(CSV_PATH, encoding="utf-8", newline="") as f:
+    text = f.read()
+rows = list(csv.reader(io.StringIO(text)))
+head = rows[0]
+assert head[:6] == ["keys", "_where", "_size", "_least", "_width", "_note"], head
+have = {r[0] for r in rows[1:] if r}
+assert not have & {r[0] for r in ROWS}, "already added"
+for r in ROWS:
+    assert len(r) == len(head), (r[0], len(r), len(head))
+out = io.StringIO()
+writer = csv.writer(out, lineterminator="\n")
+for r in ROWS:
+    writer.writerow(r)
+if not text.endswith("\n"):
+    text += "\n"
+with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+    f.write(text + out.getvalue())
+print("added", len(ROWS))

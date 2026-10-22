@@ -2302,6 +2302,7 @@ func _stage_save() -> void:
 		"%.5f" % float(_main.get(&"pollution")))
 	_check_save_hardening()
 	_check_achievements()
+	_check_donation_bank()
 	_check_demo()
 	_advance()
 
@@ -2616,6 +2617,210 @@ func _check_achievements() -> void:
 		_check(steam.earned == earned_was and not steam.steam_up(),
 			"a harness run leaves Steam and the earned file alone",
 			"earned %s steam %s" % [steam.earned, steam.steam_up()])
+
+
+## Steam's stats as the Donation Bank uses them, for `_check_donation_bank`: the account's own
+## stats, whether Steam will take a stat yet (`published`), and the global totals it answers.
+class FakeSteam extends RefCounted:
+	var stats := {}
+	var globals := {}
+	var published := true
+	var asked := 0
+	var stored := 0
+
+	func getStatInt(id: String) -> int:
+		return int(stats.get(id, 0))
+
+	func setStatInt(id: String, value: int) -> bool:
+		if not published:
+			return false
+		stats[id] = value
+		return true
+
+	func storeStats() -> bool:
+		stored += 1
+		return true
+
+	func requestGlobalStats(_days: int) -> void:
+		asked += 1
+
+	func getGlobalStatInt(id: String) -> int:
+		return int(globals.get(id, 0))
+
+	func getAchievement(_id: String) -> Dictionary:
+		return {"achieved": false}
+
+	func setAchievement(_id: String) -> bool:
+		return true
+
+
+## The Donation Bank (2026-10-22): the ledger's rules, a cleaned lake giving its purse once and
+## never again, the demo and an uncleaned lake giving nothing, a harness never reaching the
+## player's own ledger, `Achievements` squaring the gift with a stand-in Steam, and the board
+## fitting 1280x720 in every language and every state.
+func _check_donation_bank() -> void:
+	var real := "user://achievements.cfg"
+	var real_time := FileAccess.get_modified_time(real) if FileAccess.file_exists(real) else 0
+	var steam := Achievements.main() as Achievements
+	var ledger: DonationBank = _main.call(&"bank")
+	_check(ledger != null and ledger.file.is_empty() and (steam == null or ledger != steam.bank),
+		"a harness lake's bank is its own and kept nowhere", "")
+
+	# The ledger.
+	var book := DonationBank.new()
+	_check(not book.give(0) and book.give(500) and book.given == 500 and not book.give(300)
+			and book.given == 500,
+		"a ledger takes one gift and never a second", str(book.given))
+	var big := DonationBank.new()
+	big.give(DonationBank.MOST + 5)
+	_check(big.given == DonationBank.MOST, "one gift is held to the account's most", str(big.given))
+	var counting := DonationBank.new()
+	counting.total = 100
+	counting.donors = 3
+	counting.give(50)
+	var own := counting.shown_total() == 150 and counting.shown_donors() == 4
+	counting.total = 200
+	_check(own and counting.shown_total() == 200 and counting.shown_donors() == 3,
+		"a gift counts on the bar until Steam's total has it",
+		"%d %d" % [counting.shown_total(), counting.shown_donors()])
+	TranslationServer.set_locale("pt_BR")
+	var pt := DonationBank.figure(DonationBank.GOAL)
+	TranslationServer.set_locale("en")
+	var en := DonationBank.figure(DonationBank.GOAL)
+	_check(en == "$5,000,000" and pt == "$5.000.000" and DonationBank.figure(43) == "$43",
+		"the bank's figures are grouped as the language groups them", "%s %s" % [en, pt])
+
+	# The lake.
+	var purse := float(_main.get(&"sludge"))
+	var ended := bool(_main.get(&"_farewell_shown"))
+	_main.set(&"_bank", DonationBank.new())
+	_main.set(&"sludge", 43210.4)
+	_main.set(&"_farewell_shown", false)
+	var locked := not bool(_main.call(&"can_donate")) and int(_main.call(&"donate")) == 0
+	_main.set(&"_farewell_shown", true)
+	Demo.forced = true
+	var demo := not bool(_main.call(&"can_donate"))
+	Demo.forced = false
+	var open := bool(_main.call(&"can_donate"))
+	var given := int(_main.call(&"donate"))
+	var bank: DonationBank = _main.call(&"bank")
+	_check(locked and demo and open, "only a cleaned lake gives, and never in the demo",
+		"%s %s %s" % [locked, demo, open])
+	_check(given == 43210 and is_zero_approx(float(_main.get(&"sludge")) - 0.4)
+			and bank.given == 43210,
+		"a gift takes the whole purse", "%d, %.1f left" % [given, float(_main.get(&"sludge"))])
+	var file := FileAccess.open(_main.get(&"save_path") as String, FileAccess.READ)
+	var written: Dictionary = (file.get_var(true) as Dictionary) if file != null else {}
+	if file != null:
+		file.close()
+	_check(float(written.get("sludge", -1.0)) < 1.0, "the emptied purse is saved at once",
+		str(written.get("sludge", -1.0)))
+	_main.set(&"sludge", 9000.0)
+	_check(not bool(_main.call(&"can_donate")) and int(_main.call(&"donate")) == 0
+			and is_equal_approx(float(_main.get(&"sludge")), 9000.0),
+		"a second gift is refused, a full purse or not", "")
+
+	# The board, every state, every language, at 1280x720.
+	var holder := Control.new()
+	holder.size = Vector2(1280.0, 720.0)
+	add_child(holder)
+	var board := DonationBoard.new()
+	board.lake = _main
+	holder.add_child(board)
+	board.size = holder.size
+	board.open()
+	var worst := 0.0
+	var parts := {}
+	for state: int in 4:
+		_main.set(&"_bank", DonationBank.new())
+		_main.set(&"_farewell_shown", state != 0)
+		_main.set(&"sludge", 0.0 if state == 1 else 87654.0)
+		if state == 3:
+			(_main.call(&"bank") as DonationBank).give(87654)
+		board.open()
+		parts[board.part()] = true
+		for locale: String in ["en", "pt_BR", "es", "de", "fr", "ja", "zh_CN", "ko"]:
+			TranslationServer.set_locale(locale)
+			Style.set_locale(locale)
+			worst = maxf(worst, float(board.wanted_tall()))
+	TranslationServer.set_locale("en")
+	Style.set_locale("en")
+	_check(parts.size() == 4, "the board has four parts: locked, empty, door, done", str(parts.keys()))
+	_check(worst <= 680.0, "the bank's board fits 1280x720 in every language", "%.0f of 680" % worst)
+	_main.set(&"_bank", DonationBank.new())
+	_main.set(&"_farewell_shown", true)
+	_main.set(&"sludge", 500.0)
+	board.open()
+	var stops: Array = board.pad_focus()
+	_check(stops.size() == 2 and stops[0]["key"] == &"donate" and bool(stops[0]["first"]),
+		"the pad picks the door first, then the cross", str(stops))
+	board.ask()
+	var asked := (board.get(&"_confirm") as MenuConfirm).visible and board.pad_focus().is_empty()
+	board.call(&"_give")
+	_check(asked and (_main.call(&"bank") as DonationBank).given == 500 and board.part() == &"done",
+		"the door asks first, and the yes gives", board.part())
+	holder.queue_free()
+
+	# Achievements and Steam, with a stand-in for Steam on a file of the harness's own.
+	var path := "user://test_bank_achievements.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var fake := FakeSteam.new()
+	var ach := Achievements.new()
+	ach.path = path
+	ach.bank.file = path
+	ach.set(&"_tried", true)
+	ach.set(&"_steam", fake)
+	ach.set(&"_stats_in", true)
+	fake.published = false
+	ach.bank.give(300)
+	ach.donated()
+	var held := not ach.bank.sent and fake.stats.is_empty()
+	fake.published = true
+	ach.call(&"_settle_gift")
+	var kept := DonationBank.new()
+	kept.file = path
+	kept.read()
+	_check(held and ach.bank.sent and int(fake.stats.get(Achievements.DONATED, 0)) == 300
+			and int(fake.stats.get(Achievements.DONORS, 0)) == 1 and kept.given == 300 and kept.sent,
+		"a gift Steam would not take yet is sent once it will, and kept in the file",
+		str(fake.stats))
+	ach.unlock(Achievements.GREAT_NET)
+	kept.read()
+	_check(kept.given == 300, "an achievement written leaves the bank's section alone", str(kept.given))
+	var elsewhere := FakeSteam.new()
+	elsewhere.stats = {Achievements.DONATED: 700, Achievements.DONORS: 1}
+	var ach2 := Achievements.new()
+	ach2.set(&"_tried", true)
+	ach2.set(&"_steam", elsewhere)
+	ach2.set(&"_stats_in", true)
+	ach2.call(&"_settle_gift")
+	var came := ach2.bank.given == 700 and ach2.bank.sent
+	var ach3 := Achievements.new()
+	ach3.set(&"_tried", true)
+	ach3.set(&"_steam", elsewhere)
+	ach3.set(&"_stats_in", true)
+	ach3.bank.give(200)
+	ach3.donated()
+	_check(came and ach3.bank.sent and int(elsewhere.stats[Achievements.DONATED]) == 700,
+		"an account that gave elsewhere is known, and is never counted twice", str(elsewhere.stats))
+	fake.globals = {Achievements.DONATED: 4000000, Achievements.DONORS: 80}
+	var asking := ach.refresh_global() and ach.bank.asking and fake.asked == 1
+	ach.call(&"_on_global_stats", 0, "ok")
+	var again := ach.refresh_global() and fake.asked == 1
+	_check(asking and not ach.bank.asking and ach.bank.live and ach.bank.total == 4000000
+			and ach.bank.donors == 80 and ach.bank.seen_at > 0 and again,
+		"the global total is asked for, read, and not asked again at once",
+		"%d %d asked %d" % [ach.bank.total, ach.bank.donors, fake.asked])
+	for node: Achievements in [ach, ach2, ach3]:
+		node.free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+	_main.set(&"_bank", null)
+	_main.set(&"sludge", purse)
+	_main.set(&"_farewell_shown", ended)
+	var real_after := FileAccess.get_modified_time(real) if FileAccess.file_exists(real) else 0
+	_check(real_after == real_time and (steam == null or not steam.steam_up()),
+		"the player's own ledger and Steam are left alone", "")
 
 
 ## The save is written safely (2026-09-29, issue #25): a temp file moved over the save, the

@@ -1009,3 +1009,57 @@ static var DEMO_LEFT: String:
 
 static var DEMO_HOUSE: String:
 	get: return TranslationServer.translate(&"DEMO_HOUSE")
+
+static var BANK_TITLE: String:
+	get: return TranslationServer.translate(&"BANK_TITLE")
+
+static var BANK_LEAD: String:
+	get: return TranslationServer.translate(&"BANK_LEAD")
+
+static var BANK_PLEDGE: String:
+	get: return TranslationServer.translate(&"BANK_PLEDGE")
+
+static var BANK_CHARITY: String:
+	get: return TranslationServer.translate(&"BANK_CHARITY")
+
+static var BANK_PROGRESS: String:
+	get: return TranslationServer.translate(&"BANK_PROGRESS")
+
+static var BANK_DONORS: String:
+	get: return TranslationServer.translate(&"BANK_DONORS")
+
+static var BANK_ASKING: String:
+	get: return TranslationServer.translate(&"BANK_ASKING")
+
+static var BANK_OFFLINE: String:
+	get: return TranslationServer.translate(&"BANK_OFFLINE")
+
+static var BANK_NEVER: String:
+	get: return TranslationServer.translate(&"BANK_NEVER")
+
+static var BANK_REACHED: String:
+	get: return TranslationServer.translate(&"BANK_REACHED")
+
+static var BANK_LOCKED: String:
+	get: return TranslationServer.translate(&"BANK_LOCKED")
+
+static var BANK_EMPTY: String:
+	get: return TranslationServer.translate(&"BANK_EMPTY")
+
+static var BANK_DONATE: String:
+	get: return TranslationServer.translate(&"BANK_DONATE")
+
+static var BANK_DONE: String:
+	get: return TranslationServer.translate(&"BANK_DONE")
+
+static var BANK_SURE: String:
+	get: return TranslationServer.translate(&"BANK_SURE")
+
+static var BANK_ONCE: String:
+	get: return TranslationServer.translate(&"BANK_ONCE")
+
+static var BANK_YES: String:
+	get: return TranslationServer.translate(&"BANK_YES")
+
+static var BANK_NOT_YET: String:
+	get: return TranslationServer.translate(&"BANK_NOT_YET")

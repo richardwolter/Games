@@ -107,6 +107,12 @@ var _confirm: MenuConfirm
 var _flag: PlankButton
 ## The demo's Wishlist Now door (2026-10-09), in the top right beside the flag: the store page.
 var _wish: PlankButton
+## The Donation Bank (2026-10-22): a plank in the same corner in the full game, seen by every
+## player from the first launch, opening the bank's board. Its gold motes say that this run can
+## give. `lake` is the lake behind the menu, whose purse the board gives; set before `_ready`.
+var lake: Lake = null
+var _bank_plank: PlankButton
+var _bank: DonationBoard
 var _languages: LanguageBoard
 ## Whether the doors answer. Not while the menu is fading either way: a plank pressed on its
 ## way out is a second answer to a question already answered.
@@ -171,6 +177,14 @@ func _ready() -> void:
 		_wish.pulse = 0.5
 		_wish.pressed.connect(_take.bind(&"wishlist"))
 		add_child(_wish)
+	else:
+		_bank_plank = PlankButton.new()
+		_bank_plank.name = &"Bank"
+		_bank_plank.label = Text.BANK_TITLE
+		_bank_plank.size = PLANK
+		_bank_plank.water = true
+		_bank_plank.pressed.connect(_take.bind(&"bank"))
+		add_child(_bank_plank)
 	Prefs.language_changed.connect(_on_language)
 
 	_settings = SettingsSkin.new()
@@ -208,6 +222,14 @@ func _ready() -> void:
 	_languages.picked.connect(func(_at: String) -> void: _show_languages(false))
 	add_child(_languages)
 
+	if _bank_plank != null:
+		_bank = DonationBoard.new()
+		_bank.name = &"Bank"
+		_bank.lake = lake
+		_bank.visible = false
+		_bank.close_asked.connect(_shut.bind(_show_bank))
+		add_child(_bank)
+
 	_confirm = MenuConfirm.new()
 	_confirm.name = &"Confirm"
 	_confirm.visible = false
@@ -236,11 +258,19 @@ func _band() -> GradientTexture2D:
 	return band
 
 
+## The boards that open over the doors, the bank's where there is one.
+func _boards() -> Array:
+	var out: Array = [_settings, _controls, _credits, _letter, _languages, _confirm]
+	if _bank != null:
+		out.append(_bank)
+	return out
+
+
 ## Cover the window, whatever shape it currently is.
 func _fill() -> void:
 	position = Vector2.ZERO
 	size = get_viewport().get_visible_rect().size
-	for over: Control in [_scrim, _settings, _controls, _credits, _letter, _languages, _confirm]:
+	for over: Control in [_scrim] + _boards():
 		over.position = Vector2.ZERO
 		over.size = size
 	_lay_out()
@@ -286,6 +316,11 @@ func _lay_out() -> void:
 		_wish.label = Text.DEMO_WISHLIST
 		_wish.size = PLANK
 		_wish.position = Vector2(_flag.position.x - GAP - PLANK.x, FLAG_INSET.y).floor()
+	if _bank_plank != null:
+		_bank_plank.label = Text.BANK_TITLE
+		_bank_plank.size = PLANK
+		_bank_plank.position = Vector2(_flag.position.x - GAP - PLANK.x, FLAG_INSET.y).floor()
+		_bank_plank.pulse = 0.5 if lake != null and lake.can_donate() else 0.0
 	var shown: Array = []
 	for door: Dictionary in DOORS:
 		var key: StringName = door["key"]
@@ -312,7 +347,7 @@ func _lay_out() -> void:
 ## cover) or faded in (the way back from the game, out of the dark the pose was struck in).
 func show_up(at_once: bool = false) -> void:
 	_kill_fade()
-	for over: Control in [_settings, _controls, _credits, _letter, _languages, _confirm]:
+	for over: Control in _boards():
 		over.visible = false
 	visible = true
 	_live = true
@@ -354,7 +389,7 @@ func _take(key: StringName) -> void:
 	var asks := key == &"new" and has_run
 	if key == &"quit":
 		Sfx.ui(&"ui_close")
-	elif key in [&"settings", &"credits", &"how", &"language", &"wishlist"] or asks:
+	elif key in [&"settings", &"credits", &"how", &"language", &"wishlist", &"bank"] or asks:
 		# A question only; the start sound waits for the answer.
 		Sfx.ui(&"ui_click")
 	match key:
@@ -375,6 +410,8 @@ func _take(key: StringName) -> void:
 			_show_languages(true)
 		&"wishlist":
 			OS.shell_open(Demo.STORE_URL)
+		&"bank":
+			_show_bank(true)
 		&"quit":
 			if quit_asked.get_connections().is_empty():
 				get_tree().quit()
@@ -456,11 +493,29 @@ func _show_languages(open: bool) -> void:
 	_languages.visible = open
 
 
+## The Donation Bank's board. Closing it lays the corner plank out again: a gift just made
+## puts its motes out.
+func _show_bank(open: bool) -> void:
+	if _bank == null:
+		return
+	_bank.visible = open
+	if open:
+		_bank.open()
+	else:
+		_lay_out()
+
+
+## The bank's board, for the harness and the probes. Null in the demo.
+func bank_board() -> DonationBoard:
+	return _bank
+
+
 ## A language picked: the doors carry their words as labels, so they are set again, and
 ## the flag in the corner changes with them.
 func _on_language() -> void:
 	for door: Dictionary in DOORS:
 		(_planks[door["key"]] as PlankButton).label = Text.of(door["label"])
+	# The bank's plank takes its word in `_lay_out`.
 	_lay_out()
 
 
@@ -487,8 +542,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		# Not under another board: Start put the settings beneath the credits or the letter,
 		# where nothing could reach them (issue #33 audit).
-		for over: Control in [_controls, _credits, _letter, _languages, _confirm]:
-			if over.visible:
+		for over: Control in _boards():
+			if over != _settings and over.visible:
 				return
 		_show_settings(not _settings.visible)
 		return
@@ -529,7 +584,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func pad_focus() -> Array:
 	if not live():
 		return []
-	for over: Control in [_settings, _controls, _credits, _letter, _languages, _confirm]:
+	for over: Control in _boards():
 		if over.visible:
 			return []
 	var out: Array = []
@@ -539,5 +594,7 @@ func pad_focus() -> Array:
 			out.append({"box": plank.get_rect(), "key": door["key"], "first": plank.accent})
 	if _wish != null:
 		out.append({"box": _wish.get_rect(), "key": &"wishlist"})
+	if _bank_plank != null:
+		out.append({"box": _bank_plank.get_rect(), "key": &"bank"})
 	out.append({"box": _flag.get_rect(), "key": &"language"})
 	return out

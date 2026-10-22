@@ -123,6 +123,10 @@ var _menu_rect := Rect2()
 var _menu_hot: bool = false
 ## The demo's ending (2026-10-09) also offers the store page, a door left of the menu's.
 var wishlist: bool = false
+## The full game's ending offers the Donation Bank in the same place (2026-10-22): the door
+## left of the menu's opens the bank's board (`bank_asked`), which the lake lays over this.
+var bank: bool = false
+signal bank_asked
 ## The home door reads "Back to lake" and only closes the words (the demo's ending).
 var lake_door: bool = false
 var _wish_rect := Rect2()
@@ -472,7 +476,7 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if doors_up() and _wish_rect.has_point(click.position):
 		Sfx.ui(&"ui_click")
-		open_store()
+		_take_side()
 		return
 	# While the credits are climbing, a click runs them off rather than closing the screen:
 	# a player who clicks to skip the roll has not asked to leave the lake yet, and the
@@ -532,18 +536,36 @@ func _draw() -> void:
 func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> void:
 	var box := Vector2(Style.measure(_home_label(), int(height)).x, height) + ONWARD_PAD * 2.0
 	var top := under + height * ONWARD_DROP
-	if not wishlist:
+	var side := _side_label()
+	if side.is_empty():
 		_wish_rect = Rect2()
 		_menu_rect = Rect2(Vector2((size.x - box.x) * 0.5, top), box)
 		_door(_menu_rect, _home_label(), height, _menu_hot, fade, shade)
 		return
-	var wish := Vector2(Style.measure(Text.DEMO_WISHLIST, int(height)).x, height) + ONWARD_PAD * 2.0
+	var wish := Vector2(Style.measure(side, int(height)).x, height) + ONWARD_PAD * 2.0
 	var gap := height * 1.5
 	var left := (size.x - wish.x - gap - box.x) * 0.5
 	_wish_rect = Rect2(Vector2(left, top), wish)
 	_menu_rect = Rect2(Vector2(left + wish.x + gap, top), box)
-	_door(_wish_rect, Text.DEMO_WISHLIST, height, _wish_hot, fade, shade)
+	_door(_wish_rect, side, height, _wish_hot, fade, shade)
 	_door(_menu_rect, _home_label(), height, _menu_hot, fade, shade)
+
+
+## The door left of the menu's: the demo's store page or the full game's Donation Bank, or
+## none. `_wish_rect` is that door's, whichever it is.
+func _side_label() -> String:
+	if wishlist:
+		return Text.DEMO_WISHLIST
+	if bank:
+		return Text.BANK_TITLE
+	return ""
+
+
+func _take_side() -> void:
+	if wishlist:
+		open_store()
+	elif bank:
+		bank_asked.emit()
 
 
 func _door(rect: Rect2, label: String, height: float, hot: bool, fade: float, shade: Color) -> void:
@@ -580,10 +602,12 @@ func pad_focus() -> Array:
 	if not doors_up():
 		return [{"box": Rect2(Vector2.ZERO, size), "key": &"skip", "ring": false}]
 	var out: Array = []
+	# The demo's store page is picked first; the bank waits for a press, the menu door being
+	# what most players want at the end.
 	if _wish_rect.size != Vector2.ZERO:
-		out.append({"box": _wish_rect, "key": &"wish", "first": true})
+		out.append({"box": _wish_rect, "key": &"wish", "first": wishlist})
 	if _menu_rect.size != Vector2.ZERO:
-		out.append({"box": _menu_rect, "key": &"menu", "first": _wish_rect.size == Vector2.ZERO})
+		out.append({"box": _menu_rect, "key": &"menu", "first": not wishlist})
 	# The other answer, keep fishing, is a click anywhere off the door: a stop over the
 	# closing words, so a pad-only player has both (issue #33 audit).
 	var band := _message_band()

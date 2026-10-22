@@ -7666,6 +7666,56 @@ sheet Richard enters on Steamworks.
   The cleaned lake runs 7-9 ms on an RTX 5060 Ti, so expect the frame cap to matter there.
   Valve's review decides Verified.
 
+### The Donation Bank (2026-10-22, `/grill-me` with Richard)
+A goal past the cleaned lake: the money left in the purse at the end goes into a bank every
+player shares, and when it reaches **$5,000,000 in the game's money Richard donates 100 US
+dollars to The Nature Conservancy Brasil**. `scripts/donation_bank.gd` (`DonationBank`, the
+ledger), `scripts/donation_board.gd` (`DonationBoard`), `Achievements`' bank block, and the
+lake's "The Donation Bank" section.
+- **No server**: two **aggregated Steam stats**, `DONATED` (this account's gift) and `DONORS`
+  (1 once it gave). Steam sums every player's; the game reads the totals with
+  `requestGlobalStats` / `getGlobalStatInt` when the board opens (not again inside
+  `GLOBAL_GAP` 30 s). Richard enters both on Steamworks as `docs/steam/donation_bank.md` says.
+- **Once per Steam account, ever**: a New game gives no second gift. The ledger is
+  `Achievements.bank`, kept in `user://achievements.cfg` (`[donation]`, so Steam Cloud syncs
+  it) and squared with the account's own stats: a gift made on another machine comes in, one
+  made offline is sent later, and an account that already gave is never counted twice. Nothing
+  in the run's save, no `SAVE_VERSION` bump. `Achievements._write` now loads before it saves,
+  or it would wipe the bank's section.
+- **Only a cleaned lake gives** (`_farewell_shown`), **the whole purse** in one press, up to
+  `DonationBank.MOST` (1,000,000, also the stats' max: one cheating account adds no more than
+  one gift). Asked once more on `MenuConfirm` (`yes_warns` false: giving is not a danger), the
+  run written at once.
+- **The fixed pledge is what makes cheating harmless**: a faked counter only brings the
+  donation sooner. Not a share of sales, by decision (the legal and the cheating risk both).
+- **Where**: a plank in the main menu's top right (the demo's Wishlist slot), seen by every
+  player from the first launch, gold motes while this run can give; and a door left of "Back
+  to menu" on the farewell, once the credits have rolled, which lays the board over the words
+  on layer 21 (`Lake._open_bank`). **Never in the demo.**
+- **The board**: the credits' wood, two sentences, the HUD meter's bar (`MeterBar`) filling
+  with clean water as the bank fills, the figure, the donors, a status line (asking Steam, Steam
+  unreachable, goal reached), and under a rule the player's part (`part()`: locked, empty, the
+  door, or done). **Real money is written in words** ("100 US dollars"): `Style.write` paints
+  every "$" green as the game's money. Figures are grouped by language (`DonationBank.figure`:
+  "$5,000,000", "$5.000.000"). Until Steam's total has a fresh gift in it, the bar counts it
+  itself (`floor_total`).
+- **After the goal**: the bank keeps counting and says so; a new goal, if Richard pledges
+  again, ships in an update (`GOAL`, `BANK_PLEDGE`).
+- **Strings**: 18 `BANK_*` keys, machine drafts in seven languages written from the PT, with
+  back-translations (`tools/l10n_bank_rows.py` appended them). `BANK_CHARITY` is the charity's
+  own name in every language: **swap it for a generic one if TNC Brasil does not agree to be
+  named**.
+- **Open**: TNC Brasil's permission to use its name, the legal check before the store page
+  says it (draft paragraph in `docs/steam/donation_bank.md`, **not on the store**), and
+  publishing the two stats on Steamworks. The GodotSteam calls were checked by name against the
+  DLL, not against a live Steam account: a test donation on Richard's account is owed.
+- `test_lake`'s `_check_donation_bank` guards the ledger (one gift, the cap, the bar counting a
+  fresh gift, the grouping), the lake (only cleaned, never the demo, the whole purse, saved,
+  no second gift), the board (four parts, 1280x720 in eight languages, the pad's stops, ask
+  then give), `Achievements` with a stand-in Steam (a gift held until the stats are published,
+  an account that gave elsewhere, the global total read once), and the player's own file and
+  Steam left alone. `probe_wrap` covers the `BANK_*` sentences at the board's 474 px.
+
 ### The Rename (2026-10-06, Richard: "the name of the game is My Dirty Little Lake")
 "Lake Cleanup" was the working title. Everything is My Dirty Little Lake now: the folder
 (`Games/My Dirty Little Lake/`), `config/name` (the window's title), the exe

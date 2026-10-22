@@ -42,6 +42,12 @@ var no_label: String = NO:
 	set(v):
 		no_label = v
 		queue_redraw()
+## Whether the yes door wears the warning's red. The menu's and the settings' questions throw
+## something away; the Donation Bank's (2026-10-22) gives, and red would call it a danger.
+var yes_warns: bool = true:
+	set(v):
+		yes_warns = v
+		queue_redraw()
 
 ## The board's own width, and what a caller may ask for instead. **420, up from 400**
 ## (2026-09-17): the menu's own line, "The saved lake will be thrown away.", measures 348
@@ -169,7 +175,7 @@ func _draw() -> void:
 	_doors.clear()
 	var left := face.position.x + BOARD_PAD
 	var wide := (face.size.x - BOARD_PAD * 2.0 - ROW_GAP) * 0.5
-	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", Text.of(yes_label), true)
+	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", Text.of(yes_label), yes_warns)
 	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", Text.of(no_label), false)
 
 
@@ -207,7 +213,12 @@ func _draw_door(box: Rect2, key: StringName, label: String, warn: bool) -> void:
 ## words run longer than the board (2026-10-10: German and French overran it, and nothing
 ## shrank them). The smallest rung when none fits, which `test_lake` reports.
 static func fitted(text: String, wide: float) -> int:
-	for px: int in [Style.TEXT_BODY, Style.TEXT_SMALL, Style.TEXT_TINY]:
-		if Style.measure(text, px).x <= wide:
+	return fitted_to(text, wide, Style.TEXT_BODY)
+
+
+## The same walk down the ladder from any rung: the size wanted, or the first under it that fits.
+static func fitted_to(text: String, wide: float, wanted: int) -> int:
+	for px: int in [Style.TEXT_TITLE, Style.TEXT_HEAD, Style.TEXT_BODY, Style.TEXT_SMALL, Style.TEXT_TINY]:
+		if px <= wanted and Style.measure(text, px).x <= wide:
 			return px
 	return Style.TEXT_TINY

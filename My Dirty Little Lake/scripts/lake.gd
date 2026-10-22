@@ -667,6 +667,10 @@ var _ach_in := 0.0
 ## How many of `achieved` have been handed on, and whether Steam has had the backlog.
 var _ach_sent := 0
 var _ach_synced := false
+## The Donation Bank's ledger this lake reads and gives into (`bank`), and the board laid over
+## the farewell when its door is taken (see "The Donation Bank").
+var _bank: DonationBank
+var _bank_board: DonationBoard
 
 var _grid: LakeGrid
 ## The zoom the player set with the wheel, and how far a cast in progress is leaning on top
@@ -4039,6 +4043,9 @@ func _show_farewell() -> void:
 	else:
 		# The ending filmed (2026-10-12): the full game's only.
 		_farewell.reel_of = self
+		# The Donation Bank's door beside the menu's (2026-10-22).
+		_farewell.bank = true
+		_farewell.bank_asked.connect(_open_bank)
 	# The cleaned lake is the end of the game, so the credits roll under the words
 	# (2026-09-16).
 	_farewell.roll_credits()
@@ -4747,6 +4754,7 @@ func _build_menu() -> void:
 	add_child(over)
 	_menu = MainMenu.new()
 	_menu.name = &"Menu"
+	_menu.lake = self
 	_menu.visible = false
 	_menu.play_asked.connect(_begin_glide)
 	_menu.reload_asked.connect(_reload_as)
@@ -8325,6 +8333,99 @@ func all_finds_washed() -> bool:
 		if int(have.get(piece, 0)) < int(wanted[piece]):
 			return false
 	return true
+
+
+# The Donation Bank
+# =================
+#
+# A goal past the cleaned lake (2026-10-22, `/grill-me` with Richard): the money left in the
+# purse at the end can be given to a bank every player shares, and when it reaches
+# `DonationBank.GOAL` Richard donates 100 US dollars to The Nature Conservancy Brasil.
+#
+# - **Once per Steam account, ever.** The ledger is `Achievements`' (`user://achievements.cfg`,
+#   synced by Steam Cloud, squared with the account's own Steam stats), not the run's save, so
+#   a New game does not give a second gift. Nothing new in the save, no `SAVE_VERSION` bump.
+# - **Only a cleaned lake gives** (`_farewell_shown`), and it gives **the whole purse** in one
+#   press, up to `DonationBank.MOST`. The run is written straight after.
+# - **Seen from the main menu by everyone** (a plank in its corner) and offered by a door on
+#   the farewell. Never in the demo, which is another Steam app and never cleans its lake.
+# - A harness or a probe gets a bank of its own with no file (`bank`): only the game's own
+#   lake touches the player's one gift.
+
+
+## The ledger this lake gives into: the game's own (`Achievements.bank`) for the game's own
+## lake, a fresh one kept nowhere for a harness or a probe.
+func bank() -> DonationBank:
+	if _bank == null:
+		var steam: Achievements = null
+		if _owns_achievements():
+			steam = Achievements.main() as Achievements
+		_bank = steam.bank if steam != null else DonationBank.new()
+	return _bank
+
+
+## Whether this lake's ending has been reached, which is what opens the bank's door.
+func lake_ended() -> bool:
+	return _farewell_shown
+
+
+func can_donate() -> bool:
+	return not Demo.on() and _farewell_shown and not bank().has_given() and floori(sludge) >= 1
+
+
+## Give the purse. Returns what was given, 0 when nothing could be. Written at once: the
+## money has left the purse, and a crash before the next autosave would hand it back.
+func donate() -> int:
+	if not can_donate():
+		return 0
+	var amount := mini(floori(sludge), DonationBank.MOST)
+	if not bank().give(amount):
+		return 0
+	sludge -= float(amount)
+	if _owns_achievements():
+		var steam := Achievements.main() as Achievements
+		if steam != null:
+			steam.donated()
+	if _grid != null:
+		save_game()
+	return amount
+
+
+## Ask Steam for every player's total, for the board. Nothing for a harness's lake.
+func bank_refresh() -> void:
+	if not _owns_achievements():
+		return
+	var steam := Achievements.main() as Achievements
+	if steam != null:
+		steam.refresh_global()
+
+
+## The farewell's door: the bank's board laid over the closing words, on a layer of its own.
+func _open_bank() -> void:
+	if _bank_board != null:
+		return
+	var over := CanvasLayer.new()
+	over.name = &"Bank"
+	over.layer = BANK_LAYER
+	_bank_board = DonationBoard.new()
+	_bank_board.name = &"Board"
+	_bank_board.lake = self
+	_bank_board.close_asked.connect(_close_bank)
+	over.add_child(_bank_board)
+	add_child(over)
+	_bank_board.open()
+
+
+func _close_bank() -> void:
+	if _bank_board == null:
+		return
+	Sfx.ui(&"ui_close")
+	_bank_board.get_parent().queue_free()
+	_bank_board = null
+
+
+## Over the farewell's layer (20).
+const BANK_LAYER := 21
 
 
 ## The menu's Quit: the run is written before the game closes, the way the window's cross

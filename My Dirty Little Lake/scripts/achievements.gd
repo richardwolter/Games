@@ -18,6 +18,11 @@
 ##
 ## Not in `project.godot`'s autoloads (the open editor re-saves that file from memory):
 ## `Prefs._ready` hangs it off the root as `Achievements`.
+##
+## **It also keeps the Donation Bank's ledger** (`bank`, 2026-10-22): this account's one gift
+## and the last global total, in the same file, and the two aggregated stats Steam sums over
+## every player (`DONATED`, `DONORS`; entered on Steamworks as `docs/steam/donation_bank.md`
+## says). Here because Steam is started here, by the same rules.
 class_name Achievements
 extends Node
 
@@ -40,8 +45,24 @@ const ALL := [
 
 const FILE := "user://achievements.cfg"
 
+## The Donation Bank's two stats: this account's gift (INT, aggregated, increment only, max
+## `DonationBank.MOST`) and whether it gave (INT, aggregated, increment only, max 1). Steam's
+## global total of each is every player's added up.
+const DONATED := "DONATED"
+const DONORS := "DONORS"
+## The least time between two asks for the global total, and how long an ask may go
+## unanswered before it is given up.
+const GLOBAL_GAP := 30.0
+const GLOBAL_WAIT := 15.0
+## How long to wait for the account's own stats before acting without them.
+const STATS_WAIT := 10.0
+
 ## Earned ids, in the order they were earned.
 var earned: Array[String] = []
+## Where `earned` and the bank's ledger are kept. The harness points it elsewhere.
+var path := FILE
+## The Donation Bank's ledger: the game's own, the one the lake's board shows.
+var bank := DonationBank.new()
 
 var _steam: Object = null
 var _tried := false
@@ -54,6 +75,13 @@ var _retry_in := 0.0
 ## The figure last sent as Rich Presence.
 var _presence := ""
 const RETRY := 5.0
+## Whether the account's own stats are in (`user_stats_received`, or `STATS_WAIT` gone by), so
+## its stats can be read and set. The gift waits for it, and is tried again every `RETRY`.
+var _stats_in := false
+var _stats_wait := STATS_WAIT
+var _gift_retry := 0.0
+## When the global total was last asked for, in seconds of the engine's clock.
+var _asked_at := -1000.0
 
 
 static func main() -> Node:
@@ -65,6 +93,8 @@ static func main() -> Node:
 
 func _ready() -> void:
 	_read()
+	bank.file = path
+	bank.read()
 
 
 ## Push everything already earned to Steam. The game's lake calls it once it has loaded.
@@ -111,9 +141,32 @@ func steam_up() -> bool:
 	return _steam != null
 
 
+## The bank has just taken this account's gift: tell Steam, now or once it can be told.
+func donated() -> void:
+	if _start():
+		_settle_gift()
+
+
+## Ask Steam for every player's total. False where there is no Steam to ask; a second ask
+## inside `GLOBAL_GAP` of an answered one is nothing (the total moves slowly, and Steam limits
+## how often it may be asked).
+func refresh_global() -> bool:
+	if not _start():
+		return false
+	var now := Time.get_ticks_msec() / 1000.0
+	if bank.asking or (bank.live and now - _asked_at < GLOBAL_GAP):
+		return true
+	_asked_at = now
+	bank.asking = true
+	bank.changed.emit()
+	_steam.call(&"requestGlobalStats", 0)
+	return true
+
+
 func _process(delta: float) -> void:
 	if _steam == null:
 		return
+	_tend_bank(delta)
 	if not _pending.is_empty():
 		_retry_in -= delta
 		if _retry_in <= 0.0:
@@ -136,6 +189,78 @@ func _tell_steam(id: String) -> void:
 		_pending.append(id)
 
 
+## The bank's side of a frame with Steam up: the account's stats given up on after
+## `STATS_WAIT`, a gift Steam would not take yet tried again, an ask that never came back
+## dropped.
+func _tend_bank(delta: float) -> void:
+	if not _stats_in:
+		_stats_wait -= delta
+		if _stats_wait <= 0.0:
+			_stats_in = true
+			_settle_gift()
+	elif bank.given > 0 and not bank.sent:
+		_gift_retry -= delta
+		if _gift_retry <= 0.0:
+			_gift_retry = RETRY
+			_settle_gift()
+	if bank.asking and Time.get_ticks_msec() / 1000.0 - _asked_at > GLOBAL_WAIT:
+		bank.asking = false
+		bank.changed.emit()
+
+
+## Square the ledger with the account's own stats. **Steam is what says whether this account
+## has given**, wherever it gave: a gift made on another computer comes into this ledger, and
+## a gift made offline here is sent unless the account turns out to have given already.
+func _settle_gift() -> void:
+	if _steam == null or not _stats_in:
+		return
+	if int(_steam.call(&"getStatInt", DONORS)) >= 1:
+		if bank.given <= 0:
+			bank.given = maxi(1, int(_steam.call(&"getStatInt", DONATED)))
+			bank.floor_total = maxi(bank.floor_total, bank.total + bank.given)
+		bank.sent = true
+		bank.write()
+		bank.changed.emit()
+		return
+	if bank.given <= 0 or bank.sent:
+		return
+	var told := bool(_steam.call(&"setStatInt", DONATED, bank.given))
+	told = bool(_steam.call(&"setStatInt", DONORS, 1)) and told
+	if not told:
+		# The stats not published on Steamworks yet, or not in: tried again every `RETRY`.
+		_gift_retry = RETRY
+		return
+	bank.sent = true
+	bank.write()
+	_dirty = true
+	bank.changed.emit()
+
+
+## GodotSteam's `user_stats_received`: this account's stats are in and may be read and set.
+## The arguments are not read; defaults, so a build that sends fewer still connects.
+func _on_user_stats(_game: Variant = null, _result: Variant = null, _user: Variant = null) -> void:
+	_stats_in = true
+	_settle_gift()
+
+
+## GodotSteam's `global_stats_received`: every player's totals, answered. The result is "ok"
+## in GodotSteam 4 (an int 1 in builds that pass the SDK's code through).
+func _on_global_stats(_game: Variant = null, result: Variant = null) -> void:
+	bank.asking = false
+	var ok := (
+		result == null
+		or (result is String and String(result) == "ok")
+		or ((result is int or result is float) and int(result) == 1)
+	)
+	if ok and _steam != null:
+		bank.total = maxi(0, int(_steam.call(&"getGlobalStatInt", DONATED)))
+		bank.donors = maxi(0, int(_steam.call(&"getGlobalStatInt", DONORS)))
+		bank.seen_at = int(Time.get_unix_time_from_system())
+		bank.live = true
+		bank.write()
+	bank.changed.emit()
+
+
 ## Start Steam's API once. False, and quietly, wherever it cannot be had.
 func _start() -> bool:
 	if _tried:
@@ -149,20 +274,26 @@ func _start() -> bool:
 	if not res is Dictionary or int((res as Dictionary).get("status", -1)) != 0:
 		return false
 	_steam = steam
+	if steam.has_signal(&"user_stats_received"):
+		steam.connect(&"user_stats_received", _on_user_stats)
+	if steam.has_signal(&"global_stats_received"):
+		steam.connect(&"global_stats_received", _on_global_stats)
 	return true
 
 
 func _read() -> void:
 	earned.clear()
 	var cfg := ConfigFile.new()
-	if cfg.load(FILE) != OK:
+	if cfg.load(path) != OK:
 		return
 	for id: Variant in cfg.get_value("earned", "ids", []) as Array:
 		if ALL.has(String(id)) and not earned.has(String(id)):
 			earned.append(String(id))
 
 
+## Loaded first and only the earned list set: the bank keeps its own section in the same file.
 func _write() -> void:
 	var cfg := ConfigFile.new()
+	cfg.load(path)
 	cfg.set_value("earned", "ids", earned)
-	cfg.save(FILE)
+	cfg.save(path)
