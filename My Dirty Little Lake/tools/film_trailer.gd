@@ -5,7 +5,7 @@ const FilmAudio := preload("res://tools/film_audio.gd")
 ## Films the shots the trailer is cut from: opens the lake on a real 1080p window, poses each
 ## shot (how clean the water is, where the angler stands, how wide the net is, how many hulls
 ## and dogs), and dumps every rendered frame as a JPEG so the edit can pick its cuts on the
-## song's beat. The cut itself is `marketing/My Dirty Little Lake/trailer/build_trailer.py`.
+## song's beat. The cut itself is `Marketing/My Dirty Little Lake/2 Work/trailer/build_trailer.py`.
 ##
 ## Run it with the desktop build, not --headless (nothing renders under the dummy driver),
 ## at a fixed frame rate so game time is one frame's worth a frame however long a frame takes

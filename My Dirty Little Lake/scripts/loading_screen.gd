@@ -36,7 +36,7 @@ const DARKEN := Color(0.50, 0.55, 0.53)
 ## cream outline, without the shadow's halo round them. The logo is laid out by this box,
 ## never by the picture's edges, so a shadow reaching further does not move or shrink the
 ## letters (2026-10-08, v3: a halo falling down-left). **Re-measure on a re-render**
-## (`Marketing/My Dirty Little Lake/logo/make_logo.py --v3`): alpha 250 and up.
+## (`Marketing/My Dirty Little Lake/2 Work/logo/make_logo.py --v3`): alpha 250 and up.
 const LOGO_INK := Rect2(163.0, 143.0, 2093.0, 579.0)
 ## The sticker's width as a share of the window's, and where down the window its middle
 ## stands. **Above the island, not on it**: the island is the middle of the picture, and the

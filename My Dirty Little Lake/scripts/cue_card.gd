@@ -13,7 +13,7 @@ extends Control
 ## finds' stars, the double cast's ghost copy slides in and merges, the pigeon card hops, the
 ## ferry's glides in on the swell, the wildlife's grows up out of its foot, the swarm's buzzes
 ## in, the honey's drops and hangs a drip. The trailer's captions did the same thing to
-## letters (`marketing/.../trailer/captions.py`); here it is a whole card, and once it has
+## letters (`Marketing/.../2 Work/trailer/captions.py`); here it is a whole card, and once it has
 ## landed it holds still bar its icon, which keeps a small loop.
 ##
 ## Two ways up:

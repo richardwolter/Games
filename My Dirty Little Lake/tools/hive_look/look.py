@@ -91,9 +91,9 @@ PLATES = {
     "moment": "tools/last_hive_moment.png",
     "honey": "tools/last_hive_honey.png",
     # HUD-on store stills (play stop, uneven grain)
-    "big_cast": "../Marketing/My Dirty Little Lake/screenshots/store_v2/02_big_cast.png",
-    "gold_double": "../Marketing/My Dirty Little Lake/screenshots/store_v2/05_gold_double.png",
-    "tornado": "../Marketing/My Dirty Little Lake/screenshots/store_v2/10_tornado.png",
+    "big_cast": "../Marketing/My Dirty Little Lake/1 Final/Steam Store/Screenshots and Clips/02_big_cast.png",
+    "gold_double": "../Marketing/My Dirty Little Lake/1 Final/Steam Store/Screenshots and Clips/05_gold_double.png",
+    "tornado": "../Marketing/My Dirty Little Lake/1 Final/Steam Store/Screenshots and Clips/10_tornado.png",
 }
 PLATE_GRAIN = {k: ROOM_GRAIN for k in ("catch", "smoke", "queen", "settled", "uncap", "pour", "done")}
 PLATE_GRAIN.update({k: ISLAND_GRAIN for k in ("empty", "swarm", "ready", "busy")})

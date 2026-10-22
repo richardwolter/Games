@@ -9393,14 +9393,56 @@ song, beats, captions and 37.2 s, **re-filmed in portrait, not cropped**.
   checked frame by frame; `vertical/review_sheet.py` makes the stills sheet.
 
 ### The Next Fest Clip (2026-10-20, `/grill-me` with Richard)
-A 15 s vertical clip for the demo in Next Fest: `trailer/shots_nextfest_vertical.json` through
-`build_trailer2.py` into `trailer/vertical/Next Fest Demo Vertical.mp4`. **No new filming**: the
+A 15 s vertical clip for the demo in Next Fest: `2 Work/trailer/shots_nextfest_vertical.json`
+through `build_trailer2.py` into `1 Final/Videos/Next Fest Demo Vertical.mp4`. **No new filming**: the
 vertical v3 frames in `tools/film/v_*` (Oct 8, so the wash jet is the old stream). Hook "FREE
 DEMO / ON STEAM" over the open's push (captions `wishlist` and the new `steam` style, Steam's
 light blue), then gold cast, wash, placing, tornado, grime to beauty, and the end card: logo,
-WISHLIST NOW and the badge `steam_nextfest_white.png` (the Steam lockup with NEXT FEST set
-after it in Bahnschrift Bold, its registered mark dropped; `make_nextfest_badge.py`). Habibs 3
-on the trailer's grid, the cut to the gold cast on the drop. No dates, so it holds all week.
+"FREE DEMO ON" (style `demo`) over the badge `steam_nextfest_white.png` (the Steam lockup with
+NEXT FEST set after it in Bahnschrift Bold, its registered mark dropped;
+`make_nextfest_badge.py`), then WISHLIST NOW (Richard: the demo line belongs on the last scene
+too). The end-card lines take their own `px` and `fit` (new per-caption keys in
+`build_trailer2.py`) so they stay out of the right 12% where the feeds' buttons are, and the
+last shot is cropped 56 px up so they clear the angler. Habibs 3 on the trailer's grid, the
+cut to the gold cast on the drop, 15.8 s. No dates, so it holds all week.
+- **A 16:9 version** (Richard, same day): `2 Work/trailer/shots_nextfest.json` into
+  `1 Final/Videos/Next Fest Demo (16x9).mp4`. The same edit and timing on the landscape footage
+  (`t2_*`, `steam/wash_place`, filmed Oct 16, so the current wash jet): the wash cropped onto the
+  stand, the house onto the room and shelf. The frame is too short to stack four lines under
+  the island, so the end card is the logo over it, "FREE DEMO ON" and the badge side by side
+  under it, WISHLIST NOW at the foot; the side by side takes a new `x` (where the middle
+  stands across the frame) on captions and on the badge.
+
+### The Marketing Folder Sorted (2026-10-20, Richard: "separating what is final from files/cuts")
+`Games/Marketing/My Dirty Little Lake/` is four folders now, mapped in its own `README.md`.
+**Every marketing path in the notes above is the old layout**; translate it with this table
+(the whole list, file by file, is `4 Archive/moved_20261020.tsv`):
+
+| Old (notes above) | Now |
+|---|---|
+| `trailer/`, `devlog/`, `before_after/`, `logo/`, `release_date/`, `outreach/` | `2 Work/<same name>/` |
+| `source/` (capsule scripts, `keyart/`, `prints/`) | `2 Work/store_art/` |
+| the current finals: `Wishlist Trailer v4.mp4`, `Wishlist Trailer Vertical v3.mp4`, the Next Fest clip, `before_after_youtube.mp4` / `_story.mp4`, `devlog.mp4` | `1 Final/Videos/` (the last three renamed "Before and After (YouTube/Story)" and "Devlog (YouTube)") |
+| `capsules_v3/` | `1 Final/Steam Store/Capsules/` (`capsules_v3.py` builds into it) |
+| `screenshots/store_v2/` | `1 Final/Steam Store/Screenshots and Clips/` |
+| `steam/achievements/`, `steam/icons/`, `steam/system_requirements.md` | `1 Final/Steam Store/Achievements/`, `Icons/`, the `.md` |
+| `presskit/` | `1 Final/Press Kit/` |
+| `release_date/*.png` | `1 Final/Release Date Images/` (`make_release.py` builds into it) |
+| the screen recordings, `Next Fest Confirmation.png`, `audios.zip` at the root | `3 Raw Recordings/` |
+| older trailers, `capsules/`, `capsules_v2/`, `presskit_old_20261016/`, `screenshots/candidates/` and `raw/`, `source/keyart/old_20261016/` | `4 Archive/` |
+
+- **Work is one level deeper**, so every builder's path to the game went `../../../My Dirty Little
+  Lake` to `../../../../My Dirty Little Lake` (shot lists, `build_trailer2.py`, the mocks,
+  `build_before_after.py`); `make_release.py` reads `parents[3]`; the before/after reads the
+  recordings through `RAW`. All checked to resolve, and the Next Fest clip re-rendered from its
+  new place to the same 15.83 s.
+- **The game's tools follow**: `build_achievement_icons.py` and `build_icon.py` write into
+  `1 Final/Steam Store/`, `shot_keyart.gd` renders into `2 Work/store_art/keyart/`,
+  `tools/hive_look/look.py` reads the store screenshots from `1 Final`.
+- The devlog's shot list named `save_me.mp3`, gone since the music went Ogg on 2026-10-03; it
+  reads `save_me.ogg` now.
+- Nothing but scratch was deleted: the review frames and test renders in `2 Work` (2.5 GB,
+  Richard's call). `trailer/_ref` (copies of deleted probe scripts) and `_test2.json` stay.
 
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 **Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.

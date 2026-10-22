@@ -30,7 +30,7 @@ import sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STEAM = os.path.join(ROOT, "..", "Marketing", "My Dirty Little Lake", "steam", "icons")
+STEAM = os.path.join(ROOT, "..", "Marketing", "My Dirty Little Lake", "1 Final", "Steam Store", "Icons")
 
 SHEET = "assets/dogs/dog_02.png"
 FRAMES = "assets/dogs/dog_02.json"

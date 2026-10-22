@@ -7,7 +7,7 @@ twin is the same picture greyed and dimmed, which is what Steam shows until it i
 
 Rules first, picked off the contact sheet; Richard may change any subject below.
 
-Writes (with --write), into Marketing/My Dirty Little Lake/steam/achievements/:
+Writes (with --write), into Marketing/My Dirty Little Lake/1 Final/Steam Store/Achievements/:
   <API_NAME>.png          the unlocked icon, 64 x 64
   <API_NAME>_locked.png   the locked one
 Always writes tools/last_achievement_icons.png: every icon at 1x and x4, both states.
@@ -23,7 +23,7 @@ import sys
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "..", "Marketing", "My Dirty Little Lake", "steam", "achievements")
+OUT = os.path.join(ROOT, "..", "Marketing", "My Dirty Little Lake", "1 Final", "Steam Store", "Achievements")
 
 SIZE = 64
 GRID = 2            # the backing is drawn on a 32 px grid, two screen px a cell

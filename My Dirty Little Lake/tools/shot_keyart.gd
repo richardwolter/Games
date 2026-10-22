@@ -6,8 +6,8 @@ extends "res://tools/shot_store.gd"
 ## Renders the key art the Steam capsules and library art are cut from (2026-10-02): the lake
 ## with no HUD, the west of it cleaned and alive, the east still soup, the angler on the
 ## island's east beach throwing into the soup with a dog beside him. Saves a burst of
-## 1920x1080 PNGs per zoom level to `Marketing/My Dirty Little Lake/source/keyart/`, where
-## `source/capsules_v2.py` reads them. The capsules are cut at whole-pixel ratios off these,
+## 1920x1080 PNGs per zoom level to `Marketing/My Dirty Little Lake/2 Work/store_art/keyart/`, where
+## `store_art/capsules_v2.py` reads them. The capsules are cut at whole-pixel ratios off these,
 ## so the pixel art stays sharp.
 ##
 ##   godot --path . --fixed-fps 60 res://tools/shot_keyart.tscn --log-file tools/film/keyart_engine.log
@@ -16,7 +16,7 @@ extends "res://tools/shot_store.gd"
 ## rules). `FILM_ONLY=split_z2` re-shoots by name. Run `tall_z2` on its own
 ## (`FILM_ONLY=tall_z2`): the shots share one lake, so a run after a split inherits its clearing.
 
-const KEYART := "res://../Marketing/My Dirty Little Lake/source/keyart"
+const KEYART := "res://../Marketing/My Dirty Little Lake/2 Work/store_art/keyart"
 const BURST := 12
 const BURST_GAP := 4
 ## How far past the island's middle, in world px across the screen, the clean water reaches;

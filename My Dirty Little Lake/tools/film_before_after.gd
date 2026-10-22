@@ -6,7 +6,7 @@ extends "res://tools/film_trailer.gd"
 ##   godot --path . --fixed-fps 60 res://tools/film_before_after.tscn
 ##
 ## Frames land in tools/film/<shot>/ like the trailer's, on a save and a log of their own.
-## The cut is `marketing/My Dirty Little Lake/before_after/build_before_after.py`.
+## The cut is `Marketing/My Dirty Little Lake/2 Work/before_after/build_before_after.py`.
 
 ## Where the angler stands for the net shot and how far the throw goes: the prototype casts
 ## from the island's south shore straight down the screen.
