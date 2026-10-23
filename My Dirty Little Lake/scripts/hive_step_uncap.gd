@@ -79,9 +79,9 @@ const KNIFE_OUT := 0.2
 
 ## The payoff: a golden sweep of stars down the open comb, then a hold before `finished`.
 const SWEEP_TIME := 0.9
-const SWEEP_HOLD := 0.6
+const SWEEP_HOLD := 0.4  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 0.6.
 ## After the sweep, the honey still running is waited on at most this long.
-const DRAIN_WAIT := 10.0
+const DRAIN_WAIT := 6.7  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 10.0.
 const SWEEP_STARS := 3
 
 ## A row popping: its flash, the stars on it, and the most stars alive at once (a harness

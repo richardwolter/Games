@@ -12,8 +12,11 @@ Why cut the end in the file rather than at runtime: the station (`scripts/music_
 fades every song out over its own last seconds, so a song's length has to be where it ends.
 beatgucci stops at 2:12 by decision; the fade is not baked, the station makes it.
 
-The radio recipe was lost with the first bake (`music_goin_radio.mp3`); this one was matched
-to that file by spectrum and loudness (-20.7 LUFS on Goin), so the shed sounds as it did.
+The radio recipe was lost with the first bake (`music_goin_radio.mp3`); the first one here was
+matched to that file by spectrum and loudness (-20.7 LUFS on Goin). Made subtler on 2026-10-23
+(Richard's QA run: "radio effect can be a little more subtle"): a wider band, a little stereo
+kept, less drive, a lighter slap, and about 5 dB under the open song on Goin (-16 LUFS) rather
+than 9.5, so going in and out of it is not a drop. `--radio` builds the radio copies alone.
 """
 
 import os
@@ -40,18 +43,18 @@ PLAN = {
 # Trailing silence under this is taken off the end.
 SILENCE_DB = -50
 ## Ogg Vorbis quality: 5 is about 160 kbps, half the 320 kbps MP3 the songs used to ship as
-## (2026-10-03, the pre-release size pass). The radio copy is mono and band-limited, so
-## quality 0 (about 64 kbps) loses nothing it still has.
+## (2026-10-03, the pre-release size pass). The radio copy is band-limited; quality 2 (about
+## 96 kbps) since it kept some stereo and a wider band (2026-10-23).
 SONG_Q = "5"
-RADIO_Q = "0"
+RADIO_Q = "2"
 
 RADIO = ",".join([
-    "pan=mono|c0=0.5*c0+0.5*c1",
-    "highpass=f=190:poles=2", "highpass=f=190:poles=2",
-    "lowpass=f=7200:poles=2", "lowpass=f=7200:poles=2",
-    "volume=6dB", "asoftclip=type=tanh",
-    "aecho=0.8:0.6:35:0.2",
-    "volume=-2dB",
+    "pan=stereo|c0=0.75*c0+0.25*c1|c1=0.25*c0+0.75*c1",
+    "highpass=f=120:poles=2",
+    "lowpass=f=9500:poles=2",
+    "volume=3dB", "asoftclip=type=tanh",
+    "aecho=0.8:0.5:30:0.12",
+    "volume=2.5dB",
 ])
 
 
@@ -64,6 +67,7 @@ def main():
         sys.exit("run from the project root: no %s" % SOURCE)
     os.makedirs(OUT, exist_ok=True)
     only = None
+    radio_only = "--radio" in sys.argv
     if "--only" in sys.argv:
         only = set(sys.argv[sys.argv.index("--only") + 1].split(","))
     for slug, (name, cut, outdoors, radio) in PLAN.items():
@@ -79,7 +83,7 @@ def main():
             "areverse",
         ]
         chain = ",".join(trim)
-        if outdoors:
+        if outdoors and not radio_only:
             ffmpeg(["-i", src, "-af", chain, "-c:a", "libvorbis", "-q:a", SONG_Q,
                     "-map_metadata", "-1", os.path.join(OUT, slug + ".ogg")])
         if radio:

@@ -506,11 +506,12 @@ const FIND_APART := 6.0
 ## says (Richard, 2026-09-17): the small ones by the first net, the furniture after the
 ## first Strength buy. They are hidden within `EARLY_OUT` tiles of the island's shelf, one
 ## slot down, under nothing heavier than themselves — early means never waiting on Strength.
+## The coat rack left the list on 2026-10-23 (Richard's QA run: it came up before the record
+## player) and is dealt by its own tier, into the middle band.
 const EARLY_FINDS := {
 	&"decor_vynil_player": 0,
 	&"decor_pk_flower_vase": 0,
 	&"decor_pk_nightstand": 0,
-	&"decor_pk_coat_stand": 0,
 	&"decor_pk_sofa": 1,
 	&"decor_pk_coffee_table": 1,
 	&"decor_pk_chair": 1,
@@ -903,6 +904,8 @@ var _camera_tip_seen: bool = false
 ## the shop, once its tour is over, only the cheapest affordable row buys until it is bought.
 ## Saved as `first_buy`; absent reads as done, so only a new game gets it.
 var _first_buy_done: bool = true
+## The forced card has been up: from then on a shop closed unbought lets the player go.
+var _first_buy_forced := false
 var _first_buy_card: TourCard
 var _camera_tip_left: float = -1.0
 var _camera_tip: TourCard
@@ -946,6 +949,8 @@ const HINT_TEXT := {
 	# The first jar of honey held (2026-10-16), at the jar plate: what eating one does.
 	&"honey_jar": "CUE_HONEY",
 }
+## The share cleaned at which the meter's hint is owed.
+const METER_HINT_AT := 0.05
 const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter",
 	&"hive_demo", &"demo_goal", &"demo_house", &"honey_jar"]
 var _cues_seen: Dictionary = {}
@@ -1100,11 +1105,15 @@ var _decor_tour_done: bool = true
 ## as `house_walk`; absent reads as done (the tours' rule), a new game sets it false.
 var _house_walk_done: bool = true
 var _decor_tour: int = DecorTour.OFF
+## The house's door takes no E: the tour is up, or ended in the visit still open.
+var _door_quiet := false
 var _tour_card: TourCard
 ## Seconds before the hint goes up (the find-caught card first), and before a washed find
 ## takes the player back into the shed (its shine first).
 var _decor_tour_wait: float = 0.0
-const DECOR_TOUR_CARDS := 5
+## Four since 2026-10-23 (Richard's QA run): the wash list's card, which said washing cost
+## money, went with the soap. The tour puts the first find on the stand itself.
+const DECOR_TOUR_CARDS := 4
 const DECOR_HINT_AFTER := 2.8
 const DECOR_BACK_AFTER := 1.6
 ## How clean the find on the stand has to be before the stand's card gives way: a little of
@@ -3117,7 +3126,7 @@ func _set_wash(open: bool) -> void:
 	# No shed sound: the pump is outdoors (2026-09-28).
 	_wash_open = open
 	_wash.waiting = unwashed
-	if open and _decor_tour in [DecorTour.PLANK, DecorTour.PLANK_WAIT]:
+	if open and _decor_tour in [DecorTour.PLANK, DecorTour.PLANK_WAIT, DecorTour.LIST]:
 		_decor_tour = DecorTour.LIST
 	_wash.hose_level = hose_level
 	_wash.auto_next = true
@@ -3647,6 +3656,12 @@ func _fit_zoom() -> float:
 
 
 func _set_menu(open: bool) -> void:
+	# The shop closed (the cross, Escape) before the first buy, once the forcing had begun:
+	# that ends it for good (2026-10-23, Richard's QA run). No dim and no card on the lake again.
+	if not open and _menu_open and not _first_buy_done \
+			and (_first_buy_forced or _shop_skin.only != &""):
+		_first_buy_done = true
+		_shop_skin.only = &""
 	_menu_open = open
 	_shop_skin.visible = open
 	if not open:
@@ -4291,9 +4306,17 @@ func _begin_first_steps() -> bool:
 ## up. A card waits for its room — shut the shed on the second card and it is there again
 ## the next time the shed opens.
 func _decor_tour_step(delta: float) -> void:
-	# The door takes no E while the tour is walking the room (see `ShedRoom.door_off`).
+	# The door takes no E while the tour is walking the room (see `ShedRoom.door_off`), nor
+	# for the rest of the visit the tour ends in (2026-10-23, Richard's QA run): the last card
+	# says "press E to interact" with the player still by the door after the walk back in,
+	# and an E pressed straight away put them out on the lake. Escape and the cross still
+	# close the house; the next visit has its door back.
+	if not _decor_tour_done and _decor_tour >= DecorTour.PLANK:
+		_door_quiet = true
+	elif not _shed_open:
+		_door_quiet = false
 	if _room != null:
-		_room.door_off = not _decor_tour_done and _decor_tour >= DecorTour.PLANK
+		_room.door_off = _door_quiet
 	if _decor_tour_done or _decor_tour == DecorTour.OFF:
 		if _tour_card != null and _tour_card.visible:
 			_tour_card.show_card(Rect2())
@@ -4334,12 +4357,14 @@ func _decor_tour_step(delta: float) -> void:
 			else:
 				_tour_card.show_card(off)
 		DecorTour.LIST:
-			# A click on a find in the list puts it on the stand, and the stand's card is up
-			# over it (2026-09-24): the click is the step, not a way past it.
-			if _wash_open and _wash.stand().state != WashStand.State.EMPTY:
+			# No card of its own since 2026-10-23: the tour puts the first waiting find on the
+			# stand itself, and the stand's card is the next thing read.
+			if _wash_open and _wash.stand().state == WashStand.State.EMPTY \
+					and not unwashed.is_empty():
+				_wash.pick(StringName(unwashed[0]))
+			if _wash_open:
 				_decor_tour = DecorTour.STAND
-			elif _wash_open:
-				_tour_card.show_card(_wash_list_box(), Text.TOUR_DECOR_LIST, 2, DECOR_TOUR_CARDS, true)
+				_tour_card.show_card(off)
 			else:
 				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
 		DecorTour.STAND:
@@ -4349,7 +4374,7 @@ func _decor_tour_step(delta: float) -> void:
 				_decor_tour = DecorTour.WASHING
 			elif _wash_open:
 				var words := Text.TOUR_DECOR_STAND_PAD % Binds.shown(&"cast", true) if pad else Text.TOUR_DECOR_STAND
-				_tour_card.show_card(_wash_stand_box(), words, 3, DECOR_TOUR_CARDS, true)
+				_tour_card.show_card(_wash_stand_box(), words, 2, DECOR_TOUR_CARDS, true)
 			else:
 				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
 		DecorTour.SHELF:
@@ -4369,12 +4394,12 @@ func _decor_tour_step(delta: float) -> void:
 			elif _shed_open and not _room.carrying.is_empty():
 				_tour_card.show_card(off)
 			else:
-				_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 4, DECOR_TOUR_CARDS, true)
+				_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 3, DECOR_TOUR_CARDS, true)
 		DecorTour.ROOM:
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
 				lit = _room.room_box()
-			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM % Binds.shown(&"interact", pad), 5, DECOR_TOUR_CARDS)
+			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM % Binds.shown(&"interact", pad), 4, DECOR_TOUR_CARDS)
 
 
 ## A rect in the shed room's own pixels, on the HUD layer the card is drawn on.
@@ -4384,13 +4409,7 @@ func _room_box_of(box: Rect2) -> Rect2:
 	return Rect2(_room.global_position + box.position, box.size)
 
 
-## The wash room's tray (with its title plank) and its stand, on the card's layer.
-func _wash_list_box() -> Rect2:
-	var box := _wash.tray_box()
-	box = box.grow_individual(0.0, WashRoom.TRAY_RIBBON * 0.5, 0.0, 0.0)
-	return Rect2(_wash.global_position + box.position, box.size)
-
-
+## The wash room's stand, on the card's layer.
 func _wash_stand_box() -> Rect2:
 	var view := _wash.size
 	var wide := WashStand.STAND_WIDE
@@ -6215,6 +6234,19 @@ func _owe_moment(kind: StringName, at: Vector2, text: String, seen: Callable) ->
 	_start_owed_moment()
 
 
+## The lake's own cards (the camera tip, the hints, the decoration tour's, the first
+## upgrade's) while their steps stand still: behind the main menu and under the settings
+## pause. Each step hides its card under a board, but a paused step hides nothing, and the
+## camera tip stood drawn under the settings board (2026-10-23, Richard's QA run). Hidden
+## only, not ended: each step puts its card back the frame it runs again.
+func _hide_lake_cards() -> void:
+	for card: TourCard in [_camera_tip, _tour_card, _first_buy_card]:
+		if card != null and card.visible:
+			card.show_card(Rect2())
+	if _hint_card != null and _hint_card.showing():
+		_hint_card.hide_hint(true)
+
+
 ## One frame of the camera tip. See `CAMERA_TIP_AT`.
 func _camera_tip_step(delta: float) -> void:
 	if _camera_tip_seen:
@@ -6301,6 +6333,7 @@ func _first_buy_step() -> void:
 		return
 	var box: Rect2 = _skin.get(&"_upgrades_box")
 	_first_buy_card.show_card(Rect2(_skin.global_position + box.position, box.size), Text.FIRST_BUY)
+	_first_buy_forced = true
 
 
 ## Whether the forced card is up: hints and the camera tip wait for it.
@@ -6351,9 +6384,10 @@ func _hint_held_for(kind: StringName) -> bool:
 ## hidden while something holds it), or the next owed one put up.
 func _hint_step(delta: float) -> void:
 	_watch_the_ferries(delta)
-	# The meter's hint (2026-10-07, Richard): the first time it moves, a piece out of the
-	# water; it waits behind the first steps' note like any hint.
-	if pollution < 0.9999 and not _cues_seen.has(&"meter"):
+	# The meter's hint (2026-10-07, Richard): once the lake is `METER_HINT_AT` cleaned (5%
+	# since 2026-10-23, Richard's QA run: at the first catch it came with the first steps,
+	# the shop's tour and the first finds, too much at once). It waits behind any card.
+	if 1.0 - pollution >= METER_HINT_AT and not _cues_seen.has(&"meter"):
 		_owe_hint(&"meter")
 	if Demo.on() and _first_buy_done and not _farewell_shown and not _cues_seen.has(&"demo_goal"):
 		_owe_hint(&"demo_goal")
@@ -6613,6 +6647,8 @@ func _process(delta: float) -> void:
 		_first_buy_step()
 		_hint_step(delta)
 		_hive_step(delta)
+	else:
+		_hide_lake_cards()
 	# Every frame, so the menu's pose reaches the nets; its clock decides for itself.
 	_honey_step(delta)
 	_haul_count_step()

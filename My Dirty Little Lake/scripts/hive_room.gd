@@ -57,11 +57,11 @@ const STEP_NAMES := {
 ## The whole ceremony in order: the plan when there is no hive to ask (a spike, a probe).
 const STEP_ORDER: Array[StringName] = [&"catch", &"smoke", &"queen"]
 ## The settle between two steps, after the cell has filled.
-const BETWEEN := 0.7
+const BETWEEN := 0.5  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 0.7.
 ## After the last step: the done card up, and then `close_asked` by itself.
-const DONE_HOLD := 2.2
+const DONE_HOLD := 1.5  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 2.2.
 ## A done cell fills with honey from its foot over this long.
-const PIP_FILL := 0.3
+const PIP_FILL := 0.2  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 0.3.
 
 ## The plank, in painted pixels of the art grid (the mockup's `pips_art`): a cell every
 ## `PIP_SPACING`, the plank that wide a cell plus `PLANK_PAD`, its wood from `PLANK_TOP` down

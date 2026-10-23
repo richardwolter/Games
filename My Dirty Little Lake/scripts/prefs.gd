@@ -55,8 +55,9 @@ const BUS_SFX := &"SFX"
 const BUS_AMBIENCE := &"Ambience"
 const BUS_TOP := {
 	BUS_MASTER: 0.0,
-	# +3 since 2026-10-12 (Richard: "increase the volume of music overall a bit").
-	BUS_MUSIC: 3.0,
+	# +3 on 2026-10-12 (Richard: "increase the volume of music overall a bit"), back to 0 on
+	# 2026-10-23 (Richard's QA run: "songs can have the volume down a bit").
+	BUS_MUSIC: 0.0,
 	BUS_SFX: 6.0,
 	BUS_AMBIENCE: 6.0,
 }

@@ -3855,6 +3855,7 @@ func _stage_art() -> void:
 	var misplaced := 0
 	var blocked := 0
 	var banded := [0, 0, 0]
+	var coat_away := -1.0
 	for index in _grid.stacks.size():
 		var stack: PackedInt32Array = _grid.stacks[index]
 		for k in stack.size():
@@ -3867,6 +3868,8 @@ func _stage_art() -> void:
 				first_tile = index
 				continue
 			lie.append(Vector2(_grid.tile_of(index)))
+			if def.piece == &"decor_pk_coat_stand":
+				coat_away = away
 			banded[0 if Lake.EARLY_FINDS.has(def.piece) else (2 if def.tier >= Lake.LATE_TIER else 1)] += 1
 			if Lake.EARLY_FINDS.has(def.piece):
 				if away > Lake.EARLY_OUT or def.tier > 1:
@@ -3881,6 +3884,9 @@ func _stage_art() -> void:
 				misplaced += 1
 	_check(misplaced <= 2, "every find lies in its band (the darts' fallback aside)",
 		"%d outside; early/mid/late %s" % [misplaced, str(banded)])
+	_check(not Lake.EARLY_FINDS.has(&"decor_pk_coat_stand") and coat_away >= Lake.EARLY_OUT - 1.0,
+		"the coat rack is not an early find, and lies out past the early band (2026-10-23)",
+		"%.1f tiles out" % coat_away)
 	_check(blocked == 0, "no early find lies under something heavier than itself",
 		"%d do" % blocked)
 	var doubled: Array = []
@@ -6872,7 +6878,7 @@ func _stage_music() -> void:
 		"%s" % music.now_playing())
 	# The rest walks Nuven's three as they always ran: a list of just those, marked as a save
 	# that already knows Loobas' songs so they are not added back.
-	music.take_picks({"lake": ["beatgucci", "save_me", "goin"], "loobas": true})
+	music.take_picks({"lake": ["beatgucci", "save_me", "goin"], "loobas": true, "nice": true})
 	_check(music.now_playing() == &"beatgucci", "a list without it moves on to beatgucci",
 		"%s" % music.now_playing())
 	var cut := float(music.call(&"_length", 0))
@@ -6912,7 +6918,7 @@ func _stage_music() -> void:
 	music.indoors = true
 	# Sync is on from a new game (2026-10-14); the shed's own list is what is asked here.
 	music.set_synced(false)
-	_run_music(music, 0.4)
+	_run_music(music, 1.0)
 	g = music.gains()
 	_check(is_equal_approx(float(g["shed_indie_boi"]), 1.0)
 		and is_zero_approx(float(g["beatgucci"])) and music.is_playing(&"beatgucci")
@@ -6920,13 +6926,13 @@ func _stage_music() -> void:
 		"indoors, Indie Boi through the wall, the playlist running muted under it", "%s" % g)
 	music.indoors = false
 	music.muffled = true
-	_run_music(music, 0.4)
+	_run_music(music, 1.0)
 	g = music.gains()
 	_check(is_equal_approx(float(g["beatgucci_radio"]), 1.0)
 		and is_zero_approx(float(g["beatgucci"])) and is_zero_approx(float(g["shed_indie_boi"])),
 		"a board open: the lake's own song through the radio", "%s" % g)
 	music.muffled = false
-	_run_music(music, 0.4)
+	_run_music(music, 1.0)
 
 	music.set_ending(true)
 	_run_music(music, fade * 0.5)
@@ -7373,9 +7379,20 @@ func _check_record_lists(music: MusicStation) -> void:
 	_check(music.changes_in(MusicStation.SHED) == changes + 1
 		and music.playing_in(MusicStation.SHED) != shed_was,
 		"a skip moves the shed on and counts for the needle", "")
+	# Back (2026-10-23): at a song's start to the one before, past `BACK_RESTART` the same again.
+	changes = music.changes_in(MusicStation.SHED)
+	music.back(MusicStation.SHED)
+	var back_to := music.playing_in(MusicStation.SHED)
+	_run_music(music, MusicStation.BACK_RESTART + 1.0)
+	var again := music.back_in(MusicStation.SHED)
+	music.back(MusicStation.SHED)
+	_check(back_to == shed_was and music.changes_in(MusicStation.SHED) == changes + 2
+		and again == shed_was and music.playing_in(MusicStation.SHED) == shed_was,
+		"back at a song's start goes to the one before, and later plays it again",
+		"%s %s %s" % [back_to, again, music.playing_in(MusicStation.SHED)])
 	music.indoors = true
 	music.set_synced(true)
-	_run_music(music, 0.6)
+	_run_music(music, 1.0)
 	var g := music.gains()
 	var lake_song := String(music.playing_in(MusicStation.LAKE))
 	_check(music.playing_in(MusicStation.SHED) == music.playing_in(MusicStation.LAKE)
@@ -7402,7 +7419,7 @@ func _check_loobas(music: MusicStation) -> void:
 	_check(MusicStation.SONGS == [&"movimento_tranquilo", &"beatgucci", &"save_me",
 			&"tudo_que_eu_fiz", &"goin", &"indie_boi", &"habibs"]
 		and MusicStation.PLAYLIST == [&"movimento_tranquilo", &"beatgucci", &"save_me",
-			&"tudo_que_eu_fiz", &"goin"],
+			&"tudo_que_eu_fiz", &"goin", &"indie_boi"],
 		"Loobas' songs stand where Richard put them, on the lake by default", str(MusicStation.PLAYLIST))
 	var table = JSON.parse_string(FileAccess.get_file_as_string(MusicStation.BEATS))
 	var ready := true
@@ -7412,9 +7429,14 @@ func _check_loobas(music: MusicStation) -> void:
 	var kept := music.picks()
 	music.take_picks({"lake": ["beatgucci", "goin"], "shed": ["indie_boi"], "synced": false})
 	_check(music.list_of(MusicStation.LAKE) == [&"movimento_tranquilo", &"beatgucci",
-			&"tudo_que_eu_fiz", &"goin"],
-		"a save's picks from before them gain them on the lake", str(music.list_of(MusicStation.LAKE)))
-	_check(bool(music.picks().get("loobas", false)), "and the next save carries the mark", "")
+			&"tudo_que_eu_fiz", &"goin", &"indie_boi"],
+		"a save's picks from before them gain them on the lake, This is Nice too (2026-10-23)",
+		str(music.list_of(MusicStation.LAKE)))
+	_check(bool(music.picks().get("loobas", false)) and bool(music.picks().get("nice", false)),
+		"and the next save carries both marks", "")
+	music.take_picks({"lake": ["beatgucci"], "loobas": true, "nice": true})
+	_check(music.list_of(MusicStation.LAKE) == [&"beatgucci"],
+		"a save carrying the marks keeps its list as it is", str(music.list_of(MusicStation.LAKE)))
 	music.take_picks({"lake": ["beatgucci", "goin"], "shed": ["indie_boi"], "loobas": true})
 	_check(not music.ticked(MusicStation.LAKE, &"movimento_tranquilo"),
 		"so unticking them afterwards sticks", str(music.list_of(MusicStation.LAKE)))
@@ -7429,7 +7451,7 @@ func _check_loobas(music: MusicStation) -> void:
 	# The demo plays four songs, Richard's pick (2026-10-13), and lists the rest as locked.
 	Demo.forced = true
 	_check(MusicStation.songs() == [&"movimento_tranquilo", &"beatgucci", &"save_me", &"indie_boi"]
-		and MusicStation.playlist() == [&"movimento_tranquilo", &"beatgucci", &"save_me"]
+		and MusicStation.playlist() == [&"movimento_tranquilo", &"beatgucci", &"save_me", &"indie_boi"]
 		and CreditsBoard.LINES.has("Loobas")
 		and RecordMenu.label_for(&"movimento_tranquilo")[0] == RecordMenu.LOOBAS_ART,
 		"the demo plays its four songs, Movimento on the LOOBAS record, Loobas credited",
@@ -7571,6 +7593,18 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		_check(not menu.needle_up() and station.changes_in(MusicStation.SHED) == changes + 1
 			and station.playing_in(MusicStation.SHED) == going_to,
 			"then the needle sets down and the next song plays", "")
+		# The back button (2026-10-23): a target, the needle up while the song is held.
+		var back_changes := station.changes_in(MusicStation.SHED)
+		var targets: Dictionary = menu.call(&"_targets")
+		var pressed_back := menu.press(&"back")
+		menu._process(0.1)
+		var held_back := station.changes_in(MusicStation.SHED) == back_changes and menu.needle_up()
+		menu._process(3.0)
+		menu._process(0.1)
+		_check(targets.has(&"back") and pressed_back and held_back
+			and station.changes_in(MusicStation.SHED) == back_changes + 1 and not menu.needle_up(),
+			"back lifts the needle, holds the song and moves when it sets down",
+			"%s %s %s" % [targets.has(&"back"), pressed_back, held_back])
 		_check(menu.pad_focus().size() >= 8, "the pad walks its ticks, switch, skip and cross",
 			"%d" % menu.pad_focus().size())
 		menu.close()
@@ -7670,6 +7704,22 @@ func _check_camera_tip() -> void:
 			and tip.target == button.get_global_rect() and tip.text == Text.CAMERA_TIP,
 			"after ten minutes the tip points at the camera button with its words",
 			str(tip.target) if tip != null else "none")
+		# Under a board, the shop and the paused settings both: hidden, its time held, and
+		# back when the board closes (2026-10-23, it stood drawn under the settings).
+		var left_before: float = _main.get(&"_camera_tip_left")
+		_main.call(&"_set_menu", true)
+		_main.call(&"_camera_tip_step", 0.5)
+		var under_shop := tip.visible
+		_main.call(&"_set_menu", false)
+		_main.call(&"_set_settings", true)
+		_main.call(&"_hide_lake_cards")
+		var under_settings := tip.visible
+		_main.call(&"_set_settings", false)
+		_main.call(&"_camera_tip_step", 0.1)
+		_check(not under_shop and not under_settings and tip.visible
+				and is_equal_approx(float(_main.get(&"_camera_tip_left")), left_before - 0.1),
+			"the tip is hidden under the shop and the settings, its time held, and comes back",
+			"%s %s %s" % [under_shop, under_settings, tip.visible])
 		tip.next_asked.emit()
 		_check(bool(_main.get(&"_camera_tip_seen")) and not tip.visible,
 			"a click on the card takes it down for good", "")
@@ -7850,20 +7900,21 @@ func _check_cues() -> void:
 	yard.held = held_was
 	for i in boats.size():
 		(boats[i] as Boat).state = states[i]
-	# The meter's: owed the first time it moves, pointed at the meter.
+	# The meter's: owed once 5% of the lake is cleaned (2026-10-23), pointed at the meter.
 	seen.erase(&"meter")
 	var pollution_now: float = _main.pollution
-	_main.pollution = 1.0
+	_main.pollution = 0.99
 	_main.call(&"_watch_the_ferries", 0.0)
 	_main.call(&"_hint_step", 1.0 / 60.0)
-	_check(StringName(_main.get(&"_hint_up")) != &"meter", "a meter that has not moved owes no hint", "")
-	_main.pollution = 0.99
+	_check(StringName(_main.get(&"_hint_up")) != &"meter" and not (_main.get(&"_hints") as Array).has(&"meter"),
+		"a meter under 5% cleaned owes no hint", "")
+	_main.pollution = 1.0 - Lake.METER_HINT_AT
 	hint._process(CueCard.FADE + 0.05)
 	_main.call(&"_hint_step", 1.0 / 60.0)
 	var meter_at := (skin.get_global_transform() * skin.meter_box()).get_center()
-	_check(hint.kind == &"meter" and hint.text == Text.CUE_METER
+	_check(Lake.METER_HINT_AT == 0.05 and hint.kind == &"meter" and hint.text == Text.CUE_METER
 		and hint.target.get_center().distance_to(meter_at) < 1.0,
-		"the meter's first move owes its hint, pointed at the meter", str(hint.target))
+		"at 5% cleaned the meter owes its hint, pointed at the meter", str(hint.target))
 	_main.call(&"_end_hint", false)
 	_main.pollution = pollution_now
 	var source := FileAccess.get_file_as_string("res://scripts/lake.gd")
@@ -11211,6 +11262,16 @@ func _check_first_buy() -> void:
 	var shop: ShopSkin = _main.get(&"_shop_skin")
 	_check(not card.visible and shop.only == cheapest,
 		"in the shop only the cheapest affordable row is offered", "%s, %s" % [shop.only, cheapest])
+	# A click off the boards stays in the shop while the row is shown (2026-10-23).
+	var table := Vector2(3.0, 3.0)
+	var off_board := not bool(shop.call(&"_on_a_board", table))
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = table
+	shop.call(&"_gui_input", press)
+	_check(off_board and bool(_main.get(&"_menu_open")),
+		"a click off the boards does not close the shop on the first upgrade", str(off_board))
 	# Bought on the net's Width, put back after: the cheapest may be a hull or a dog, and a
 	# purchase of either builds one.
 	var width: int = _main.get(&"net_width_level")
@@ -11223,6 +11284,16 @@ func _check_first_buy() -> void:
 	_main.call(&"_set_menu", false)
 	_main.call(&"_first_buy_step")
 	_check(not card.visible, "and the card does not come back", "")
+	# Closed unbought (the cross, Escape) once the forcing has begun: it lets the player go.
+	_main.set(&"_first_buy_done", false)
+	_main.set(&"sludge", float(_main.call(&"cost_of", cheapest)))
+	_main.call(&"_first_buy_step")
+	_main.call(&"_set_menu", true)
+	_main.call(&"_first_buy_step")
+	_main.call(&"_set_menu", false)
+	_main.call(&"_first_buy_step")
+	_check(bool(_main.get(&"_first_buy_done")) and not card.visible and shop.only == &"",
+		"a shop closed unbought on the first upgrade ends the forcing, no card on the lake", "")
 	_main.set(&"sludge", purse)
 	_main.set(&"_steps_done", steps)
 	_main.set(&"_shop_tour_done", tour_done)
@@ -12133,10 +12204,14 @@ func _stage_first_steps() -> void:
 		"opening the shed turns the hint into the wash plank's card", str(_main.get(&"_decor_tour")))
 	_main.call(&"_decor_tour_next")
 	_main.call(&"_shed_to_wash")
-	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.LIST, "the wash room opens on the list's card", "")
+	_main.call(&"_decor_tour_step", 0.016)
+	var washing_room: WashRoom = _main.get(&"_wash")
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.STAND
+			and washing_room.on_stand() == StringName(bed) and Lake.DECOR_TOUR_CARDS == 4,
+		"the wash room opens with the find on the stand, on the stand's card (no list card)",
+		"%s on %s" % [_main.get(&"_decor_tour"), washing_room.on_stand()])
 	_main.call(&"_decor_tour_next")
-	_main.call(&"_decor_tour_next")
-	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.WASHING, "then the stand's, then the washing", "")
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.WASHING, "then the washing", "")
 	var washer: WashRoom = _main.get(&"_wash")
 	var purse: float = _main.get(&"sludge")
 	_main.call(&"_on_find_washed", StringName(bed))
@@ -12150,6 +12225,17 @@ func _stage_first_steps() -> void:
 	_main.call(&"_decor_tour_next")
 	_check(bool(_main.get(&"_decor_tour_done")) and int(_main.get(&"_decor_tour")) == Lake.DecorTour.OFF,
 		"the room's card ends the tour, saved", "")
+	# The visit the tour ended in keeps the door shut to E (2026-10-23); the next has it back.
+	var tour_room: ShedRoom = _main.get(&"_room")
+	_main.call(&"_decor_tour_step", 0.016)
+	var quiet_after := tour_room.door_off
+	_main.call(&"_set_shed", false)
+	_main.call(&"_decor_tour_step", 0.016)
+	_main.call(&"_set_shed", true)
+	_main.call(&"_decor_tour_step", 0.016)
+	_check(quiet_after and not tour_room.door_off,
+		"E keeps the door shut for the rest of the visit the tour ends in, not the next",
+		"%s %s" % [quiet_after, tour_room.door_off])
 	_main.call(&"_set_shed", false)
 	_main.call(&"_set_wash", true)
 	_main.call(&"_wash_to_shed")
@@ -14259,6 +14345,19 @@ func _check_pad_focus(pad: Node) -> void:
 	var bank_shown := DonationBank.OPEN and not Demo.on()
 	_check((menu.bank_board() != null) == bank_shown and menu.has_node(^"Bank") == bank_shown,
 		"the menu shows the Donation Bank only while it is open (off for 1.0)", "")
+	var station := MusicStation.main()
+	var ending_was: bool = station.ending if station != null else false
+	menu.call(&"_show_credits", true)
+	var credits_ending: bool = station.ending if station != null else false
+	menu.call(&"_show_credits", false)
+	var quit_plank: PlankButton = menu.get_node(^"Door_quit")
+	_check(credits_ending == ending_was and quit_plank.warn,
+		"the menu's credits leave the music alone, and Save and quit is in the warning red",
+		"%s %s" % [credits_ending, quit_plank.warn])
+	_check(CreditsBoard.LINES.find("Clearwavsound") > CreditsBoard.LINES.find(Text.CREDITS_HEAD_ART)
+			and CreditsBoard.LINES.find("Nuven") + 1 == CreditsBoard.LINES.find("Loobas")
+			and CreditsBoard.LINES[CreditsBoard.LINES.find("Loobas") + 1] == "",
+		"the credits' music is Nuven and Loobas only, Clearwavsound under Art and Assets", "")
 	_check(pad.call(&"focus_owner") == menu, "the menu is the board the stick picks on", "")
 	var confirm: MenuConfirm = menu.get_node(^"Confirm")
 	confirm.visible = true

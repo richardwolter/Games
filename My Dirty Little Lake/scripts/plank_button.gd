@@ -36,6 +36,14 @@ const HudButtons := preload("res://scripts/hud_buttons.gd")
 		accent = value
 		queue_redraw()
 
+## The word in the warning red (`Style.WARN_INK`): the main menu's "Save and quit", told
+## apart from the doors into the lake (2026-10-23, Richard's QA run), as the settings board's
+## "Save and go to menu" already is.
+@export var warn: bool = false:
+	set(value):
+		warn = value
+		queue_redraw()
+
 @export var mark: StringName = &"":
 	set(value):
 		mark = value
@@ -423,7 +431,7 @@ func _draw() -> void:
 	Style.write(
 		self, label, height,
 		Vector2(0.0, on.position.y + (on.size.y + float(height) * 0.62) * 0.5),
-		Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, on
+		Style.WARN_INK if warn else Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, on
 	)
 
 

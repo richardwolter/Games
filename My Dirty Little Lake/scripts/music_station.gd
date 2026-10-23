@@ -36,9 +36,13 @@ extends Node
 
 const DIR := "res://assets/music/"
 
-## The lake's songs by default, in the order they play, looping back to the first.
+## The lake's songs by default, in the order they play, looping back to the first. This is
+## Nice (`indie_boi`) joined them on 2026-10-23 (Richard's QA run).
 const PLAYLIST: Array[StringName] = [
-	&"movimento_tranquilo", &"beatgucci", &"save_me", &"tudo_que_eu_fiz", &"goin"]
+	&"movimento_tranquilo", &"beatgucci", &"save_me", &"tudo_que_eu_fiz", &"goin", &"indie_boi"]
+## Back, past this many seconds into a song, plays it again from its start; within them it
+## goes to the song before (2026-10-23, Richard: "like any player").
+const BACK_RESTART := 3.0
 const SHED_SONG := &"indie_boi"
 const ENDING_SONG := &"habibs"
 ## Every song the record player offers, in the order a list plays them.
@@ -65,8 +69,9 @@ const FADE := 4.0
 ## it is the next song easing in underneath.
 const FADE_OUT := 1.5
 ## How fast the sound moves between outdoors, the radio and the shed, as a fraction of the
-## way a second: a quarter of a second door, as it was.
-const DOOR_FADE := 4.0
+## way a second: a quarter of a second door until 2026-10-23, 0.8 s since (Richard's QA
+## run: the way in and out of the radio "should be also more subtle").
+const DOOR_FADE := 1.25
 
 ## Each song's level against the others, in decibels, levelled to Goin's loudness (-11.1
 ## LUFS, what the slider was tuned on) off `ebur128` on the built files. The mixes were
@@ -211,6 +216,33 @@ class Track:
 		if list.is_empty():
 			return
 		var to := next if next >= 0 else (song + 1) % list.size()
+		stop_slug(list[song])
+		if next >= 0:
+			stop_slug(list[next])
+		song = to
+		next = -1
+		at = 0.0
+		start(song)
+		changes += 1
+
+	## Where a press of back goes: the song playing again once it has run `BACK_RESTART`
+	## seconds (or when it is the only one), the one before it on the list otherwise.
+	func back_index() -> int:
+		if list.is_empty():
+			return -1
+		if at > BACK_RESTART or list.size() == 1:
+			return song
+		return (song + list.size() - 1) % list.size()
+
+	func back_slug() -> StringName:
+		var to := back_index()
+		return list[to] if to >= 0 else &""
+
+	func back() -> void:
+		held = false
+		if list.is_empty():
+			return
+		var to := back_index()
 		stop_slug(list[song])
 		if next >= 0:
 			stop_slug(list[next])
@@ -437,6 +469,17 @@ func skip(place: StringName) -> void:
 	_push()
 
 
+## Back on a place's list: see `Track.back_index`.
+func back(place: StringName) -> void:
+	_track(place).back()
+	_push()
+
+
+## The song a press of back in a place would go to.
+func back_in(place: StringName) -> StringName:
+	return _track(place).back_slug()
+
+
 ## A place's own list, whatever the sync says.
 func list_of(place: StringName) -> Array[StringName]:
 	return (_shed if place == SHED else _lake).list.duplicate()
@@ -479,6 +522,7 @@ func picks() -> Dictionary:
 		"shed": _shed.list.map(func(s): return String(s)),
 		"synced": synced,
 		"loobas": true,
+		"nice": true,
 	}
 
 
@@ -486,13 +530,17 @@ func picks() -> Dictionary:
 ##
 ## A save whose picks were written before Loobas' songs existed (no `loobas` mark) has them
 ## ticked on the lake once, on the way in (Richard: "add to lake list"); the mark goes out
-## with the next save, so unticking them afterwards sticks.
+## with the next save, so unticking them afterwards sticks. This is Nice the same way, by its
+## own `nice` mark (2026-10-23).
 func take_picks(saved: Dictionary) -> void:
 	var lake := _read_list(saved.get("lake"), [])
 	if lake.is_empty():
 		lake = MusicStation.playlist()
-	elif not saved.has("loobas"):
-		lake = _read_list(lake + LOOBAS, MusicStation.playlist())
+	else:
+		if not saved.has("loobas"):
+			lake = _read_list(lake + LOOBAS, MusicStation.playlist())
+		if not saved.has("nice"):
+			lake = _read_list(lake + [SHED_SONG], MusicStation.playlist())
 	_lake.take(lake)
 	_shed.take(_read_list(saved.get("shed"), [SHED_SONG]))
 	synced = bool(saved.get("synced", true))

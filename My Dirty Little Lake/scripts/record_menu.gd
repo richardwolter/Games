@@ -120,7 +120,11 @@ const ROW_GAP := 15.0
 const TICK_X := [163.0, 190.0]
 const SYNC_BOX := Rect2(126, 104, 48, 16)
 const NOW_BOX := Rect2(16, 98, 72, 24)
-const SKIP_BOX := Rect2(74, 102, 11, 11)
+## Back and skip stand side by side under the panel, on its middle (2026-10-23, Richard's
+## QA run: a way back on the list, or the same song again), so the title has the panel's
+## whole width.
+const BACK_BOX := Rect2(39, 126, 11, 11)
+const SKIP_BOX := Rect2(54, 126, 11, 11)
 
 ## The station the ticks are read from and written to. The autoload unless set.
 var music: MusicStation
@@ -142,6 +146,8 @@ var _from := 0
 var _cross := 1.0
 ## A skip under way: the song is held and the next starts when the needle sets down.
 var _skipping := false
+## Which way it goes: 1 on to the next song, -1 back (`MusicStation.back`).
+var _skip_way := 1
 ## The record's turning speed, 0 to 1.
 var _speed := 1.0
 var _lift := -1.0
@@ -256,7 +262,8 @@ func _panel(r: Rect2, face: Color, lit: Color) -> void:
 	_px(r.position.x + 1, r.position.y + 1, r.size.x - 2, 1, lit)
 
 
-## Every place something answers a click, by key: `tick:<place>:<slug>`, `sync`, `skip`.
+## Every place something answers a click, by key: `tick:<place>:<slug>`, `sync`, `back`,
+## `skip`.
 func _targets() -> Dictionary:
 	var out := {}
 	for i in MusicStation.shown().size():
@@ -267,6 +274,7 @@ func _targets() -> Dictionary:
 		out[StringName("tick:lake:" + String(slug))] = _box(Rect2(TICK_X[0] - 3, y - 3, 13, 13))
 		out[StringName("tick:shed:" + String(slug))] = _box(Rect2(TICK_X[1] - 3, y - 3, 13, 13))
 	out[&"sync"] = _box(sync_box())
+	out[&"back"] = _box(BACK_BOX)
 	out[&"skip"] = _box(SKIP_BOX)
 	return out
 
@@ -308,12 +316,15 @@ func press(key: StringName) -> bool:
 	if key == &"sync":
 		m.set_synced(not m.synced)
 		done = true
-	elif key == &"skip":
+	elif key == &"skip" or key == &"back":
 		# The song stops as the needle comes up, and the next one only starts once the
-		# needle has set down on its band (Richard, 2026-09-28).
+		# needle has set down on its band (Richard, 2026-09-28). Back the same way, to the
+		# song before or to the start of this one.
 		if _lift >= 0.0 or _skipping:
 			return false
-		var next := MusicStation.shown().find(m.next_in(MusicStation.SHED))
+		_skip_way = -1 if key == &"back" else 1
+		var going := m.back_in(MusicStation.SHED) if _skip_way < 0 else m.next_in(MusicStation.SHED)
+		var next := MusicStation.shown().find(going)
 		m.hold(MusicStation.SHED)
 		_skipping = true
 		_from = _band
@@ -385,7 +396,10 @@ func _land_skip() -> void:
 	_skipping = false
 	var m := _station()
 	if m != null:
-		m.skip(MusicStation.SHED)
+		if _skip_way < 0:
+			m.back(MusicStation.SHED)
+		else:
+			m.skip(MusicStation.SHED)
 		_seen = m.changes_in(MusicStation.SHED)
 
 
@@ -561,20 +575,27 @@ func _draw_now(m: MusicStation) -> void:
 	Style.write(self, Text.RECORD_NOW, Style.TEXT_TINY,
 		box.position + Vector2(4 * UNIT, 8 * UNIT), AMBER_HI)
 	var slug := m.playing_in(MusicStation.SHED) if m != null else &""
-	# The title drops a size rather than run under the skip: "Movimento Tranquilo" is 211
-	# design pixels at the body size against the 159 left of the skip.
+	# The title drops a size rather than run off the panel: "Movimento Tranquilo" is 211
+	# design pixels at the body size against the 192 the panel leaves.
 	var title := String(TITLES.get(slug, ""))
-	Style.write(self, title, _fit_size(title, (SKIP_BOX.position.x - NOW_BOX.position.x - 5) * UNIT,
+	Style.write(self, title, _fit_size(title, (NOW_BOX.size.x - 8) * UNIT,
 		[Style.TEXT_BODY, Style.TEXT_SMALL, Style.TEXT_TINY]),
 		box.position + Vector2(4 * UNIT, 20 * UNIT), CREAM)
+	# Skip: a wedge pointing on, a bar after it. Back: the same turned round.
 	var skip := SKIP_BOX
-	var face := AMBER_HI if _hover == &"skip" else AMBER
-	_panel(skip, face, AMBER_HI)
+	_panel(skip, AMBER_HI if _hover == &"skip" else AMBER, AMBER_HI)
 	var x := skip.position.x
 	var y := skip.position.y
 	for k in 4:
 		_px(x + 3 + k, y + 2 + k, 1, 7 - k * 2, OUT)
 	_px(x + 8, y + 2, 1, 7, OUT)
+	var back := BACK_BOX
+	_panel(back, AMBER_HI if _hover == &"back" else AMBER, AMBER_HI)
+	x = back.position.x
+	y = back.position.y
+	_px(x + 2, y + 2, 1, 7, OUT)
+	for k in 4:
+		_px(x + 7 - k, y + 2 + k, 1, 7 - k * 2, OUT)
 
 
 func _draw_rows(m: MusicStation) -> void:

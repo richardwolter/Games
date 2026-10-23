@@ -20,7 +20,9 @@ import subprocess
 
 import numpy as np
 
-SONGS = ["beatgucci", "save_me", "goin", "habibs", "movimento_tranquilo", "tudo_que_eu_fiz"]
+## This is Nice (`indie_boi`) since it went on the lake's list by default (2026-10-23).
+SONGS = ["beatgucci", "save_me", "goin", "habibs", "movimento_tranquilo", "tudo_que_eu_fiz",
+    "indie_boi"]
 DIR = os.path.join("assets", "music")
 OUT = os.path.join(DIR, "beats.json")
 RATE = 11025
@@ -96,8 +98,18 @@ def measure(slug: str) -> dict:
 
 
 def main() -> None:
+    import sys
+    # `--only a,b` measures the named songs and keeps every other grid as it stands.
+    only = None
+    if "--only" in sys.argv:
+        only = sys.argv[sys.argv.index("--only") + 1].split(",")
     table = {}
+    if only is not None and os.path.exists(OUT):
+        with open(OUT, encoding="utf-8") as f:
+            table = json.load(f)
     for slug in SONGS:
+        if only is not None and slug not in only:
+            continue
         table[slug] = measure(slug)
         print(slug, table[slug])
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:

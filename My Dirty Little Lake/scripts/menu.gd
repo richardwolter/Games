@@ -156,6 +156,7 @@ func _ready() -> void:
 		# The doors into the lake play the start sound rather than a click; `_take` decides.
 		plank.clicks = false
 		plank.water = true
+		plank.warn = door["key"] == &"quit"
 		plank.pressed.connect(_take.bind(door["key"] as StringName))
 		add_child(plank)
 		_planks[door["key"]] = plank
@@ -481,12 +482,10 @@ func _show_letter(open: bool) -> void:
 		_letter.open()
 
 
+## The menu's credits leave the music alone (2026-10-23, Richard's QA run): Habibs is the
+## ending's song, first heard when the lake is clean, and the record player's after that.
 func _show_credits(open: bool) -> void:
 	_credits.visible = open
-	# The credits roll to the end song, and the playlist comes back under it on the way out.
-	var music := MusicStation.main()
-	if music != null:
-		music.set_ending(open)
 
 
 func _show_languages(open: bool) -> void:

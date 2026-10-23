@@ -638,9 +638,6 @@ static var TOUR_DECOR_HINT_PAD: String:
 static var TOUR_DECOR_PLANK: String:
 	get: return TranslationServer.translate(&"TOUR_DECOR_PLANK")
 
-static var TOUR_DECOR_LIST: String:
-	get: return TranslationServer.translate(&"TOUR_DECOR_LIST")
-
 static var TOUR_DECOR_STAND: String:
 	get: return TranslationServer.translate(&"TOUR_DECOR_STAND")
 

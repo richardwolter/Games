@@ -78,12 +78,12 @@ const STAGGER := 0.9
 ## The pump: a squeeze every this while held, and its puff's level over its balance.
 const PUMP := 0.32
 const PUFF_DB := -4.0
-const PAYOFF_HOLD := 1.8
+const PAYOFF_HOLD := 1.2  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 1.8.
 ## The shared ending over the hive once the last stop is quiet (`HiveStep.payoff`).
 const FINALE_AT := Vector2(233.0, 170.0)
 const FINALE_WIDE := 110.0
 ## The last bees are waited on at most this long once the entrance is quiet.
-const IN_WAIT := 4.0
+const IN_WAIT := 2.7  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 4.0.
 const STAR_LIFE := 0.8
 ## The bees' light steps off the room's top-left sun (the mockup's ramp swaps, as tints): lit,
 ## mid, shade; a quiet bee a step paler.

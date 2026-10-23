@@ -1568,6 +1568,57 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
   `test_lake`'s `_stage_first_steps` guards the bed at the pump, the hint giving way, the
   cards following the rooms, the free wash, the walk back into the shed and the flag.
 
+### The First QA Run (2026-10-23, `/grill-me` with Richard)
+Richard's notes off his first full-game run on the beta branch, inside the feature freeze.
+- **The decoration tour has four cards** (`DECOR_TOUR_CARDS` 4): the wash list's card
+  ("Washing an object costs money", `TOUR_DECOR_LIST`, deleted from the CSV) went with the
+  soap. The wash room opens with the first waiting find already on the stand (`DecorTour.LIST`
+  is a state with no card: it picks and moves on to the stand's card). **Supersedes** the five
+  cards in The Decoration Tour above.
+- **The door takes no E for the rest of the visit the tour ends in** (`Lake._door_quiet`):
+  the last card says "press E to interact" with the player still by the door after the walk
+  back in, and an E pressed straight away put them out on the lake. Escape and the cross still
+  close the house; the next visit has its door back.
+- **The lake's cards hide while their steps stand still** (`Lake._hide_lake_cards`): behind
+  the main menu and under the settings pause, the camera tip, the hints, the decoration tour's
+  card and the first upgrade's card are hidden, not ended. The camera tip stood drawn under the
+  settings board (`tools/probe_camera_tip.tscn`, headless, shows it).
+- **The meter's hint waits for 5% cleaned** (`Lake.METER_HINT_AT`), not the first catch:
+  the first minutes had too many cards at once.
+- **The coat rack is not an early find**: dealt by its own tier (0) into the middle band. The
+  other early finds stay, by Richard's call, so one of them can still come up before the record
+  player.
+- **The forced first upgrade**: a click off the boards does nothing while its row is shown
+  (`ShopSkin.only`); the cross and Escape still close the shop, and closing it unbought once
+  the forcing has begun (`Lake._first_buy_forced`) ends it for good (saved as `first_buy`).
+- **Credits**: Music lists Nuven and Loobas only; Clearwavsound moved under Art and Assets.
+  The main menu's Credits no longer plays Habibs (`MainMenu._show_credits`): it is the
+  ending's song, then the record player's. **Supersedes** "Habibs fades in ... when Credits
+  opens on the menu" in The Music.
+- **"Save and quit" is in the warning red** (`PlankButton.warn`, `Style.WARN_INK`).
+- **Music −3 dB**: `Prefs.BUS_TOP` Music 0 again (it was +3 from 2026-10-12).
+- **This is Nice is on the lake's list by default** (`MusicStation.PLAYLIST`); a save without
+  the new `nice` mark gets it ticked once on load, the Loobas rule. Being on the lake it needs
+  a beat grid for the animals: measured 65 BPM, offset 0.8846 (`tools/measure_beats.py --only
+  indie_boi`, a new flag that keeps the other grids). **The octave is owed an ear check** on
+  `tools/last_beat_indie_boi.wav`; if the clicks fall on every other beat, give it a
+  `TEMPO_HINT` of 130.
+- **The record player has a back button** (`RecordMenu.BACK_BOX`, `MusicStation.back`,
+  `back_in`, `BACK_RESTART` 3 s): past three seconds into a song it plays it again, within them
+  it goes to the song before; the needle lifts and sets down as on a skip. Back and skip stand
+  side by side under the Now playing panel, so the title has the panel's width.
+- **The radio is subtler** (`tools/build_music.py` `RADIO`, `--radio` builds those copies
+  alone): a little stereo kept, 120 Hz to 9.5 kHz on one stage each, less drive and slap,
+  about 5 dB under the open song (Goin's radio -16 LUFS, was -20.6), quality 2. The way in and
+  out of it takes 0.8 s (`MusicStation.DOOR_FADE` 1.25, was 4), the shed's and sync's too.
+- **Every hive ending is a third shorter**: the payoffs (catch 2.6 to 1.7 s, smoke and queen
+  1.8 to 1.2), the bees' file-in wait 4 to 2.7, uncap's sweep hold 0.6 to 0.4 and drain 10 to
+  6.7, the pour's finale 1.8 to 1.2, the cell fill and the gap between steps 0.3 + 0.7 to
+  0.2 + 0.5, and the done card 2.2 to 1.5.
+- **No leftover text**: a sweep of the CSV against the code found every key read, and only
+  the wash list's card naming a retired mechanic.
+- All numbers first guesses for Richard's ear and eye. `test_lake` guards each.
+
 ### Demo Playtest Feedback (2026-10-15, `/grill-me` with Richard, issue #41)
 A friend's notes on the demo, for both builds. Ten points grilled; rotation (9) left alone
 (the chairs already turn 90 degrees; he most likely tried a piece with no side view). Done so

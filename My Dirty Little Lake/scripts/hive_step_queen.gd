@@ -189,7 +189,7 @@ const HALO_EASE := 8.0
 const CALM := 0.35
 const CALM_EASE := 2.0
 const PAYOFF_WIDE := 44.0
-const PAYOFF_HOLD := 1.8
+const PAYOFF_HOLD := 1.2  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 1.8.
 
 ## The glass's colours: the builder's brass and dark wood (`tools/build_hive.py`); the sheen on
 ## its upper left a stepped arc in the sky's own pale blue with a foam line inside it, and the

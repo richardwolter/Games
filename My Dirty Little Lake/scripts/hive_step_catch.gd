@@ -98,7 +98,7 @@ const LIT_AFTER := 0.4
 ## Done at this share boxed.
 const ENOUGH := 0.8
 ## Long enough for the shared ending to land.
-const PAYOFF_HOLD := 2.6
+const PAYOFF_HOLD := 1.7  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 2.6.
 ## A new frame's crowd drops in from this far up over this long.
 const DROP_IN := 10.0
 const DROP_TIME := 0.35

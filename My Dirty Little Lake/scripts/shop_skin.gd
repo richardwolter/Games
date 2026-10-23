@@ -679,8 +679,10 @@ func _gui_input(event: InputEvent) -> void:
 	if index < 0 or index >= rows.size():
 		# Anywhere off the boards is the way out: the boards are things on a table, and
 		# clicking the table puts them down. The rest of a board, a row's name included, is
-		# eaten and does nothing.
-		if not _on_a_board(click.position):
+		# eaten and does nothing. Not while the first upgrade is being shown (`only`): a stray
+		# click there put the player back on the lake (2026-10-23, Richard's QA run). The cross
+		# and Escape still close it.
+		if not _on_a_board(click.position) and only == &"":
 			close_asked.emit()
 		accept_event()
 		return

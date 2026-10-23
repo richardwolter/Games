@@ -185,7 +185,7 @@ license/agreement in place with the artist (confirmed 2026-09-06).
   Clearwavsound, https://freesound.org/people/Clearwavsound/sounds/541034/, licensed CC BY 3.0
   (https://creativecommons.org/licenses/by/3.0/). Cut to a 1.7 s loop and levelled by
   `tools/build_sfx.py` from `art_source/SFX/Hot_Knife_In_Butter.wav` (downloaded by Richard,
-  2026-10-19). ✅ Cleared with credit: "Clearwavsound" on the credits board under Music.
+  2026-10-19). ✅ Cleared with credit: "Clearwavsound" on the credits board, under Art and Assets since 2026-10-23 (Music lists only Nuven and Loobas).
   Not by Nuven, so "every recorded sound" above has this exception.
 
 - **The Spotify mark** beside Nuven on the credits board (`assets/ui/spotify_icon.png`) —

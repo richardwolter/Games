@@ -93,7 +93,7 @@ const LID_FROM := 14.0
 const SLIDE := 0.5
 const SLIDE_IN := 0.45
 const HOP := 8.0
-const FINALE_WAIT := 1.8
+const FINALE_WAIT := 1.2  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 1.8.
 ## The shared ending over the three jars on the shelf (`HiveStep.payoff`, no crown in the air:
 ## the crown is on the rosette), and the rosette dropping onto the middle jar with a bounce.
 const FINALE_WIDE := 100.0
