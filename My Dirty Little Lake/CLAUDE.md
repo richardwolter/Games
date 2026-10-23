@@ -9494,6 +9494,94 @@ cut to the gold cast on the drop, 15.8 s. No dates, so it holds all week.
 - Nothing but scratch was deleted: the review frames and test renders in `2 Work` (2.5 GB,
   Richard's call). `trailer/_ref` (copies of deleted probe scripts) and `_test2.json` stay.
 
+### The Gameplay Short (2026-10-23, `/grill-me` with Richard)
+A 45-60 s vertical (9:16) video of plain play for Shorts, Reels and TikTok: no captions until
+the end card. **Richard plays it himself**; Godot's Movie Maker records it, a beat a take, and
+the takes are cut together. `tools/play_video.gd` (`.tscn`), `tools/record_video.bat`,
+`Marketing/My Dirty Little Lake/2 Work/gameplay_short/build_short.py` + `short.json`.
+- **The run**: mid-game, the lake 40% cleaned out from the island in big lobed bays (`_thin`:
+  tiles emptied nearest first, the distance bent by a slow noise, `FRONT_WOBBLE` 12 tiles);
+  three casts at the dirty edge, the second a forced double, the third at the sculpture
+  shining on the surface; washed at the pump; placed in Richard's own decorated house
+  (`user://play_decor.save`, never written); out of the house into rain, then a tornado he
+  casts at until the end card ("Wishlist on" and the Steam lockup over the v3 logo, the
+  footage dimmed and still playing). Movimento Tranquilo under the edit.
+- **Staged once, played a beat a take** (`PLAY_VIDEO_STAGE=1`, headless): the lake dressed
+  and saved as `tools/film/short/staged/play_video_{casts,wash,house,tornado}.save`, each
+  beat's take played on a copy (`staged/take.save`). **In the project, not user://**: a take
+  launched from the Claude app (a click on the .bat link) runs inside its MSIX package, where
+  AppData is redirected to an empty folder, and the first takes found no staged saves.
+  Launched that way `settings.cfg` is not found either, so the take plays at `Prefs`' defaults. `tools/film/short/stage.log` says what moved. Upgrades are
+  the run's middle (Width 8, Catch 4 = 36, **Strength 3** because the sculpture is tier 3,
+  Range 10, Reel 8); the top `LIGHT_SLOTS` (6) of every dirty stack within `REACH` 24 tiles
+  are kept liftable so every net fills; every other find taken out of the water; the hive
+  busy; every first-time cue marked seen; no shower due; the run's second tornado (4 hits).
+- **The house at stage 2 with the stage-up** (Richard's pick): `Lake.force_house` 2 (a
+  borrowed lake's room is otherwise pinned at 3), `house_seen` 1 so the door plays u12.
+  Richard laid the room out at stage 3, so four pieces stood on stage 2's holes (the bed, the
+  drawer desk, the fancy bed, the small table); `_nudge_house` moves each to the nearest spot
+  it may stand (a few px) rather than sending it to the shelf. The sculpture is taken out of
+  the room; the tornado beat puts it back where it stood.
+- **The take's cues** (`_watch`): the second throw of the casts beat casts the second net the
+  way `_roll_luck` does (luck levels are 0, so nothing else is gold or doubled); the washed
+  sculpture leads the shelf; putting it down starts `Weather.storm`; the first door shut after
+  that starts the tornado at the angler's bearing.
+- **What is on screen** (Richard's calls): HUD off but the haul count over the angler; every
+  game pop-up off (find card, hints, cue and moment cards, pigeon head, Strength line, coins:
+  hidden every frame after the lake's process); the shelf and the wash tray stay (they are how
+  the sculpture is picked). Three static switches in the game, set only by `play_video.gd`:
+  **`ShedRoom.stacked`** (the shelf a `STACK_SHELF` band under the room, the room at zoom 2 in
+  the 720-wide canvas), **`WashRoom.stacked` + `WashStand.stacked`** (the tray centred over
+  the stand, the stand fitted to `STACK_WIDE` of the width, its foot at `STACK_GROUND` 0.72),
+  **`ShedRoom.quiet` / `WashStand.quiet`** (no key chips, hands, turn chip or clean figure).
+  All default false: the game is untouched.
+- **The pointer is drawn into the picture** (`DrawnPointer`, layer 128): Movie Maker does not
+  capture the hardware cursor, so the real one is made a transparent 1x1 for every shape and
+  the game's wooden arrow is drawn at the mouse, hidden whenever the game hides its pointer.
+- **Movie Maker at 30 fps, real time** (Richard's pick over 60 fps at ~60% game speed and
+  over installing OBS): at 1080x1920 the main-thread MJPEG encode costs ~17-25 ms a frame
+  (the whole frame ~29 ms against 33), so the game keeps true speed at `--fixed-fps 30`. The
+  movie's size comes from `display/window/size/viewport_*` (Movie Maker records at the
+  project's base size, not the window's), which `record_video.bat` sets in a throwaway
+  `override.cfg` (deleted after). The take's sound is the game's own with the Music bus
+  muted (`AudioServer`, not `Prefs`, so `settings.cfg` is untouched).
+- **The picture is 1080x1920 in a window that fits the screen** (second pass the same day,
+  Richard: the monitor does not pivot, a portrait desktop is sideways): the window is portrait,
+  borderless, as tall as the usable screen (about 580x1032); the root draws at 1080x1920
+  (`content_scale_mode` viewport) scaled into it, which is what Movie Maker records; the lake
+  lives in a 1080x1920 SubViewport whose 2D is 720x1280 stretched (`size_2d_override_stretch`),
+  so every `get_final_transform` stretch read in the game is still 1.5. Input reaches it
+  through the SubViewportContainer and the real cursor maps through both scales (checked
+  against the OS position). **A click synthesised with `Input.parse_input_event` does not
+  aim**: the lake aims off `get_mouse_position`, the real cursor, so the dry run throws by
+  `_cast_at`. The click ripple is drawn by `Pad` in the root at 1:1, two thirds of its size in
+  play. Still real time at 30 fps (~31 ms a frame).
+- **Probes**: `PLAY_VIDEO_SHOT=1` saves `tools/film/short/shot_<beat>.png`; `PLAY_VIDEO_DRY=1`
+  plays the whole run by script (casts, wash, place, door, tornado) and logs `dry.log` with
+  `dry_*.png`: the check that the cues fire before a take is spent.
+- **The cut** (`build_short.py`, base python with the psd-extract site-packages): segments
+  `{take, in, out, join}` (join 0 a cut, else a dissolve), the end card at `end.at` seconds
+  (dim, logo by its sticker box, the trailers' `captions.py` slam in gold, `steam_white.png`,
+  the find chime), game sound to `game_lufs` -21, the song to `song_lufs` -19, the mix to
+  `master_lufs` -14; `--sheet` writes a still a segment. Output `1 Final/Videos/Gameplay
+  Short (Vertical).mp4`, 1080x1920 30 fps.
+- **First cut** (same day): three takes (casts, wash running on into the house, tornado), seven
+  segments, 45.5 s; the walk in the rain before touchdown trimmed and the pump's two seconds
+  put in instead; the end card from 4.7 s before the end, before the tornado is tamed, at
+  `dim` 0.4 (0.55 over the storm hid it).
+- **Second pass, off the first cut** (Richard): the song from its first note (`song_in` 1.45,
+  its own silence skipped); straight from the third cast to the wash stand, no pump; **the find
+  card shown** ("You found a decoration!"), stood at `Trophy.middle` 0.64 of the height rather
+  than `MIDDLE` 0.79 (over a phone's bottom quarter); **four more finds waiting on the shelf**
+  (`SHELF_EXTRA`, second copies of pieces in the room) and `STACK_SHELF` 236 so three rows
+  show; **thunder laid in the cut** (`hits` in `short.json`, a take's moment wherever the cut
+  puts it, set by peak since a crack is all transient, the song ducked under them by
+  `sidechaincompress`) on the take's two flashes and the step out into the rain; the game's
+  sound fading over 1.5 s as the end card comes in.
+- **Out of scope, by decision**: a 16:9 version, the HUD, captions over the play, a release
+  date, taming the tornado on camera, a scripted bot driving the take.
+- All numbers first guesses for Richard's eye.
+
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 **Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions

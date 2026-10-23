@@ -39,6 +39,13 @@ const HOSE_GAP := 22.0
 
 ## Down under the HUD's money and Waiting plates, which stay up in the room (2026-10-01).
 const TRAY_AT := Vector2(28.0, 172.0)
+## **The tray over the stand, for the vertical gameplay short** (2026-10-23, `/grill-me` with
+## Richard; `tools/play_video.gd` sets it with `WashStand.stacked`, nothing in the game does):
+## in a 720-wide portrait canvas the tray down the left left the stand a narrow strip, so the
+## tray is centred across the top, `STACK_TOP` down (under a phone's top overlay), and the
+## stand has the whole width under it.
+static var stacked := false
+const STACK_TOP := 196.0
 const TRAY_WIDE := 268.0
 const TRAY_FRAME := 10.0
 const TRAY_RIBBON := 36.0
@@ -235,7 +242,10 @@ func tray_box() -> Rect2:
 			+ rows * ROW_TALL + (rows - 1) * ROW_GAP
 	if waiting.is_empty():
 		tall = _ribbon_lip() + wood + 96.0
-	return Rect2(TRAY_AT, Vector2(TRAY_WIDE, tall))
+	var at := TRAY_AT
+	if stacked:
+		at = Vector2(round((size.x - TRAY_WIDE) * 0.5), STACK_TOP)
+	return Rect2(at, Vector2(TRAY_WIDE, tall))
 
 
 ## How far the title plank's lower half reaches onto the face: it straddles the board's top
@@ -275,7 +285,7 @@ func _lay_out() -> void:
 	_tray.size = box.size
 	# The stage stands in the middle of what the tray leaves, not of the window.
 	if _stand != null:
-		_stand.centre_x = (tray_box().end.x + size.x) * 0.5
+		_stand.centre_x = size.x * 0.5 if stacked else (tray_box().end.x + size.x) * 0.5
 	var cross := Style.close_on(_ribbon_box(), CLOSE_SIDE)
 	_close.position = cross.position
 	_close.size = cross.size

@@ -81,6 +81,19 @@ const SHELF_BAR_GAP := 4.0
 const GUTTER := 22
 const MARGIN := 8.0
 
+## **The shelf under the room, for the vertical gameplay short** (2026-10-23, `/grill-me` with
+## Richard; `tools/play_video.gd` sets it, nothing in the game does). In a 720-wide portrait
+## canvas the room beside its shelf draws at zoom 1, half the frame; stacked, the shelf is a
+## band `STACK_SHELF` tall under the floor, as wide as it, and the room draws at zoom 2. The
+## room and the shelf are one block whose middle stands `STACK_AT` down the control, so the
+## room is clear of the top of a phone's frame and the shelf clear of its bottom quarter.
+static var stacked := false
+const STACK_SHELF := 236.0
+const STACK_AT := 0.45
+## The key chips, the turn chip, the pick-up chip and the pointing hands left undrawn: the
+## same short has no writing over the play (`play_video.gd` sets it).
+static var quiet := false
+
 ## How far the inventory column fades back while a find is being carried. The list sits over
 ## part of the floor and a player placing furniture is looking at the floor, not at the list
 ## they have already taken the piece out of.
@@ -2990,6 +3003,9 @@ func _zoom() -> float:
 	# the answer to know how much the wall takes).
 	var wide := maxf(size.x - float(LIST_WIDTH + GUTTER) - MARGIN * 2.0, 1.0)
 	var tall := maxf(size.y - MARGIN * 2.0, 1.0)
+	if stacked:
+		wide = maxf(size.x - MARGIN * 2.0, 1.0)
+		tall = maxf(size.y - MARGIN * 2.0 - STACK_SHELF - float(GUTTER), 1.0)
 	var fit := clampi(mini(int(wide) / (COLS * CELL), int(tall) / ((ROWS + WALL_ROWS) * CELL)), 1, ZOOM_MOST)
 	# A step down while the shelf would run under `keep_clear`, the shed's own Upgrades
 	# button in the corner (2026-10-06, the Steam Deck pass): at 1280 x 800 the room steps up
@@ -3008,7 +3024,7 @@ var keep_clear := Rect2()
 ## `_floor_rect`, `_shed_rect` and `_board_rect`, which cannot be asked here because they ask
 ## `_zoom` themselves.
 func _board_under_corner(zoom: float) -> bool:
-	if not keep_clear.has_area():
+	if not keep_clear.has_area() or stacked:
 		return false
 	var step := CELL * zoom
 	var span := Vector2(float(COLS) * step, float(ROWS) * step)
@@ -3039,6 +3055,14 @@ func _wall_tall() -> float:
 ## be laid out beside anything, so the wall is given room here instead.
 func _room_rect() -> Rect2:
 	var wall := _wall_tall()
+	if stacked:
+		return Rect2(
+			Vector2(MARGIN, wall + MARGIN),
+			Vector2(
+				maxf(size.x - MARGIN * 2.0, 1.0),
+				maxf(size.y - wall - MARGIN * 2.0 - STACK_SHELF - float(GUTTER), 1.0)
+			)
+		)
 	return Rect2(
 		Vector2(MARGIN, wall + MARGIN),
 		Vector2(
@@ -3055,6 +3079,13 @@ func _room_rect() -> Rect2:
 func _floor_rect() -> Rect2:
 	var step := CELL * _zoom()
 	var span := Vector2(float(COLS) * step, float(ROWS) * step)
+	if stacked:
+		var wall := _wall_tall()
+		var whole := wall + span.y + float(GUTTER) + STACK_SHELF
+		var top := clampf(size.y * STACK_AT - whole * 0.5, MARGIN, maxf(size.y - MARGIN - whole, MARGIN))
+		return Rect2(
+			Vector2(MARGIN + maxf(size.x - MARGIN * 2.0 - span.x, 0.0) * 0.5, top + wall).floor(), span
+		)
 	var room := _room_rect()
 	var block := span.x + GUTTER + float(LIST_WIDTH)
 	var left := MARGIN + maxf(size.x - MARGIN * 2.0 - block, 0.0) * 0.5
@@ -3090,6 +3121,13 @@ func _list_rect() -> Rect2:
 func _board_rect() -> Rect2:
 	var shed := _shed_rect()
 	var floor_box := _floor_rect()
+	if stacked:
+		# Under the floor, as wide as it: the plank's drawn top on the gutter's far side.
+		var under := floor_box.end.y + float(GUTTER) + shelf_lift()
+		return Rect2(
+			Vector2(floor_box.position.x, under),
+			Vector2(floor_box.size.x, maxf(STACK_SHELF - shelf_lift(), SHELF_FRAME * 2.0 + 8.0))
+		)
 	# Top and bottom off the shed, not off the floor: the board and the room it stands
 	# beside are two pieces of furniture of the same height, and a board that started
 	# below the wallpaper read as a panel bolted on rather than as a thing in the room.
@@ -3397,9 +3435,10 @@ func _draw() -> void:
 	# The shade the window's light is lifted out of. Over the room and everything standing
 	# in it, under the light quad, which is a child and so drawn after all of this.
 	draw_rect(_shed_rect(), ROOM_DIM)
-	_draw_hands(floor_box)
-	_draw_prompt(floor_box)
-	_draw_walk_hint(floor_box)
+	if not quiet:
+		_draw_hands(floor_box)
+		_draw_prompt(floor_box)
+		_draw_walk_hint(floor_box)
 	_dress_shelf()
 
 	# The piece in hand off the room — over the shelf, say — follows the cursor over
@@ -3411,7 +3450,8 @@ func _draw() -> void:
 			_carry_view,
 			Color(1.0, 1.0, 1.0, 0.75)
 		)
-	_draw_turn_hint(floor_box)
+	if not quiet:
+		_draw_turn_hint(floor_box)
 
 
 ## The piece in hand as a row of `decor` would hold it, where it would land, or nothing

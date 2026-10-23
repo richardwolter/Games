@@ -65,6 +65,9 @@ const LEAVE := 0.5
 ## Where the card sits, as a fraction of the window's height. Down in the open water under
 ## the island, clear of the HUD along the top and of the buttons in the corners.
 const MIDDLE := 0.79
+## Where the card stands instead, for the vertical gameplay short (`tools/play_video.gd`): a
+## phone's feed covers the bottom quarter of a 9:16 frame. Below nought, `MIDDLE`.
+static var middle := -1.0
 
 ## The piece's height as a fraction of the window's, and the most it may be blown up from
 ## its own pixels. Furniture is cut small; past a point it stops being a picture of a chair
@@ -302,7 +305,7 @@ func _draw() -> void:
 		return
 	var piece: StringName = _queue[0]["piece"]
 	var swell := _swell()
-	var centre := Vector2(size.x * 0.5, size.y * MIDDLE)
+	var centre := Vector2(size.x * 0.5, size.y * (middle if middle >= 0.0 else MIDDLE))
 
 	# The grimy picture, as it came out of the water — see the note at the top of the file.
 	var region := Rect2()

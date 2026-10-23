@@ -47,6 +47,34 @@ const ROOM_WIDE := 0.46
 const ROOM_TALL := 0.7
 const ZOOM_LEAST := 2
 const ZOOM_MOST := 14
+## The stand under the tray in a portrait canvas (`WashRoom.stacked`, the vertical gameplay
+## short, 2026-10-23): the whole width to fit a find into, a shorter room so the tallest find
+## clears the tray, and the pallet's foot `STACK_GROUND` down, over a phone's bottom quarter.
+## Set by `tools/play_video.gd`; nothing in the game does.
+static var stacked := false
+const STACK_WIDE := 0.86
+const STACK_TALL := 0.42
+const STACK_GROUND := 0.72
+## The clean figure left undrawn: the same short has no writing over the play.
+static var quiet := false
+
+
+func _room_wide() -> float:
+	return STACK_WIDE if stacked else ROOM_WIDE
+
+
+func _room_tall() -> float:
+	return STACK_TALL if stacked else ROOM_TALL
+
+
+## Where the pallet's foot is, and where the drops splat, as shares of the height: the floor
+## keeps its distance in front of the pallet when the stand is moved up.
+func _ground() -> float:
+	return STACK_GROUND if stacked else PALLET_GROUND
+
+
+func _floor_at() -> float:
+	return _ground() + FLOOR_AT - PALLET_GROUND
 
 ## The jet, in painted pixels and grime a second. At the middle of the jet the thickest coat
 ## there is comes off in under half a second; at its edge, not at all.
@@ -728,7 +756,7 @@ func _fit() -> void:
 	_build_pallet()
 	_pallet_at = Vector2(
 		round(_mid() - _pallet_size.x * zoom * 0.5),
-		round(size.y * PALLET_GROUND - _pallet_size.y * zoom)
+		round(size.y * _ground() - _pallet_size.y * zoom)
 	)
 	_origin = Vector2(
 		round(_mid() - wide * zoom * 0.5),
@@ -765,7 +793,7 @@ func _zoom_for_all() -> int:
 		if view.x <= 0.0 or view.y <= 0.0:
 			continue
 		_widest = maxf(_widest, view.x)
-		fit = minf(fit, minf(size.x * ROOM_WIDE / view.x, size.y * ROOM_TALL / view.y))
+		fit = minf(fit, minf(size.x * _room_wide() / view.x, size.y * _room_tall() / view.y))
 	if fit == INF:
 		fit = ZOOM_LEAST
 	var zoom := int(floor(fit))
@@ -1212,7 +1240,7 @@ func _drive_finish(delta: float) -> void:
 # --- Drawing -----------------------------------------------------------------------------
 
 func _draw() -> void:
-	var floor_y := size.y * FLOOR_AT
+	var floor_y := size.y * _floor_at()
 	if bare_room:
 		draw_rect(Rect2(Vector2.ZERO, size), WALL)
 		draw_rect(Rect2(0.0, floor_y, size.x, size.y - floor_y), FLOOR)
@@ -1233,7 +1261,8 @@ func _draw() -> void:
 	_draw_impact()
 	_draw_flecks()
 	_draw_stars()
-	_draw_clean_figure()
+	if not quiet:
+		_draw_clean_figure()
 	_draw_nozzle()
 	# Over the nozzle, not under it (2026-10-02, Richard: the water came from underneath the
 	# tip): drawn first, the brass hid the stream's start and it showed below the bore.
