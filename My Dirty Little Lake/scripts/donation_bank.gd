@@ -25,6 +25,11 @@ const GOAL := 5000000
 ## real purse never meets it.
 const MOST := 1000000
 const SECTION := "donation"
+## Whether a player can reach the bank: the menu's plank and the farewell's door. **False for
+## 1.0** (2026-10-23, Richard): TNC Brasil has not yet said the game may use its name, and the
+## legal check is not done. The ledger, the board and the Steam side all still work and stay
+## tested, so turning this on is the whole of bringing the bank back in a patch.
+const OPEN := false
 
 ## This account's gift, 0 while none has been made.
 var given: int = 0

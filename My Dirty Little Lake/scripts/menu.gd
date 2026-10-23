@@ -177,7 +177,7 @@ func _ready() -> void:
 		_wish.pulse = 0.5
 		_wish.pressed.connect(_take.bind(&"wishlist"))
 		add_child(_wish)
-	else:
+	elif DonationBank.OPEN:
 		_bank_plank = PlankButton.new()
 		_bank_plank.name = &"Bank"
 		_bank_plank.label = Text.BANK_TITLE

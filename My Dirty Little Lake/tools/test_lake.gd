@@ -6300,6 +6300,9 @@ func _stage_ending() -> void:
 	_check(ending != null and ending.get_child_count() >= 0
 		and not CreditsBoard.LINES.is_empty(),
 		"off the credits board's own words", "%d" % CreditsBoard.LINES.size())
+	_check(ending != null and ending.bank == DonationBank.OPEN,
+		"the farewell offers the Donation Bank only while it is open (off for 1.0)",
+		str(ending.bank if ending != null else null))
 	_check_credits()
 	_check_reel(ending)
 	_check(_main.call(&"_last_pieces_line") == "",
@@ -14253,6 +14256,9 @@ func _check_pad_focus(pad: Node) -> void:
 	_check(not version.is_empty() and version != "0.1.0" and stamp.begins_with("v" + version)
 		and stamp.ends_with("-demo") == Demo.on(),
 		"the menu carries the build's version, marked in the demo", stamp)
+	var bank_shown := DonationBank.OPEN and not Demo.on()
+	_check((menu.bank_board() != null) == bank_shown and menu.has_node(^"Bank") == bank_shown,
+		"the menu shows the Donation Bank only while it is open (off for 1.0)", "")
 	_check(pad.call(&"focus_owner") == menu, "the menu is the board the stick picks on", "")
 	var confirm: MenuConfirm = menu.get_node(^"Confirm")
 	confirm.visible = true

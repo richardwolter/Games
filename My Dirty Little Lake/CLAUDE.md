@@ -7707,6 +7707,10 @@ lake's "The Donation Bank" section.
   back-translations (`tools/l10n_bank_rows.py` appended them). `BANK_CHARITY` is the charity's
   own name in every language: **swap it for a generic one if TNC Brasil does not agree to be
   named**.
+- **Hidden in 1.0** (2026-10-23, Richard, release plan): `DonationBank.OPEN` false, so the
+  menu has no plank and the farewell no door. The ledger, the board, the lake's `donate` and
+  the Steam side are untouched and still tested. Turn the flag on in a patch once TNC agrees
+  and the legal check is done. `test_lake` guards that the menu and the farewell follow the flag.
 - **Open**: TNC Brasil's permission to use its name, the legal check before the store page
   says it (draft paragraph in `docs/steam/donation_bank.md`, **not on the store**), and
   publishing the two stats on Steamworks. The GodotSteam calls were checked by name against the

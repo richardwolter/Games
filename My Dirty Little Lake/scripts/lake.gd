@@ -4043,9 +4043,11 @@ func _show_farewell() -> void:
 	else:
 		# The ending filmed (2026-10-12): the full game's only.
 		_farewell.reel_of = self
-		# The Donation Bank's door beside the menu's (2026-10-22).
-		_farewell.bank = true
-		_farewell.bank_asked.connect(_open_bank)
+		# The Donation Bank's door beside the menu's (2026-10-22), hidden while
+		# `DonationBank.OPEN` is off.
+		if DonationBank.OPEN:
+			_farewell.bank = true
+			_farewell.bank_asked.connect(_open_bank)
 	# The cleaned lake is the end of the game, so the credits roll under the words
 	# (2026-09-16).
 	_farewell.roll_credits()
