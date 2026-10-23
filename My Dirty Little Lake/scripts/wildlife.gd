@@ -1631,6 +1631,11 @@ const PEACOCK_STEP_PX := 3.0
 const PATROL_REACH := Vector2i(4, 18)
 const PATROL_STRIDE := 2
 const PATROL_INLAND := 1.2
+## **Half grass, half beach** (2026-10-23, `/grill-me` with Richard: they "just want to be close
+## to the lake, they should roam around on forest grass more"): patrols take turns, one along
+## the beach as above, the next along the grass between the beach and the trees, each
+## waypoint `PATROL_GRASS` tiles past the lawn's line (out to the woods' edge).
+const PATROL_GRASS := Vector2(1.0, 7.0)
 ## A snake keeps to `SNAKE_RANGE` tiles of its spot, and a fright sends it `SNAKE_AWAY` tiles.
 const SNAKE_RANGE := 1.6
 const SNAKE_AWAY := Vector2(1.4, 2.4)
@@ -2101,7 +2106,8 @@ func _land_choose(c: Dictionary) -> void:
 				# Grazing along the grass, pulled back towards home.
 				to = at + along * _rng.randf_range(LAND_WANDER.x, LAND_WANDER.y) + (home - at) * 0.4
 		&"fox", &"wolf":
-			c["path"] = _patrol(c)
+			c["patrol_grass"] = not bool(c.get("patrol_grass", _rng.randf() < 0.5))
+			c["path"] = _patrol(c, bool(c["patrol_grass"]))
 			to = c["path"].pop_front() if not c["path"].is_empty() else at
 		&"snake":
 			var mid: Vector2 = home
@@ -2425,8 +2431,9 @@ var _bank_ring: Array = []
 
 
 ## A patrol from where this one stands, along the ring of bank spots, a waypoint every
-## `PATROL_STRIDE` spots, each pulled a little way up the beach.
-func _patrol(c: Dictionary) -> Array:
+## `PATROL_STRIDE` spots, each pulled a little way up the beach, or with `grass` out onto the
+## grass towards the trees (`PATROL_GRASS`), a few tries a waypoint to miss a trunk.
+func _patrol(c: Dictionary, grass: bool = false) -> Array:
 	if _bank_ring.is_empty():
 		return []
 	var at: Vector2 = c["at"]
@@ -2447,8 +2454,18 @@ func _patrol(c: Dictionary) -> Array:
 		if not _shore_clean(spot):
 			break
 		var inland := -(spot["normal"] as Vector2)
-		var p := _inland_to(spot["land"], inland, _rng.randf_range(0.6, PATROL_INLAND))
-		if _blocked(c, p):
+		var p := Vector2.INF
+		if grass:
+			for attempt in 4:
+				var q := _to_grass(spot["land"], inland, _rng.randf_range(PATROL_GRASS.x, PATROL_GRASS.y))
+				if _on_bank(q) and not _blocked(c, q):
+					p = q
+					break
+		else:
+			p = _inland_to(spot["land"], inland, _rng.randf_range(0.6, PATROL_INLAND))
+			if _blocked(c, p):
+				p = Vector2.INF
+		if not p.is_finite():
 			break
 		out.append(p)
 	return out

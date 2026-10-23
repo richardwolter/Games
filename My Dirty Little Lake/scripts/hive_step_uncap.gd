@@ -413,8 +413,9 @@ func _process(delta: float) -> void:
 				_bob = 0.0
 				_settle = 0.0
 		Phase.SWEEP:
+			# The knife stays where the cut ended, at the comb's foot, while the honey runs
+			# (2026-10-23, Richard: it "shouldn't disappear").
 			_clock += delta
-			_knife_alpha = maxf(_knife_alpha - delta / KNIFE_OUT, 0.0)
 			_drive_sweep()
 			# Done once the sweep has run and nearly all the honey is in the bucket, or a
 			# while after, whichever is first: the last drips are not waited on.
@@ -423,7 +424,7 @@ func _process(delta: float) -> void:
 				_phase = Phase.DONE
 				done_once()
 		Phase.DONE:
-			_knife_alpha = maxf(_knife_alpha - delta / KNIFE_OUT, 0.0)
+			pass
 	_was_down = down
 	_drive_settle(delta)
 	_drive_honey(delta)
@@ -1215,6 +1216,11 @@ const TIP_SWELL := 0.3
 const SINK := 2.0
 const FLARE := 4.0
 const FLARE_WIDE := 5.0
+## Where a fed curtain leaves the comb (or the blade) it spreads into it the same way, over its
+## first `TOP_FLARE` rows and `TOP_FLARE_WIDE` px wider, in the honey's top colours with no dark
+## edge (2026-10-23, Richard: the seams at the comb's foot were "too visible").
+const TOP_FLARE := 4.0
+const TOP_FLARE_WIDE := 6.0
 const POOL_FLARE := 3.0
 const POOL_FLARE_WIDE := 4.0
 ## The channel: honey runs down it at `RUN_BASE` plus `RUN_DEEP` a pixel of depth, and spreads a
@@ -2085,7 +2091,12 @@ func _curtain(
 		var left := end - float(yy)
 		if at_floor and left <= FLARE:
 			var u := 1.0 - left / FLARE
-			_soft_row(cx, yy, w + u * u * FLARE_WIDE)
+			_join_row(cx, yy, w + u * u * FLARE_WIDE, u)
+			continue
+		var down := float(yy) - y0
+		if not necking and down < TOP_FLARE:
+			var v := 1.0 - down / TOP_FLARE
+			_join_row(cx, yy, w + v * v * TOP_FLARE_WIDE, v)
 			continue
 		if not at_floor and left <= tip and end - y0 > tip:
 			w = _tip_width(w, 1.0 - left / tip)
@@ -2100,6 +2111,28 @@ static func _tip_width(w: float, u: float) -> float:
 	var swell := 1.0 + TIP_SWELL * sin(minf(u / 0.6, 1.0) * PI * 0.5)
 	var round := 1.0 if u < 0.55 else sqrt(maxf(1.0 - pow((u - 0.55) / 0.45, 2.0), 0.0))
 	return maxf(w * swell * round, 1.0)
+
+
+## A row of a curtain where it meets other honey (the flume's below, the comb's above), `u` 0
+## on the curtain's side of the join to 1 on the other's: the curtain's own bands with its dark
+## edge turned to the body's colour, going over into `_soft_row` past the middle of the join,
+## so neither a pale band nor the curtain's dark outline marks where one ends (2026-10-23,
+## Richard: the seams were "too visible").
+func _join_row(cx: float, y: float, w: float, u: float) -> void:
+	if u >= 0.55:
+		_soft_row(cx, y, w)
+		return
+	var l := roundf(cx - w * 0.5)
+	var r := roundf(cx + w * 0.5)
+	var span := r - l
+	if span < 1.0:
+		_box(Vector2(l, y), Vector2.ONE, HiveArt.HONEY)
+		return
+	_box(Vector2(l, y), Vector2(span + 1.0, 1.0), HiveArt.HONEY)
+	if u < 0.3:
+		_box(Vector2(l, y), Vector2(maxf(ceilf(span * 0.22), 1.0), 1.0), HiveArt.HONEY_MID)
+	_box(Vector2(l + ceilf(span * 0.28), y), Vector2(maxf(ceilf(span * 0.17), 1.0), 1.0), HiveArt.HONEY_SHINE)
+	_box(Vector2(l + ceilf(span * 0.45), y), Vector2(maxf(ceilf(span * 0.15), 1.0), 1.0), HiveArt.HONEY_LIGHT)
 
 
 ## A row of a curtain where it sinks into the honey: the honey's own top colours, light across

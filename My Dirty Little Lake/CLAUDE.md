@@ -5303,7 +5303,8 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   the first clean shore, and 2 on the island's lawn from 70% cleaned (`ISLE_BUNNY_FROM`);
   fox 5 and wolf 5 from 40% (`CANID_FROM`, was 60% for the fox), each new one on the clean
   bank spot furthest from the others (`_spread_spot`), patrolling along the beach a waypoint
-  every `PATROL_STRIDE` shore spots so it never cuts across the water; snakes 8 on the bank (on its grass since 2026-10-06, see Wildlife Sizes below) from the first clean shore, **never the island** (Richard:
+  every `PATROL_STRIDE` shore spots so it never cuts across the water (and the grass by turns
+  since 2026-10-23, see Seven Fixes in the House, the Hive and the Lake); snakes 8 on the bank (on its grass since 2026-10-06, see Wildlife Sizes below) from the first clean shore, **never the island** (Richard:
   "no snake on main isle"); capybaras 3 pairs from 50% (`CAPY_FROM`); the
   peacock 1 from 80% (`PEACOCK_FROM`), on the island's lawn in front of the hut
   (`_peacock_spots`).
@@ -5537,7 +5538,8 @@ over four passes off `tools/lakebed_mockup.py` (`tools/last_lakebed_mockup.png`)
   back): a plant or shell shows once the growth passes its rank. Rocks and branches are there
   from the start.
 - **The sky's cloud reflections keep off the two shallow bands** (`sky_over_bed`): laid over the
-  bed they read as holes cut in the picture. Glints and the finished sparkle lift the bed's
+  bed they read as holes cut in the picture (the shallowest band only since 2026-10-23, see
+  Seven Fixes in the House, the Hive and the Lake). Glints and the finished sparkle lift the bed's
   colour towards the light step where they fire.
 - **Cost**: `bench_frames` `BENCH_CLEAN=1` 7.2 ms without the bed, 7.3-7.5 with it.
 - **Fish are seen, not only shadows** (same day; `tools/build_fish.py`, `assets/fish.png`,
@@ -8369,7 +8371,7 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
 - **Idle life**: a breath every `BREATH`; lying, Zs and shut eyes after `SLEEP_AFTER`
   (1.5 s since 2026-10-12, Richard; was 6).
 - **Dogs**: on the sofa and the bed a dog already lying there stays, **in the middle**
-  (moved over to the free half it lay on the sofa's arm, Richard); on the armchair and chair (`SEAT_FOR_ONE`) it hops
+  (moved over to the free half it lay on the sofa's arm, Richard); on the armchair and chair (`SEAT_FOR_ONE`; the armchairs share since 2026-10-23) it hops
   off. A dog with nowhere to lie climbs up on a free seat of the piece at `JOIN_ODDS`. **The
   dogs' seats went up a little** (Richard, same day): sofa cushion 4 to 6, armchair 3 to 5,
   bed 21 to 24, in `decor_sets.json` and `pieces.json` by hand (the builder was not run).
@@ -8434,7 +8436,8 @@ and "get-up frames" out of scope.
   `_draw_seated`, `_over_rects`, `_posts_of` (columns that reach the view's bottom rows).
 - **Middle of the sofa on every face**; a dog already on a sofa's front lies across his lap,
   drawn over him, its feet `LAP_BELOW` figure px under the spot (`_draw_dog`). Everywhere else a
-  dog hops off, as before.
+  dog hops off, as before (superseded 2026-10-23 for the armchairs and the bar stool, see Seven
+  Fixes in the House, the Hive and the Lake).
 - **Sit-down and stand-up**: the `sitdown_*` frame for `SIT_DOWN` (0.14 s) at each end,
   `SIT_DROP` px low; getting up holds the player still for it (`_rise_left`).
 - **Known**: from the front a small chair is half his width and hides behind him.
@@ -8443,6 +8446,47 @@ and "get-up frames" out of scope.
   `tools/last_rest_<seat>_<kind>.png`. `test_lake`'s `_check_shed_rest` guards the strips and
   anchors, every pack face being a seat with its spot on the picture, the side facing, and the
   get-up frame holding the player.
+
+### Seven Fixes in the House, the Hive and the Lake (2026-10-23, `/grill-me` with Richard)
+- **The record player takes E first** (`ShedRoom._record_near`): within `REACH` of it, E opens
+  its menu, ahead of the piece it stands on, a seat beside it, a dog or the door, and the key
+  chip and the pointing hands follow. To open the drawer under it, move it off.
+  **Supersedes "nearest wins"** (2026-09-28) for the record player.
+- **Click to walk in the house** (`walk_to_click`, `_mouse_press`, `_you_path`): a mouse click
+  on bare floor walks the player there round the furniture, on the dogs' path grid (`_route`,
+  pulled straight like a dog's); a click inside a base walks to the nearest floor beside it
+  (`_nearest_standing`, `CLICK_NEAREST`). A press on a piece still lifts it, **except a rug**:
+  a click on a rug walks, a press moved `RUG_DRAG` (5) px lifts it. The walk keys take over at
+  once, a click while sitting or lying gets up first, a walk that makes no ground for
+  `CLICK_STUCK` (0.6 s) is given up. Mouse only; the pad is unchanged.
+- **The fire moves** (`_fire_frames`, `_draw_fire`, `_tick_fire`, `fire_breath`): off the lit
+  fireplace's own flame pixels, worked out once, `FIRE_FRAMES` (8) frames in which each flame
+  pixel steps a tone up or down `FIRE_RAMP` and each column's tip rises or falls a pixel, shown
+  at `FIRE_FPS` (8) in a rolled order; an ember (`FIRE_SPARK_ODDS` a step) pops off a tip and
+  rises a pixel or two inside the hearth; the pool of light breathes `FIRE_FLICKER` (0.16) of
+  its power and `FIRE_SWAY` of its reach. Any piece whose light is `fire`.
+- **A dog lies across the lap on the armchairs and the bar stool too** (`SEAT_FOR_ONE` is the
+  plain chairs now, which offer a dog no seat): a dog on one stays when the player sits, and a
+  dog with nowhere to lie may climb on (`JOIN_ODDS`). The bar stool is `decor_pk_diner_seat`.
+- **The uncapping knife stays on the comb** (`HiveStepUncap`, the sweep and done phases no
+  longer fade `_knife_alpha`): it rests at the comb's foot while the honey runs.
+  **The curtains join the honey with no seam** (`_join_row`, `TOP_FLARE`, `TOP_FLARE_WIDE`): at
+  both ends, where a curtain leaves the blade or comb and where it sinks into the flume, its
+  rows keep its own bands with the dark edge turned to the body's colour and go over into the
+  pale soft rows past the middle of the join. It was a pale band under a dark-edged sheet.
+- **Clouds on the water reach the middle bed band** (`water.gdshader`, `sky_over_bed` now asks
+  `bed_bands.x`): held off both shallow bands, they showed only in the deep ring round the
+  island. Only the shallowest band, a thin strip along both shores, stays clear.
+  **Supersedes** "keep off the two shallow bands" (The Lakebed Through Clean Water).
+- **Foxes and wolves patrol grass and beach by turns** (`_patrol(c, grass)`, `PATROL_GRASS`
+  1-7 tiles past the lawn's line, `patrol_grass` flipped each patrol): one patrol along the
+  beach as before, the next along the grass between the beach and the trees, a few tries a
+  waypoint to miss a trunk. Their inland trips are unchanged.
+- All numbers first guesses. `test_lake`'s `_check_oct23_shed` guards the record over the
+  nightstand, a click walk round a sofa never through it, the rug's click and drag, the fire's
+  frames and breathing light; `_check_shed_rest` the lap seats; the uncap stage the knife;
+  `_check_lakebed` the cloud band; `_check_land_animals` the two patrols and their turns.
+  Probe: `tools/shot_hive_kitchen.tscn` (the knife and the joins).
 
 ### The Shed's Cues (2026-10-02, `/grill-me` with Richard)
 A carried piece says it can turn, and a switch nobody has tried points at itself.

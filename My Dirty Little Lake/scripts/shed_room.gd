@@ -330,10 +330,11 @@ const SIT_DROP := 2.0
 const LAP_BELOW := 3.0
 ## Pieces a dog and the player cannot share: a dog lying on one hops off when the player sits.
 ## The sofa and the bed are shared, and the dog keeps to the middle of either: moved over on
-## the sofa it lay on the arm (Richard, 2026-09-29: "just middle").
-const SEAT_FOR_ONE := [&"decor_loveseat", &"decor_dining_chair", &"decor_pk_armchair",
-	&"decor_pk_old_seat", &"decor_pk_chair", &"decor_pk_diner_chair", &"decor_pk_green_chair",
-	&"decor_pk_wood_chair", &"decor_pk_carved_chair", &"decor_pk_diner_seat"]
+## the sofa it lay on the arm (Richard, 2026-09-29: "just middle"). The armchairs and the bar
+## stool are shared too since 2026-10-23 (`/grill-me` with Richard): a dog on one lies across
+## the lap, as on the sofa. Only the plain chairs are for one, and they offer a dog no seat.
+const SEAT_FOR_ONE := [&"decor_dining_chair", &"decor_pk_chair", &"decor_pk_diner_chair",
+	&"decor_pk_green_chair", &"decor_pk_wood_chair", &"decor_pk_carved_chair"]
 ## How many books `tools/build_rest_frames.py` draws on the reading strip, two frames each.
 const BOOKS := 5
 ## Pieces that stand on the floor and block nothing, besides the flats and the pet bed: a
@@ -372,6 +373,22 @@ const LAMPS_MOST := 8
 const FIRE_REACH := 9.0
 const FIRE_POWER := 0.34
 const FIRE_TONE := Color(1.0, 0.55, 0.2)
+## **The fire moves** (2026-10-23, `/grill-me` with Richard: "should move a bit, to make it
+## more alive"). Worked out by rule off the lit picture's own flame pixels, once
+## (`_fire_frames`): `FIRE_FRAMES` frames in which each flame pixel steps a tone up or down
+## `FIRE_RAMP` and each column's tip rises or falls a pixel, shown at `FIRE_FPS` in an order
+## rolled off the step, so it has no loop to see. An ember now and then (`FIRE_SPARK_ODDS` a
+## step) pops off a tip and rises a pixel or two inside the hearth. The pool it throws
+## breathes with it, `FIRE_FLICKER` of its power and `FIRE_SWAY` of its reach. First guesses.
+const FIRE_FPS := 8.0
+const FIRE_FRAMES := 8
+const FIRE_FLICKER := 0.16
+const FIRE_SWAY := 0.05
+const FIRE_SPARK_ODDS := 0.14
+const FIRE_RAMP: Array[Color] = [
+	Color8(120, 14, 0), Color8(244, 57, 1), Color8(255, 130, 1), Color8(255, 167, 1),
+	Color8(255, 210, 92),
+]
 const FRIDGE_REACH := 4.5
 const FRIDGE_POWER := 0.14
 const FRIDGE_TONE := Color(0.86, 0.93, 1.0)
@@ -612,6 +629,18 @@ const YOU_STEP := 0.5
 const YOU_SPEED := 7.7
 const YOU_RUN_FRAME := 0.04
 const YOU_STEP_MOST := 0.7
+
+## **Click to walk** (2026-10-23, `/grill-me` with Richard): a click on bare floor walks the
+## player there round the furniture, on the dogs' own path grid (`_route`). A press on a piece
+## still picks it up, except a rug: a click on a rug walks too, and only a press moved
+## `RUG_DRAG` screen pixels lifts it, since rugs cover much of the floor a player walks on.
+## The walk keys take over at once; a click while sitting or lying gets up first. A walk that
+## makes no ground for `CLICK_STUCK` seconds (a dog in the only gap) is given up. Mouse only:
+## the pad is unchanged.
+const RUG_DRAG := 5.0
+const CLICK_STUCK := 0.6
+## How far round a click inside furniture to look for floor to walk to, in cells.
+const CLICK_NEAREST := 6.0
 
 ## How far the player stands in front of the door when the room opens, in cells. Just onto
 ## the floor: they have come through it, not out of the wall.
@@ -1079,6 +1108,7 @@ func _process(delta: float) -> void:
 	_walk_you(delta)
 	_you_walk = _you_at - you_was
 	_tick_pick_chip(delta)
+	_tick_fire(delta)
 	_tick_house(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
@@ -1092,6 +1122,14 @@ func _process(delta: float) -> void:
 ## How far the player moved this frame, in cells: which way they are walking when a dog is
 ## in the way (`_give_way`).
 var _you_walk := Vector2.ZERO
+## The way a click is walking the player, in cells, the clicked spot last; empty when no
+## click walk is under way. And how long it has made no ground.
+var _you_path: Array[Vector2] = []
+var _you_path_stuck := 0.0
+## A press on a rug, waiting to be a click (walk) or a drag (lift): the rug's index into
+## `decor` and where the press was, or -1.
+var _rug_pressed := -1
+var _rug_from := Vector2.ZERO
 
 
 ## A dog the player is walking at steps aside: sideways off their walk, onto floor it may stand
@@ -1330,16 +1368,79 @@ func _walk_you(delta: float) -> void:
 		Input.get_axis(&"walk_left", &"walk_right"),
 		Input.get_axis(&"walk_up", &"walk_down")
 	)
+	# The keys take over from a click walk at once.
+	if push != Vector2.ZERO or not carrying.is_empty():
+		_you_path.clear()
+	var most := INF
+	if push == Vector2.ZERO and not _you_path.is_empty():
+		# Pulled straight like a dog's: skip a corner whenever the next point is in plain sight.
+		while _you_path.size() > 1 and _line_clear(_you_at, _you_path[1], {}, true):
+			_you_path.remove_at(0)
+		var gap := _you_path[0] - _you_at
+		if gap.length() <= 0.12:
+			_you_path.remove_at(0)
+			if not _you_path.is_empty():
+				gap = _you_path[0] - _you_at
+		if not _you_path.is_empty():
+			push = gap
+			most = gap.length()
 	if push == Vector2.ZERO or not carrying.is_empty():
 		_you_step = 0.0
 		return
 	_you_step += delta
 	_you_facing = push.normalized()
-	var step := push.normalized() * minf(YOU_SPEED * delta, YOU_STEP_MOST)
+	var step := push.normalized() * minf(minf(YOU_SPEED * delta, YOU_STEP_MOST), most)
 	var from := _you_at
 	_you_at = _slid(_you_at, step, _you_may_stand)
 	var moved := _you_at.distance_to(from)
 	_you_stride += delta if moved < step.length() * 0.5 else moved / YOU_SPEED
+	if most < INF:
+		_you_path_stuck = _you_path_stuck + delta if moved < step.length() * 0.25 else 0.0
+		if _you_path_stuck >= CLICK_STUCK:
+			_you_path.clear()
+			_you_path_stuck = 0.0
+
+
+## A click on the floor at `where` (this control's pixels): walk there round the furniture.
+## A click inside a piece's base walks to the nearest floor beside it; one nothing leads to
+## does nothing.
+func walk_to_click(where: Vector2) -> void:
+	var cells := (where - _floor_origin()) / maxf(float(CELL) * _zoom(), 0.001)
+	var keep := _feet_keep()
+	cells.x = clampf(cells.x, keep.x, float(COLS) - keep.z)
+	cells.y = clampf(cells.y, keep.y, float(ROWS) - keep.w)
+	var goal := _nearest_standing(cells)
+	if not goal.is_finite():
+		return
+	if not _rest_key.is_empty():
+		stand_up()
+	var way := _route(_you_at, goal)
+	_you_path = way
+	_you_path_stuck = 0.0
+
+
+## The nearest spot a walker may stand on to `at`, in cells, looked for in rings out to
+## `CLICK_NEAREST`; `Vector2.INF` when there is none.
+func _nearest_standing(at: Vector2) -> Vector2:
+	if _dog_may_stand(at):
+		return at
+	var ring := 0.25
+	while ring <= CLICK_NEAREST:
+		var best := Vector2.INF
+		var turns := maxi(8, ceili(TAU * ring / 0.25))
+		for k in turns:
+			var spot := at + Vector2.from_angle(TAU * float(k) / float(turns)) * ring
+			if _dog_may_stand(spot) and (not best.is_finite() or spot.distance_to(at) < best.distance_to(at)):
+				best = spot
+		if best.is_finite():
+			return best
+		ring += 0.25
+	return Vector2.INF
+
+
+## Whether a click walk is under way (for the harness).
+func click_walking() -> bool:
+	return not _you_path.is_empty()
 
 
 ## With a piece in hand on a pad, the left stick moves it (Richard, 2026-09-14). It walks the
@@ -1544,7 +1645,7 @@ func _dog_think(dog: ShedDog) -> void:
 		# the animal mooch about beside it half the afternoon. If there is somewhere to lie,
 		# the dog lies on it; the mooching is what a dog with no seat left gets.
 		var seat := _seat_point(dog.seat)
-		if dog.at.distance_to(seat) <= 0.6:
+		if dog.at.distance_to(seat) <= SEATED_NEAR:
 			dog.state = &"sleep"
 			dog.mood = DOG_BED_SLEEP
 		else:
@@ -1565,6 +1666,20 @@ func _dog_think(dog: ShedDog) -> void:
 		dog.state = &"sleep"
 	else:
 		dog.state = &"sit" if DogArt.has(&"sit", dog.breed) else &"idle"
+
+
+## How near its seat's spot a dog has to be to be lying on it, in cells.
+const SEATED_NEAR := 0.6
+
+
+## Whether a dog is lying on the seat `key`, not just holding it: a dog holds a seat from the
+## moment it sets off for it. Asked before the dog is drawn across the lap of a player sitting
+## there and sorted over them (2026-10-23, Richard: sat on while a dog was still on its way,
+## it jumped onto the lap and walked over the piece).
+func _dog_lies_on(dog: ShedDog, key: String) -> bool:
+	if key.is_empty() or dog.seat != key or dog.state == &"walk" or dog.state == &"walk2":
+		return false
+	return dog.at.distance_to(_seat_point(key)) <= SEATED_NEAR
 
 
 ## The clock a shed dog's picture steps on: the walk's own ground for a walking dog, its age
@@ -2127,7 +2242,7 @@ func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 	var at := floor_box.position + dog.at * float(step)
 	# Lying across the lap of a player sitting on its seat: on his thighs, over him, not on
 	# the seat's front at his feet (2026-10-22, Richard).
-	if _rest_kind == &"front" and dog.seat == _rest_key and not _rest_key.is_empty():
+	if _rest_kind == &"front" and _dog_lies_on(dog, _rest_key):
 		var spot := _seat_spot(floor_box)
 		if spot.is_finite():
 			var tall := YOU_TALL * float(CELL) * _zoom()
@@ -2400,7 +2515,9 @@ func hand_rows() -> Array[int]:
 	var out: Array[int] = []
 	if sheets == null or not carrying.is_empty() or record_up():
 		return out
-	var near := _switch_near()
+	var near := _record_near()
+	if near < 0:
+		near = _switch_near()
 	for i in decor.size():
 		if i == near:
 			continue
@@ -2494,6 +2611,25 @@ func _switch_near() -> int:
 	return best
 
 
+## The record player the player is in E's reach of, nearest first, or -1. It comes before
+## everything else E could use (2026-10-23, `/grill-me` with Richard): it is small and stands
+## on other furniture, and measured from its foot it lost to the desk under it, whose foot is
+## nearer the player. To work the piece underneath, the record player is moved off it.
+func _record_near() -> int:
+	if sheets == null:
+		return -1
+	var best := -1
+	var best_gap := REACH
+	for i in decor.size():
+		if StringName(decor[i]["piece"]) != RECORD_PIECE:
+			continue
+		var gap := _you_at.distance_to(_switch_middle(i))
+		if gap < best_gap:
+			best_gap = gap
+			best = i
+	return best
+
+
 ## Switch the piece the player is standing at: light the fire, open the fridge. What E does.
 ##
 ## The footprint is left alone on purpose. Both state sets are drawn the same size in both
@@ -2530,6 +2666,10 @@ func switch_near() -> bool:
 		return true
 	if not _rest_key.is_empty():
 		stand_up()
+		return true
+	var record := _record_near()
+	if record >= 0:
+		_open_record(record)
 		return true
 	var at := _switch_near()
 	var dog := _dog_near()
@@ -2616,6 +2756,155 @@ func _fire_lit() -> bool:
 	return false
 
 
+## The fire's clock, its step at `FIRE_FPS`, the frames worked out per lit picture
+## ("piece:view" -> {"box": the hearth in the picture's pixels, "frames", "tops": each flame
+## column's tip}) and the embers in the air (row key -> [[x, y, steps left], ...], picture px).
+var _fire_clock := 0.0
+var _fire_step := -1
+var _fire_art := {}
+var _fire_sparks := {}
+
+
+## A placed piece's key, the one the seats use: the piece and the spot it stands on.
+func _row_key(row: Dictionary) -> String:
+	return "%s@%d,%d" % [String(row["piece"]), int(row["cell"][0]), int(row["cell"][1])]
+
+
+## How the fire is drawing this moment, -1..1, stepped with the flames: what its pool of light
+## breathes by. Each hearth on its own phase.
+func fire_breath(key: String) -> float:
+	var t := floorf(_fire_clock * FIRE_FPS) / FIRE_FPS + float(hash(key) % 997) * 0.37
+	return clampf(sin(t * 7.1) * 0.5 + sin(t * 12.9 + 1.3) * 0.3 + sin(t * 21.7 + 2.9) * 0.2, -1.0, 1.0)
+
+
+## The fire's step: a new frame each step, and the embers rise or go.
+func _tick_fire(delta: float) -> void:
+	_fire_clock += delta
+	var step := int(floorf(_fire_clock * FIRE_FPS))
+	if step == _fire_step:
+		return
+	_fire_step = step
+	var lit := {}
+	if sheets != null:
+		for row: Dictionary in decor:
+			var piece := StringName(row["piece"])
+			if sheets.light_of(piece) != &"fire" or not sheets.is_on(piece, _row_view(row)):
+				continue
+			var key := _row_key(row)
+			lit[key] = true
+			var art := _fire_frames(piece, _row_view(row))
+			if art.is_empty():
+				continue
+			var sparks: Array = _fire_sparks.get(key, [])
+			for spark: Array in sparks:
+				spark[1] = int(spark[1]) - 1
+				spark[2] = int(spark[2]) - 1
+			var box: Rect2i = art["box"]
+			sparks = sparks.filter(func(s: Array) -> bool: return int(s[2]) > 0 and int(s[1]) >= box.position.y)
+			var tops: Array = art["tops"]
+			if not tops.is_empty() and randf() < FIRE_SPARK_ODDS:
+				var tip: Vector2i = tops[randi() % tops.size()]
+				sparks.append([tip.x, tip.y - 1, randi_range(1, 3)])
+			_fire_sparks[key] = sparks
+	for key: String in _fire_sparks.keys():
+		if not lit.has(key):
+			_fire_sparks.erase(key)
+
+
+## The flames over a lit fireplace standing at `corner`: this step's frame over the hearth,
+## and its embers. Nothing for anything else.
+func _draw_fire(row: Dictionary, corner: Vector2, tint: Color) -> void:
+	if sheets == null:
+		return
+	var piece := StringName(row["piece"])
+	var view := _row_view(row)
+	if sheets.light_of(piece) != &"fire" or not sheets.is_on(piece, view):
+		return
+	var art := _fire_frames(piece, view)
+	if art.is_empty():
+		return
+	var frames: Array = art["frames"]
+	var box: Rect2i = art["box"]
+	var key := _row_key(row)
+	var px := sheets.view_size_of(piece, view).x / maxf(sheets.view_region_of(piece, view).size.x, 1.0) * _zoom()
+	var frame: Texture2D = frames[posmod(hash([_fire_step, key]), frames.size())]
+	draw_texture_rect(frame, Rect2(corner + Vector2(box.position) * px, Vector2(box.size) * px), false, tint)
+	for spark: Array in _fire_sparks.get(key, []):
+		var tone: Color = FIRE_RAMP[clampi(int(spark[2]) + 1, 1, 4)]
+		tone.a *= tint.a
+		draw_rect(Rect2(corner + Vector2(float(spark[0]), float(spark[1])) * px, Vector2(px, px)), tone)
+
+
+## The lit picture's flames as frames, worked out once: the flame pixels are the bright warm
+## ones, the hearth's back the dark reds round them, and the box both cover is what a frame
+## holds. Each frame steps every flame pixel a tone up or down the ramp now and then and moves
+## each column's tip up or down a pixel. Empty when the picture has no flames to move.
+func _fire_frames(piece: StringName, view: int) -> Dictionary:
+	var key := "%s:%d" % [piece, view]
+	if _fire_art.has(key):
+		return _fire_art[key]
+	var out := {}
+	_fire_art[key] = out
+	if sheets == null or sheets.atlas == null:
+		return out
+	var atlas := sheets.atlas.get_image()
+	if atlas == null:
+		return out
+	var art := atlas.get_region(Rect2i(sheets.view_region_of(piece, view)))
+	art.convert(Image.FORMAT_RGBA8)
+	var tone := {}
+	var back := {}
+	var lo := Vector2i(art.get_width(), art.get_height())
+	var hi := Vector2i(-1, -1)
+	for y in art.get_height():
+		for x in art.get_width():
+			var c := art.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			if c.r > 0.85 and c.b < 0.15 and c.g > 0.12:
+				tone[Vector2i(x, y)] = 3 if c.g > 0.6 else (2 if c.g > 0.42 else 1)
+			elif c.r > 0.15 and c.r < 0.5 and c.g < 0.05 and c.b < 0.05:
+				back[Vector2i(x, y)] = c
+			else:
+				continue
+			lo = Vector2i(mini(lo.x, x), mini(lo.y, y))
+			hi = Vector2i(maxi(hi.x, x), maxi(hi.y, y))
+	if tone.is_empty():
+		return out
+	var box := Rect2i(lo, hi - lo + Vector2i.ONE)
+	# Each flame column's tip, and the colour that stands above it.
+	var tips := {}
+	for at: Vector2i in tone:
+		if not tips.has(at.x) or at.y < (tips[at.x] as Vector2i).y:
+			tips[at.x] = at
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash(key)
+	var frames: Array[Texture2D] = []
+	for f in FIRE_FRAMES:
+		var image := art.get_region(box)
+		for at: Vector2i in tone:
+			var t := int(tone[at])
+			var r := roll.randf()
+			if r < 0.22:
+				t -= 1
+			elif r > 0.78:
+				t += 1
+			image.set_pixelv(at - lo, FIRE_RAMP[clampi(t, 1, 4 if int(tone[at]) == 3 else 3)])
+		for x: int in tips:
+			var tip: Vector2i = tips[x]
+			var r := roll.randf()
+			var above := tip + Vector2i(0, -1)
+			if r < 0.35 and back.has(above):
+				image.set_pixelv(above - lo, FIRE_RAMP[clampi(int(tone[tip]), 1, 3)])
+			elif r > 0.7 and tone.has(tip + Vector2i(0, 1)):
+				image.set_pixelv(tip - lo, back.get(above, FIRE_RAMP[0]))
+		frames.append(ImageTexture.create_from_image(image))
+	out["box"] = box
+	out["frames"] = frames
+	out["tops"] = tips.values()
+	return out
+
+
 ## Take a piece back off the floor and into the store.
 func take_back(index: int) -> void:
 	if index < 0 or index >= decor.size():
@@ -2664,6 +2953,12 @@ func _gui_input(event: InputEvent) -> void:
 	if motion != null:
 		var row_was := _hovered_row() if carrying.is_empty() else -1
 		_pointer = motion.position
+		# A press on a rug moved far enough is a drag: the rug comes up.
+		if _rug_pressed >= 0 and carrying.is_empty() and _pointer.distance_to(_rug_from) >= RUG_DRAG:
+			var rug := _rug_pressed
+			_rug_pressed = -1
+			if rug < decor.size():
+				_lift(rug)
 		if carrying.is_empty() and _hovered_row() >= 0 and _hovered_row() != row_was:
 			Sfx.ui(&"ui_hover")
 		if not carrying.is_empty():
@@ -2696,7 +2991,12 @@ func _gui_input(event: InputEvent) -> void:
 		if not carrying.is_empty():
 			_put_down()
 		else:
-			_pick_up()
+			_mouse_press()
+	elif _rug_pressed >= 0:
+		# Let go of a rug without moving: a click, and a click on a rug walks.
+		_rug_pressed = -1
+		if carrying.is_empty():
+			walk_to_click(_rug_from)
 	elif _carried_from == -1 and not carrying.is_empty() and not _over_room(_pointer):
 		# Let go of the button over the shelf itself, it stays in hand (2026-09-24, Richard:
 		# one click on a row should be enough): the next press puts it down. A drag out
@@ -2707,19 +3007,27 @@ func _gui_input(event: InputEvent) -> void:
 	queue_redraw()
 
 
+## The mouse's press with nothing in hand: a piece under it comes up, a row of the shelf comes
+## out, a rug waits to see whether this is a click or a drag, and bare floor is walked to.
+func _mouse_press() -> void:
+	var on_floor := _placed_at(_pointer)
+	if on_floor >= 0 and sheets != null and sheets.lies_flat(StringName(decor[on_floor]["piece"])):
+		_rug_pressed = on_floor
+		_rug_from = _pointer
+		return
+	if on_floor >= 0 or not _listed_at(_pointer).is_empty() or not _over_room(_pointer):
+		_pick_up()
+		return
+	walk_to_click(_pointer)
+
+
 ## Press: lift whatever is under the cursor, off the floor or out of the list.
 func _pick_up() -> void:
 	if not carrying.is_empty():
 		return
 	var on_floor := _placed_at(_pointer)
 	if on_floor >= 0:
-		var row: Dictionary = decor[on_floor]
-		carrying = StringName(row["piece"])
-		_carry_view = _row_view(row)
-		_carried_from = on_floor
-		decor.remove_at(on_floor)
-		changed.emit()
-		Sfx.ui(&"ui_click")
+		_lift(on_floor)
 		return
 	var from_list := _listed_at(_pointer)
 	if not from_list.is_empty():
@@ -2728,6 +3036,18 @@ func _pick_up() -> void:
 		# Out of the store it comes as drawn: front on, fire out, door shut.
 		_carry_view = 0
 		_carried_from = -1
+
+
+## Take a placed piece off the floor into the hand.
+func _lift(on_floor: int) -> void:
+	var row: Dictionary = decor[on_floor]
+	carrying = StringName(row["piece"])
+	_carry_view = _row_view(row)
+	_carried_from = on_floor
+	decor.remove_at(on_floor)
+	_you_path.clear()
+	changed.emit()
+	Sfx.ui(&"ui_click")
 
 
 ## Release: stand it where the cursor is, or put it back in the store. A drop that does not
@@ -3403,7 +3723,7 @@ func _draw() -> void:
 	var sharing := not _rest_key.is_empty() and _rest_kind != &"read"
 	for dog in _dogs:
 		var key := _walker_key(dog.at, rows)
-		if sharing and dog.seat == _rest_key:
+		if sharing and _dog_lies_on(dog, _rest_key):
 			key = you_key + SHARED_OVER
 		walkers.append({"key": key, "dog": dog})
 	if _you_sheet != null:
@@ -3419,15 +3739,13 @@ func _draw() -> void:
 				_draw_walker(floor_box, walkers[next_walker])
 				next_walker += 1
 		var row: Dictionary = entry["row"]
-		_stamp_piece(
-			StringName(row["piece"]),
-			floor_box.position + Vector2(
-				float(int(row["cell"][0])) * _zoom(),
-				float(int(row["cell"][1])) * _zoom()
-			),
-			_row_view(row),
-			Color(1.0, 1.0, 1.0, float(row.get("ghost", 1.0)))
+		var corner := floor_box.position + Vector2(
+			float(int(row["cell"][0])) * _zoom(),
+			float(int(row["cell"][1])) * _zoom()
 		)
+		var tint := Color(1.0, 1.0, 1.0, float(row.get("ghost", 1.0)))
+		_stamp_piece(StringName(row["piece"]), corner, _row_view(row), tint)
+		_draw_fire(row, corner, tint)
 	while next_walker < walkers.size():
 		_draw_walker(floor_box, walkers[next_walker])
 		next_walker += 1
@@ -3585,13 +3903,14 @@ func lamps(floor_box: Rect2) -> Array[Dictionary]:
 		if light == &"" or not sheets.is_on(piece, _row_view(row)):
 			continue
 		var span := span_of(piece, _row_view(row))
+		var breath := fire_breath(_row_key(row)) if light == &"fire" else 0.0
 		out.append({
 			"at": floor_box.position + Vector2(
 				(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
 				(float(int(row["cell"][1])) + float(span.y)) * _zoom()
 			),
-			"reach": _pool(light).x * CELL * _zoom(),
-			"power": _pool(light).y,
+			"reach": _pool(light).x * CELL * _zoom() * (1.0 + FIRE_SWAY * breath),
+			"power": _pool(light).y * (1.0 + FIRE_FLICKER * breath),
 			"tone": _pool_tone(light),
 		})
 		if out.size() >= LAMPS_MOST:
@@ -4209,6 +4528,13 @@ func _over_piece(floor_box: Rect2, index: int) -> Vector2:
 func _draw_interact_prompt(floor_box: Rect2) -> int:
 	if _you_pet >= 0.0 or not _rest_key.is_empty():
 		return -1
+	var record := _record_near()
+	if record >= 0:
+		var over_record := _over_piece(floor_box, record)
+		if _pick_shown > 0.0 and _piece_near() == record:
+			over_record.x -= PICK_BESIDE * 0.5
+		_draw_key(over_record)
+		return record
 	var at := _switch_near()
 	var dog := _dog_near()
 	var rest := _rest_near()

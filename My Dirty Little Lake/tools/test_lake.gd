@@ -5074,12 +5074,25 @@ func _check_shed_rest(room: ShedRoom) -> void:
 		room.call(&"_walk_you", 1.0)
 		_check(is_zero_approx(float(room.get(&"_rise_left"))) and room.get(&"_you_at") == you,
 			"and the player stands where they stood, after it", "")
-	# A dog on the armchair hops off; on the sofa it stays.
+	# A dog on a plain chair hops off; on the sofa, the armchairs and the bar stool it stays,
+	# across the lap (2026-10-23).
 	var dogs: Array = room.dogs()
 	if dogs.is_empty():
 		dogs.append(ShedRoom.ShedDog.new())
 	var dog: ShedRoom.ShedDog = dogs[0]
-	for case: Array in [[&"decor_loveseat", 0, false], [&"decor_sofa", 2, true]]:
+	var lap_bad := PackedStringArray()
+	for piece: StringName in ShedRoom.SEAT_FOR_ONE:
+		if not sheets.has(piece):
+			continue
+		for view in sheets.view_count(piece):
+			if sheets.seat_of(piece, view) > 0:
+				lap_bad.append("%s/%d" % [piece, view])
+	_check(lap_bad.is_empty(), "no seat a dog lies on is a seat for one", ", ".join(lap_bad))
+	for case: Array in [[&"decor_pk_chair", 0, false], [&"decor_loveseat", 0, true],
+			[&"decor_pk_armchair", 0, true], [&"decor_pk_old_seat", 0, true],
+			[&"decor_pk_diner_seat", 0, true], [&"decor_sofa", 2, true]]:
+		if not sheets.has(case[0]):
+			continue
 		decor.clear()
 		var span: Vector2i = room.span_of(case[0], case[1])
 		var cell := Vector2i(int(you.x * ShedRoom.CELL) - span.x / 2,
@@ -5138,6 +5151,148 @@ func _check_shed_rest(room: ShedRoom) -> void:
 	if sheets.has(&"decor_chew_toy"):
 		room.place(&"decor_chew_toy", Vector2i(40, 80), 0)
 		_check((room.call(&"_blockers") as Array).is_empty(), "the chew toy blocks nothing", "")
+	decor.clear()
+	decor.append_array(kept)
+	if not was_open:
+		_main.call(&"_set_shed", false)
+
+
+## The house's fixes of 2026-10-23: the record player takes E over the piece it stands on, a
+## click on bare floor walks there round the furniture, a click on a rug walks and a drag lifts
+## it, and the lit fireplace's flames and light move.
+func _check_oct23_shed(room: ShedRoom) -> void:
+	var sheets: Sheets = room.sheets
+	if sheets == null:
+		return
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	var dogs_at := []
+	for dog in room.dogs():
+		dogs_at.append([dog, dog.at, dog.seat])
+		dog.at = Vector2(2.0, float(ShedRoom.ROWS) - 1.5)
+		dog.seat = ""
+	room.carrying = &""
+	room.set(&"_you_pet", -1.0)
+	room.stand_up()
+	room.set(&"_rise_left", 0.0)
+	# The record player on a nightstand that opens: E opens the record's menu, not the drawer.
+	var stand := &"decor_pk_nightstand"
+	var record := &"decor_vynil_player"
+	if sheets.has(stand) and sheets.has(record) and sheets.switched(stand, 0) >= 0:
+		decor.clear()
+		var at := Vector2i(ShedRoom.CELL * 14, ShedRoom.CELL * 14)
+		room.place(stand, at, 0)
+		var stand_span: Vector2i = room.span_of(stand, 0)
+		var record_span: Vector2i = room.span_of(record, 0)
+		var foot := at.y + stand_span.y - room.base_of(stand, 0) - 2
+		decor.append({"piece": String(record), "view": 0,
+			"cell": [at.x + stand_span.x / 2 - record_span.x / 2, foot - record_span.y]})
+		room.set(&"_you_at", Vector2(float(at.x + stand_span.x / 2), float(at.y + stand_span.y + 4)) / ShedRoom.CELL)
+		_check(room.call(&"_switch_near") == 0, "standing at the nightstand, its drawer is nearer than the record", "")
+		_check(room.switch_near() and room.record_up() and int(decor[0]["view"]) == 0,
+			"but E opens the record player on it, and leaves the drawer shut", "view %d" % int(decor[0]["view"]))
+		room.close_record()
+	# A dog on its way to a seat holds it but is not on it: the player sitting there meanwhile
+	# does not pull it onto the lap or over the piece (2026-10-23).
+	decor.clear()
+	var sofa := &"decor_pk_sofa"
+	if sheets.has(sofa) and sheets.seat_of(sofa, 0) > 0:
+		var sofa_at := Vector2i(ShedRoom.CELL * 12, ShedRoom.CELL * 8)
+		room.place(sofa, sofa_at, 0)
+		var key := "%s@%d,%d" % [sofa, sofa_at.x, sofa_at.y]
+		var walker := ShedRoom.ShedDog.new()
+		walker.seat = key
+		walker.state = &"walk"
+		walker.at = Vector2(4.0, 14.0)
+		_check(not bool(room.call(&"_dog_lies_on", walker, key)), "a dog still walking to a seat is not lying on it", "")
+		walker.at = room.call(&"_seat_point", key)
+		walker.state = &"sleep"
+		_check(bool(room.call(&"_dog_lies_on", walker, key)), "one arrived and asleep there is", "")
+		var source := FileAccess.get_file_as_string("res://scripts/shed_room.gd")
+		_check(not source.contains("dog.seat == _rest_key"),
+			"the lap and the sort over the player ask whether the dog is on the seat, not whether it holds it", "")
+		decor.clear()
+	# A click on bare floor walks there, round a sofa in the way, never through it.
+	if sheets.has(sofa):
+		room.place(sofa, Vector2i(ShedRoom.CELL * 12, ShedRoom.CELL * 8), 0)
+	var start := Vector2(9.0, 12.0)
+	var goal := Vector2(22.0, 11.0)
+	room.set(&"_you_at", start)
+	var origin: Vector2 = room.call(&"_floor_origin")
+	var zoom: float = room.call(&"_zoom")
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = origin + goal * ShedRoom.CELL * zoom
+	room.call(&"_gui_input", press)
+	_check(room.click_walking(), "a click on bare floor walks there", "")
+	var through := false
+	for i in 300:
+		room.call(&"_walk_you", 1.0 / 60.0)
+		through = through or not bool(room.call(&"_dog_may_stand", room.get(&"_you_at")))
+	var landed: Vector2 = room.get(&"_you_at")
+	_check(landed.distance_to(goal) < 0.4 and not room.click_walking(), "and gets there",
+		"%s" % landed)
+	_check(not through, "never standing in the furniture on the way", "")
+	var release := press.duplicate() as InputEventMouseButton
+	release.pressed = false
+	room.call(&"_gui_input", release)
+	# A click on a rug walks; a press moved on it lifts it.
+	var rug := &"decor_pk_rug"
+	if sheets.has(rug) and sheets.lies_flat(rug):
+		decor.clear()
+		var rug_at := Vector2i(ShedRoom.CELL * 20, ShedRoom.CELL * 12)
+		room.place(rug, rug_at, 0)
+		var rug_mid := Vector2(rug_at) + Vector2(room.span_of(rug, 0)) * 0.5
+		room.set(&"_you_at", start)
+		var on_rug := origin + rug_mid * zoom
+		press.position = on_rug
+		release.position = on_rug
+		room.call(&"_gui_input", press)
+		_check(room.carrying == &"" and decor.size() == 1, "a press on a rug does not lift it yet", "")
+		room.call(&"_gui_input", release)
+		_check(room.click_walking() and decor.size() == 1, "a click on a rug walks onto it", "")
+		room.call(&"_gui_input", press)
+		var move := InputEventMouseMotion.new()
+		move.position = on_rug + Vector2(ShedRoom.RUG_DRAG + 4.0, 0.0)
+		room.call(&"_gui_input", move)
+		_check(room.carrying == rug and decor.is_empty(), "a press moved on a rug lifts it", String(room.carrying))
+		release.position = move.position
+		room.call(&"_gui_input", release)
+		_check(room.carrying == &"" and decor.size() == 1, "and letting go puts it down", "")
+	room.set(&"_you_path", [] as Array[Vector2])
+	# The lit fireplace moves: frames off its own flame pixels, none for the unlit one, and its
+	# pool of light breathes.
+	var fire := &"decor_pk_fireplace"
+	if sheets.has(fire):
+		var lit := sheets.switched(fire, 0)
+		var art: Dictionary = room.call(&"_fire_frames", fire, lit)
+		var frames: Array = art.get("frames", [])
+		var differ := 0
+		if frames.size() >= 2:
+			var a: Image = (frames[0] as Texture2D).get_image()
+			var b: Image = (frames[1] as Texture2D).get_image()
+			for y in a.get_height():
+				for x in a.get_width():
+					if a.get_pixel(x, y) != b.get_pixel(x, y):
+						differ += 1
+		_check(frames.size() == ShedRoom.FIRE_FRAMES and differ > 0, "the lit fireplace's flames move",
+			"%d frames, %d pixels differ" % [frames.size(), differ])
+		_check((room.call(&"_fire_frames", fire, 0) as Dictionary).is_empty(), "the unlit one has none", "")
+		decor.clear()
+		room.place(fire, Vector2i(ShedRoom.CELL * 10, ShedRoom.CELL * 2), lit)
+		var powers := {}
+		for k in 16:
+			room.set(&"_fire_clock", float(k) * 0.37)
+			var pools: Array = room.lamps(Rect2(Vector2.ZERO, Vector2(800.0, 600.0)))
+			if not pools.is_empty():
+				powers[snappedf(float(pools[0]["power"]), 0.001)] = true
+		_check(powers.size() > 4, "and its light breathes", "%d powers" % powers.size())
+	for row: Array in dogs_at:
+		(row[0] as ShedRoom.ShedDog).at = row[1]
+		(row[0] as ShedRoom.ShedDog).seat = row[2]
 	decor.clear()
 	decor.append_array(kept)
 	if not was_open:
@@ -5454,6 +5609,7 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 	_check_shed_pet(room)
 	_check_shed_rest(room)
 	_check_shed_cues(room)
+	_check_oct23_shed(room)
 	_check_shed_paths(room)
 	_check_house_manners(room)
 	_check_house(room)
@@ -8891,7 +9047,9 @@ func _check_lakebed() -> void:
 	_check(src.contains("if (bed_on > 0.5 && state < 1.5)"), "the bed shows on clean or hazy water only", "")
 	_check(src.contains("bool grown_here = pow(honest, color_bite) < state_at.y"),
 		"what grows on the bed reads the honest map, not the patches", "")
-	_check(src.contains("!sky_over_bed"), "the sky's clouds keep off the bed in the shallow bands", "")
+	_check(src.contains("!sky_over_bed"), "the sky's clouds keep off the bed in the shallowest band", "")
+	_check(src.contains("sky_over_bed = bed_on > 0.5 && bed_depth(cell, d) < bed_bands.x;"),
+		"and only there: the middle band takes clouds (2026-10-23)", "")
 	var spec: Variant = JSON.parse_string(FileAccess.get_file_as_string(Lake.BED_JSON))
 	var mats: Array = spec["materials"] if spec is Dictionary else []
 	_check(mats.size() * 5 == 60, "the bed's materials fill the shader's ramp array", "%d" % mats.size())
@@ -9233,6 +9391,38 @@ func _check_land_animals(wild: Wildlife) -> void:
 		if c["kind"] == &"snake" and (not wild._walkable(c, c["home"]) or wild._past_lawn(c["home"]) <= 0.0):
 			sandy_snakes += 1
 	_check(sandy_snakes == 0, "every snake's home is on the grass, none on the sand", "%d" % sandy_snakes)
+	# Foxes and wolves patrol the grass and the beach by turns (2026-10-23): a grass patrol's
+	# waypoints are past the lawn's line, a beach patrol's short of it, and they alternate.
+	var canid: Dictionary = {}
+	for c: Dictionary in wild.land_animals():
+		if c["kind"] == &"fox" or c["kind"] == &"wolf":
+			canid = c
+			break
+	if not canid.is_empty():
+		var on_grass := 0
+		var on_sand := 0
+		var points := 0
+		for k in 6:
+			for p: Vector2 in wild._patrol(canid, true):
+				points += 1
+				on_grass += 1 if wild._past_lawn(p) > 0.5 and wild._on_bank(p) else 0
+			for p: Vector2 in wild._patrol(canid, false):
+				on_sand += 1 if wild._past_lawn(p) < 0.0 else 0
+		_check(points > 0 and on_grass == points and on_sand > 0,
+			"a fox's grass patrol keeps to the grass, its beach patrol to the sand",
+			"%d of %d on grass, %d on sand" % [on_grass, points, on_sand])
+		var turns: Array[bool] = []
+		var at_was: Vector2 = canid["at"]
+		var path_was: Array = canid.get("path", [])
+		for k in 4:
+			# Not off on a trip inland this time: that rest takes no patrol.
+			canid["up_inland"] = true
+			wild._land_choose(canid)
+			turns.append(bool(canid["patrol_grass"]))
+			canid["at"] = at_was
+		canid["path"] = path_was
+		_check(turns[0] != turns[1] and turns[1] != turns[2] and turns[2] != turns[3],
+			"and the two take turns", str(turns))
 	var leads := 0
 	var lost := 0
 	for c: Dictionary in wild.land_animals():
@@ -12777,6 +12967,9 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 						drips_in_stream += (step.get(&"_falls") as Array).size()
 					level_seen.append(float(step.call(&"bucket_level")))
 				_check(streamed and drips_in_stream == 0, "off the lip the honey runs as one stream, no drops while it runs", "")
+				# The knife stays at the comb's foot while the honey runs (2026-10-23).
+				_check(float(step.get(&"_knife_alpha")) > 0.99, "the knife stays on the comb while the honey runs",
+					"%.2f" % float(step.get(&"_knife_alpha")))
 				_check(float(step.call(&"bucket_level")) > 0.0 and level_seen[5] < level_seen[level_seen.size() - 1],
 					"the honey runs down the gutter and the bucket fills as it lands",
 					"%.2f" % float(step.call(&"bucket_level")))

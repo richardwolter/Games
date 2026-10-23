@@ -832,9 +832,11 @@ void fragment() {
 	float murk_state = state * 0.5;
 
 	// The sky in it: see `sky_reflect`. Whole art pixels, the plane drifting in whole steps.
-	// Kept off the two shallow bands while the bed shows there: a flat cloud laid over rocks
-	// and weed read as a hole cut in the picture, not as sky on the water.
-	bool sky_over_bed = bed_on > 0.5 && bed_depth(cell, d) < bed_bands.y;
+	// Kept off the shallowest band while the bed shows there: a flat cloud laid over rocks
+	// and weed read as a hole cut in the picture, not as sky on the water. The middle band
+	// takes clouds since 2026-10-23 (Richard: held off both, they only showed in the deep ring
+	// round the island; the lake is deepest there).
+	bool sky_over_bed = bed_on > 0.5 && bed_depth(cell, d) < bed_bands.x;
 	if (sky_reflect > 0.001 && !sky_over_bed && pow(honest, color_bite) < state_at.x) {
 		vec2 sky_cell = vec2(cell.x - floor(clock * sky_drift), cell.y);
 		vec2 sky_p = vec2(sky_cell.x / (sky_cloud * sky_stretch), sky_cell.y / sky_cloud);
