@@ -12,7 +12,7 @@ Lance ton filet, nettoie un lac crasseux et ramène la nature dans ce jeu cosy e
 ## About This Game
 
 ```
-[h2][b][i]Un jeu cosy, relaxant et satisfaisant.[/i][/b][/h2][p][i][b]Améliore ton filet[/b][/i]
+[h2][b][i]Un jeu court, cosy, relaxant et satisfaisant.[/i][/b][/h2][p][i][b]Améliore ton filet[/b][/i]
 Augmente sa force, sa taille, sa chance, le lancer double et bien plus pour attraper tous les objets du lac.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]Tout n'est pas bon à jeter.[/i][/b] 
 Lave des trésors cachés et décore ta maison douillette.
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]De la crasse à la beauté.[/i][/b] 
@@ -44,7 +44,7 @@ Short description:
 
 About This Game:
 
-> A cozy, relaxing and satisfying game.
+> A short, cozy, relaxing and satisfying game.
 > **Upgrade your net** — Increase its strength, its size, its luck, the double cast and
 > much more to catch all the objects in the lake.
 > **Not everything is fit to throw away.** — Wash hidden treasures and decorate your snug
@@ -110,3 +110,17 @@ Left for the owner:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (French) and change the words of the first heading to:
+
+```
+Un jeu court, cosy, relaxant et satisfaisant.
+```
+
+Back-translation: A short, cozy, relaxing and satisfying game.
+
+Reviewed by an independent reviewer the same day. "Court" is natural, with no second meaning. The heading has none of ! ? : ;, so no no-break space is needed.

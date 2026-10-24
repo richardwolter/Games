@@ -12,7 +12,7 @@ Translated 2026-10-10 from `en.md`. Paste each block into the matching Steamwork
 ## About This Game
 
 ```
-[h2][b][i]느긋하고 속 시원한 힐링 게임.[/i][/b][/h2][p][i][b]그물을 업그레이드해요[/b][/i]
+[h2][b][i]느긋하고 속 시원한 짧은 힐링 게임.[/i][/b][/h2][p][i][b]그물을 업그레이드해요[/b][/i]
 힘, 크기, 행운, 쌍그물 등을 강화해서 호수에 있는 물건을 모두 잡아요.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]건져 올린 게 다 쓰레기는 아니에요.[/i][/b] 
 숨은 보물을 씻어서 아늑한 집을 꾸며요.
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]구정물에서 아름다운 호수로.[/i][/b] 
@@ -45,7 +45,7 @@ Translated 2026-10-10 from `en.md`. Paste each block into the matching Steamwork
 
 **About This Game**
 
-> Relaxed and refreshing (satisfying) healing game.
+> Relaxed and refreshing (satisfying), short healing game.
 > Upgrade your net
 > Strengthen Strength, Size, Luck, Double Net and so on, and catch all the objects in the lake.
 > Not everything you pull up is trash.
@@ -110,3 +110,17 @@ Left for the owner:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (Korean) and change the words of the first heading to:
+
+```
+느긋하고 속 시원한 짧은 힐링 게임.
+```
+
+Back-translation: Relaxed and refreshing (satisfying), short healing game.
+
+Reviewed by an independent reviewer the same day. 짧은 simply says the game is short. 짧게 즐기는 was turned down: it reads as "you only enjoy it briefly", or as short sessions.

@@ -12,7 +12,7 @@ Wirf dein Netz aus, mach einen verdreckten See sauber und hol die Natur zurück 
 ## About This Game
 
 ```
-[h2][b][i]Ein gemütliches Spiel zum Entspannen und Wohlfühlen.[/i][/b][/h2][p][i][b]Verbessere dein Netz[/b][/i]
+[h2][b][i]Ein kurzes, gemütliches Spiel zum Entspannen und Wohlfühlen.[/i][/b][/h2][p][i][b]Verbessere dein Netz[/b][/i]
 Steigere Stärke, Größe, Glück, Doppelwurf und mehr, um alle Objekte im See zu fangen.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]Nicht jeder Fund ist Müll.[/i][/b] 
 Wasch versteckte Schätze und dekoriere dein gemütliches Haus.
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]Vom Dreck zur Pracht.[/i][/b] 
@@ -44,7 +44,7 @@ Short description:
 
 About This Game:
 
-> A cozy game for relaxing and feeling good.
+> A short, cozy game for relaxing and feeling good.
 > **Improve your net.** Raise strength, size, luck, double cast and more, to catch all the
 > objects in the lake.
 > **Not every find is trash.** Wash hidden treasures and decorate your cozy house.
@@ -106,3 +106,17 @@ Left for the owner:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (German) and change the words of the first heading to:
+
+```
+Ein kurzes, gemütliches Spiel zum Entspannen und Wohlfühlen.
+```
+
+Back-translation: A short, cozy game for relaxing and feeling good.
+
+Reviewed by an independent reviewer the same day. "Kurz" is neutral, and the comma is correct.

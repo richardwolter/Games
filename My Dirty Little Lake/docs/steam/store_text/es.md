@@ -12,7 +12,7 @@ Lanza tu red, limpia un lago sucio y haz que vuelva la naturaleza en este juego 
 ## About This Game
 
 ```
-[h2][b][i]Un juego acogedor, relajante y satisfactorio.[/i][/b][/h2][p][i][b]Mejora tu red[/b][/i]
+[h2][b][i]Un juego breve, acogedor, relajante y satisfactorio.[/i][/b][/h2][p][i][b]Mejora tu red[/b][/i]
 Aumenta su fuerza, su tamaño, su suerte, el lanzamiento doble y más para atrapar todos los objetos del lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]No todo lo que encuentras es basura.[/i][/b] 
 Lava tesoros escondidos y decora tu acogedora casa.
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]De la mugre a la belleza.[/i][/b] 
@@ -41,7 +41,7 @@ Short description:
 
 About This Game:
 
-> **A cozy, relaxing and satisfying game.**
+> **A brief, cozy, relaxing and satisfying game.**
 > **Upgrade your net.** Increase its strength, its size, its luck, the double cast and more to catch all the objects in the lake.
 > **Not everything you find is trash.** Wash hidden treasures and decorate your cozy house.
 > **From grime to beauty.** Watch how wildlife recovers its place while you clean the lake.
@@ -102,3 +102,17 @@ Left for the owner:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (Spanish - Spain and Spanish - Latin America) and change the words of the first heading to:
+
+```
+Un juego breve, acogedor, relajante y satisfactorio.
+```
+
+Back-translation: A brief, cozy, relaxing and satisfying game.
+
+Reviewed by an independent reviewer the same day. "Breve" over "corto": "corto" is the word players use when they complain a game is too short. "Breve" reads as deliberate, in Spain and in Latin America.

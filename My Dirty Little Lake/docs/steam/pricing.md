@@ -1,8 +1,16 @@
 # Steam Pricing — My Dirty Little Lake
 
 > **Decided by Richard, 2026-10-10: US$4.99, 15% launch discount (Nov 16-30).** Regional
-> prices: entered 2026-10-10, see **Regional prices for US$4.99** below. The Winter Sale and the length
-> line on the store page are still open.
+> prices: entered 2026-10-10, see **Regional prices for US$4.99** below.
+>
+> **Revisited 2026-10-24** (`/grill-me` with Richard, a sanity check after Next Fest):
+> - US$4.99 and the 15% launch discount stay.
+> - **Japan goes to ¥700**, from Valve's ¥705. **Not yet entered in Steamworks.**
+> - **If Japan converts under 70% of the US rate by Nov 30, Japan drops to ¥600 on Dec 16**,
+>   the first day Valve allows a price change. See **Japan, revisited** below.
+> - **The store page says the game is short**, in the About heading of every language, with
+>   no hour count (Richard's call). See `store_text/`.
+> - Still open: the Winter Sale at 20%, recommended on 2026-10-10 and not reconfirmed.
 
 Researched 2026-10-10 for the 2026-11-16 launch (app 5375170). Prices and review counts
 were read from the Steam store API (US and BR storefronts) the same day.
@@ -22,7 +30,8 @@ were read from the Steam store API (US and BR storefronts) the same day.
 >   empty those regions pay the full US price.
 > - **State the length on the store page**, along the lines of: "A short, cozy game: about an
 >   hour to clean the lake, then more time to wash, decorate and look around." Spilled! says
->   the same thing about itself and has 94% positive reviews.
+>   the same thing about itself and has 94% positive reviews. **Decided 2026-10-24: say
+>   "short", give no hours.**
 
 ## Comparables
 
@@ -111,7 +120,8 @@ tornadoes, 8 languages, controller support), so it belongs in the cozy band, not
 ## Regional prices for US$4.99 (2026-10-10)
 
 **Entered in Steamworks by Richard, 2026-10-10**: Valve's recommendations, with GBP set to
-£3.99 and CNY to ¥18.00, and the four USD regions filled.
+£3.99 and CNY to ¥18.00, and the four USD regions filled. **JPY changes to ¥700**
+(decided 2026-10-24, still to be entered).
 
 **A lesson on method.** Before the tool was opened, its output was guessed by reading two
 $4.99 games (*A Game About Digging A Hole*, *Brotato*) off the store API in 42 storefronts.
@@ -129,7 +139,7 @@ never a published game.**
 | RUB | 245 | |
 | PLN | 20,49 | |
 | BRL | 16,99 | kept, see below |
-| JPY | 705 | Japanese prices usually end in 0; ¥700 is an optional tidy-up |
+| JPY | 700 | **¥700 decided 2026-10-24, to be entered in Steamworks** (the tool said 705). ¥600 on Dec 16 if Japan converts poorly: see **Japan, revisited** |
 | NOK | 52,50 | |
 | IDR | 50 999 | |
 | MYR | 12.49 | |
@@ -184,6 +194,83 @@ never a published game.**
 - **The launch discount and sales apply as a percentage in every currency**, so this table only
   has to be right once.
 
+## Japan, revisited (2026-10-24)
+
+**Why it came up.** Japan is the biggest wishlist country by far. Steamworks, Regional
+Wishlists by country, lifetime to 2026-10-24 (the store page went public about Oct 8):
+**908 net wishlists.**
+
+| Country | Net | Share |
+|---|---|---|
+| Japan | 417 | 46% |
+| United States | 148 | 16% |
+| China | 46 | 5% |
+| Brazil | 41 | 4.5% |
+| Germany | 41 | 4.5% |
+| United Kingdom | 24 | 2.6% |
+| Korea, Taiwan, Hong Kong together | 32 | 3.5% |
+
+- **245 of Japan's 432 adds came on one day, Oct 9**, from a post by the curator account
+  [Indie_FreaksJP](https://x.com/Indie_FreaksJP) on X. Otherwise Japan ran at 1–23 a day.
+- **During Next Fest (Oct 19–24) Japan added 115 and the US 123.** So there is a real
+  Japanese audience, about level with the US day to day, and one curator post was worth
+  half of it. A repeat post at launch would move more sales than a few yen.
+- Steamworks' "Asia" region (495 net) is mostly Japan; the other Asian prices barely matter
+  at these numbers.
+
+**What Japanese players see.** JP storefront, read 2026-10-24 through the store API:
+
+| Game | US | JP | Yen per US dollar |
+|---|---|---|---|
+| Nodebuster, Tower Wizard | $2.99 | ¥350 | 117 |
+| Cats Organized Neatly | $2.99 | ¥295 | 99 |
+| Ropuka's Idle Island | $3.99 | ¥400 | 100 |
+| A Game About Digging A Hole | $4.99 | ¥580 | 116 |
+| Tiny Pasture | $5.99 | ¥600 | 100 |
+| Spilled! | $5.99 | ¥700 | 117 |
+| Rusty's Retirement | $6.99 | ¥750 | 107 |
+| A Short Hike | $7.99 | ¥820 | 103 |
+| Stacklands | $7.99 | ¥920 | 115 |
+| Unpacking | $19.99 | ¥2,050 | 103 |
+| PowerWash Simulator | $24.99 | ¥2,970 | 119 |
+| **MDLL at ¥700** | **$4.99** | **¥700** | **140** |
+
+Valve's pricing tool raised its yen suggestions about 12% in March 2026, and games priced
+before that kept their lower yen. Most comparables sit at 100–120 yen to the dollar; MDLL
+sits at 140. **In Japan MDLL costs as much as Spilled!, which is US$1 dearer.**
+
+**Decision: ¥700**, Richard's call, kept after one push back. ¥600 (recommended: 120 yen to
+the dollar, the same gap under Spilled! as in the US) and ¥580 (Digging A Hole's price) were
+the alternatives. What speaks for ¥700: the full Japanese translation, the curator's
+interest, and launch week at **¥595** (15% off), level with the comparables. The gap shows
+from Dec 1.
+
+**The fallback, decided:**
+- **On Nov 30** (the launch discount's last day), open Steamworks, Regional Wishlists by
+  country, and compare Japan's conversion rate (purchases over wishlists) with the US's.
+- **If Japan's rate is under 70% of the US's, lower JPY to ¥600 on Wednesday Dec 16.**
+  Valve asks "that price changes wait until after 30 days from release", and Nov 16 + 30
+  days is Dec 16. The Winter Sale's 20% (from Thursday Dec 17) then puts Japan at ¥480.
+- Valve reviews a price change in one or two business days and it can't be scheduled, so a
+  change submitted Dec 16 may land a day into the Winter Sale.
+- A price **decrease** starts no discount cooldown (only increases do), so the cut does not
+  cost the Winter Sale. Still check the sale's opt-in shows the game as eligible afterwards.
+- Leave the other Asian currencies alone: China, Korea, Taiwan and Hong Kong are 78
+  wishlists together.
+
+**Checked and left as it was:**
+- **Short games.** No measured median price by playtime exists. Short cozy games with real
+  art sit at $4.99–7.99; short incrementals with plain art at $2.99.
+- **Cozy games.** Median list price US$4.99 (Steam's Cozy tag, released Jan 2024 to Jun 2025,
+  counted Sep 2026), the same as all of Steam; 52% of paid cozy games are under $5. Under $5,
+  2.7% reached 1,000 reviews; at $5–9.99, 7.8%. A correlation: dearer games tend to be
+  bigger productions.
+- **Asset packs.** Not a reason to price lower: buyers price what they see, and the art
+  reads as one style.
+- **Length.** Richard puts a full run with washing and decorating at about 1.5 hours (the
+  logged clearing runs were 50 and 65 minutes). Still under the 2-hour refund window; the
+  store page now says the game is short.
+
 ## Risks
 
 - **"Too short for the price" reviews.** These come from surprise, not from the length
@@ -217,3 +304,9 @@ never a published game.**
 - Digging A Hole length: https://thefilibusterblog.com/digging-a-hole-game-estimated-completion-time-and-how-long-to-beat/
 - Nodebuster length (review summary): https://vaporlens.app/app/3107330/nodebuster.md
 - Tower Wizard length: https://gg.deals/game/tower-wizard/ and https://itch.io/post/12511584
+- Added 2026-10-24:
+  - Steam store API, JP storefront prices: `store.steampowered.com/api/appdetails?appids=<id>&cc=jp`
+  - Steamworks Regional Wishlists export, lifetime to 2026-10-24 (Richard's download, not in the repo)
+  - Cozy games niche report (Steam Page Analyzer): https://www.steampageanalyzer.com/blog/cozy-games-steam-2026-niche-report
+  - Valve's 2026 pricing-tool update and the yen: https://automaton-media.com/en/news/steams-updated-pricing-tools-could-push-game-prices-in-japan-higher-with-weak-yen-reflected/
+  - Median Steam price trend (GameDiscoverCo): https://gamedevreports.substack.com/p/gamediscoverco-people-are-spending

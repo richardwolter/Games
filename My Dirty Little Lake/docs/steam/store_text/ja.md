@@ -12,7 +12,7 @@ Translated 2026-10-10 from `en.md`. Paste each block into the matching Steamwork
 ## About This Game
 
 ```
-[h2][b][i]のんびりスッキリ、ほっこりゲーム。[/i][/b][/h2][p][i][b]あみを強化[/b][/i]
+[h2][b][i]のんびりスッキリ、ほっこり短編ゲーム。[/i][/b][/h2][p][i][b]あみを強化[/b][/i]
 パワー、大きさ、ラッキー投げ、ダブル投げなどを強化して、湖のものをぜんぶ取りましょう。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]取ったものが、ぜんぶゴミとはかぎりません。[/i][/b] 
 かくれたお宝を洗って、居心地のいい家をかざりましょう。
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]よごれた湖から、美しい湖へ。[/i][/b] 
@@ -45,7 +45,7 @@ Short description:
 
 About This Game:
 
-> **Laid-back and refreshing, a heartwarming game.**
+> **Laid-back and refreshing, a heartwarming short game.**
 > **Upgrade the net**
 > Upgrade Power, Size, Lucky casts, Double casts and more, and catch every object in the
 > lake. [video]
@@ -112,3 +112,17 @@ Left for the owner:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (Japanese) and change the words of the first heading to:
+
+```
+のんびりスッキリ、ほっこり短編ゲーム。
+```
+
+Back-translation: Laid-back and refreshing, a heartwarming short game.
+
+Reviewed by an independent reviewer the same day. 短編 ("a short work") says plainly that the whole game is short, and keeps the heading's rhythm. The friendlier alternative is "サクッと遊べる、のんびりスッキリほっこりゲーム。" ("a laid-back, refreshing, heartwarming game you can enjoy quickly"), the usual phrase on Japanese indie pages for a short game; 短編 was picked because "short" cannot be misread. 短時間で遊べる was turned down: it reads like spec copy and suggests short sessions rather than a short game.

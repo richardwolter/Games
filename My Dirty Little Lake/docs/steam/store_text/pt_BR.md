@@ -9,7 +9,7 @@ Lance sua rede para limpar um lago sujo e trazer a natureza de volta neste jogo 
 ## About This Game
 
 ```
-[h2][b][i]Um jogo aconchegante, relaxante e satisfatório.[/i][/b][/h2][p][i][b]Melhore sua rede[/b][/i]
+[h2][b][i]Um jogo curto, aconchegante, relaxante e satisfatório.[/i][/b][/h2][p][i][b]Melhore sua rede[/b][/i]
 Aumente a força, o tamanho, a sorte, o lançamento duplo e muito mais para pegar todos os objetos do lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]Nem tudo o que você encontra é lixo.[/i][/b] 
 Lave tesouros escondidos e decore sua casa aconchegante.
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]Da sujeira à beleza.[/i][/b] 
@@ -38,7 +38,7 @@ Cast your net to clean a dirty lake and bring nature back in this cozy and relax
 
 About This Game:
 
-A cozy, relaxing and satisfying game.
+A short, cozy, relaxing and satisfying game.
 Improve your net
 Increase the Strength, the Size, the Luck, the Double and much more to catch all the objects in the lake.
 Not everything you find is trash.
@@ -101,3 +101,17 @@ same as `en.md`, line by line, with the same 21 lines and the same blank lines.
 
 - Upgrade list in plain words: "a força, o tamanho, a sorte, o lançamento duplo" (was the shop's row names, "o Dobro" unclear to a store reader).
 - "Nem tudo o que você encontra é lixo" (was "acha", which can read as "think").
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (Portuguese - Brazil) and change the words of the first heading to:
+
+```
+Um jogo curto, aconchegante, relaxante e satisfatório.
+```
+
+Back-translation: A short, cozy, relaxing and satisfying game.
+
+Reviewed by an independent reviewer the same day. "Curto" is the plain word and reads as a fact. "Curtinho" (a warmer "nice and short") is the softer option.

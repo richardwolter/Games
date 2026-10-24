@@ -13,7 +13,7 @@ the English field's.
 ## About This Game
 
 ```
-[h2][b][i]轻松解压的温馨游戏。[/i][/b][/h2][p][i][b]升级你的渔网[/b][/i]
+[h2][b][i]轻松解压的温馨短篇游戏。[/i][/b][/h2][p][i][b]升级你的渔网[/b][/i]
 提升力量、尺寸、幸运、双网等能力，把湖里的物品统统捞上来。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p][p][b][i]捞到的不全是垃圾。[/i][/b] 
 清洗藏在湖里的宝物，装饰你温馨的房子。
 [img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p][p][b][i]从污浊到美景。[/i][/b] 
@@ -46,7 +46,7 @@ Short description:
 
 About This Game:
 
-> **Relaxing, stress-relieving, warm game.**
+> **Relaxing, stress-relieving, warm short game.**
 > **Upgrade your fishing net**
 > Raise strength, size, luck, double net and other abilities, and bring up every object in
 > the lake. [video]
@@ -109,3 +109,17 @@ Left for the owner:
 
 Checked by script: every BBCode tag, `[video ...]` line, URL and `{STEAM_APP_IMAGE}` is the
 same as `en.md`, line by line, with the same 21 lines and the same blank lines.
+
+## Short-game heading (2026-10-24)
+
+The About heading now says the game is short, so buyers know before they buy (Richard's call;
+no hour count; see `docs/steam/pricing.md`, Japan, revisited). Only this line changed. In
+Steamworks, open the About field (Simplified Chinese) and change the words of the first heading to:
+
+```
+轻松解压的温馨短篇游戏。
+```
+
+Back-translation: Relaxing, stress-relieving, warm short game.
+
+Reviewed by an independent reviewer the same day. 短篇 ("a short work") is about overall length and neutral. 短小精悍 was turned down: it means "punchy and vigorous", which jars with relaxing and cozy, and 短小 carries an online innuendo.
