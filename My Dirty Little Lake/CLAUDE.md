@@ -9690,11 +9690,12 @@ the takes are cut together. `tools/play_video.gd` (`.tscn`), `tools/record_video
 
 ### The 1000-Wishlists Video (2026-10-25, `/grill-me` with Richard)
 A 14 s vertical ASMR post for TikTok and Reels, plus the Steam announcement's art: a grimy oak
-plaque drops onto the wash stand and is hosed clean to read "1000 WISHLISTS"; then "THANK
-YOU!", "Coming November 16", "Wishlist now" and the Steam mark. The logo stands over the
-plaque as it lands (to 3.5 s); no other words before the reveal. The hose, the drips and the
-chime, with Habibs from its first note low under them, its drop landing on "THANK YOU!"
-(second pass the same day, Richard). English only.
+plaque drops onto the wash stand and is hosed clean to read "1000 WISHLISTS"; then the logo
+again (small, at the top), "THANK YOU!", "Release on November 16", "Wishlist now" and the Steam
+mark. The logo stands over the plaque as it lands (to 3.5 s); no other words before the
+reveal. Birdsong over the opening, then the hose, the drips and the chime with birds under
+them and Habibs from its first note over them (set above the hose: Richard, twice, "the
+music is still too low"), its drop landing on "THANK YOU!". English only.
 Builders in `Marketing/.../2 Work/wishlist_1000/` (`build_plaque.py`, `build_1000.py`,
 `make_event_art.py`), finals in `1 Final/Videos/` and `1 Final/1000 Wishlists Images/`.
 - **The plaque is not in the game**: rule-built in the pack finds' look (`build_plaque.py`,
