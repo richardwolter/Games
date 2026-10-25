@@ -547,7 +547,6 @@ func sprayed_at(point: Vector2) -> void:
 			clampf(dog.at.x + away * maxf(BOLT_LEAST, size.x * 0.3), -80.0, size.x + 80.0),
 			dog.at.y
 		))
-		dog.left = away < 0.0
 		if _bark_in <= 0.0:
 			_bark_in = BARK_GAP
 			var sound := Sfx.main()
@@ -655,7 +654,6 @@ func _send(dog: Hound) -> void:
 		dog.at.y = _lawn_y(dog.depth)
 	var depth := clampf(dog.depth + _roll.randf_range(-0.3, 0.3), 0.0, 1.0)
 	_aim(dog, Vector2(_roll.randf_range(0.04, 0.96) * size.x, _lawn_y(depth)))
-	dog.left = dog.to.x < dog.at.x
 	dog.pose = DogArt.gait(dog.slot, true, dog.breed) if DogArt.has(&"walk", dog.breed) else &"idle"
 	dog.rest = 0.0
 	dog.bolting = false
@@ -682,8 +680,15 @@ func _drive_dogs(delta: float) -> void:
 		var was := dog.at
 		dog.at = dog.at.move_toward(going, pace * delta)
 		dog.stride += dog.at.distance_to(was) / pace
+		# It faces the way it is stepping, whatever set its goal (2026-10-25, Richard: dogs
+		# walking backwards). A step straight up or down the lawn keeps the facing it had.
+		if absf(dog.at.x - was.x) > 0.01:
+			dog.left = dog.at.x < was.x
 		if dog.via != Vector2.INF and dog.at.distance_to(dog.via) < 1.0:
 			dog.via = Vector2.INF
+			# Round the corner, it faces the spot it is going to (2026-10-25, Richard: dogs
+			# walking backwards). The facing was the corner's and was never turned again.
+			dog.left = dog.to.x < dog.at.x
 			continue
 		# How big it draws follows where it is, all the way there.
 		dog.depth = clampf(inverse_lerp(_lawn_y(0.0), _lawn_y(1.0), dog.at.y), 0.0, 1.0)
@@ -724,14 +729,21 @@ func _aim(dog: Hound, spot: Vector2) -> void:
 		var by_left := dog.at.distance_to(left) + left.distance_to(spot)
 		var by_right := dog.at.distance_to(right) + right.distance_to(spot)
 		dog.via = left if by_left <= by_right else right
+	# Facing the first leg: the corner when there is one, not the spot past it. `_send` and
+	# the bolt used to overwrite this with the spot's side, so a dog going round the pallet
+	# walked to the corner backwards.
 	dog.left = (dog.to if dog.via == Vector2.INF else dog.via).x < dog.at.x
 
 
 ## Whether the segment from `a` to `b` passes through the box (sampled: the box is big and
 ## the dogs' legs are short, so a handful of points is plenty).
 static func _crosses(a: Vector2, b: Vector2, box: Rect2) -> bool:
+	# The box's own top edge is where a dog behind the pallet walks, and a walk along it does
+	# not go through the pallet: counted, it sent the dog past its spot to the far corner and
+	# back (2026-10-25).
+	var inside := box.grow_individual(0.0, -0.5, 0.0, 0.0)
 	for k in range(1, 24):
-		if box.has_point(a.lerp(b, float(k) / 24.0)):
+		if inside.has_point(a.lerp(b, float(k) / 24.0)):
 			return true
 	return false
 

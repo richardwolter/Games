@@ -11612,6 +11612,7 @@ func _stage_wash() -> void:
 		"and a dog under the jet bolts", "%.0f px" % absf(pup.at.x - sat.x))
 	_check(room.stand().jet_past_piece() == Vector2.INF,
 		"a jet that is off tells the backdrop nothing", "")
+	_check_hound_facing(back)
 	var sound := Sfx.main()
 	if sound != null:
 		# Outdoors since 2026-09-28: the lake's own barks and coos carry on behind the pump.
@@ -15065,3 +15066,48 @@ func _check_oct15_notes() -> void:
 	room.house_seen = seen_was
 	(room.get(&"_house_playing") as Array).clear()
 	hints.erase(&"demo_house")
+
+
+## The wash room's dogs face the way they are stepping, all the way round the pallet
+## (2026-10-25, Richard: dogs walking backwards), and a walk along the pallet's back edge
+## goes straight there rather than out to the far corner and back.
+func _check_hound_facing(back: WashBackdrop) -> void:
+	var keep_was := back.keep_out
+	back.keep_out = Rect2(back.size.x * 0.15, back.size.y * 0.6, back.size.x * 0.7, 60.0)
+	var out: Rect2 = back.call(&"_kept_out")
+	var edge := out.position.y
+	var dog: WashBackdrop.Hound = back.dogs()[0]
+	dog.rest = 0.0
+	dog.bolting = false
+	dog.at = Vector2(out.position.x + out.size.x * 0.3, edge)
+	back.call(&"_aim", dog, Vector2(out.position.x + out.size.x * 0.6, edge + 40.0))
+	var straight: bool = dog.via == Vector2.INF
+	var backwards := 0
+	var moved := 0
+	for k in 400:
+		var was := dog.at
+		back.step(1.0 / 60.0)
+		if dog.rest > 0.0:
+			break
+		if absf(dog.at.x - was.x) > 0.01:
+			moved += 1
+			if (dog.at.x < was.x) != dog.left:
+				backwards += 1
+	# Across the front of the pallet: it has to go round by a corner.
+	dog.rest = 0.0
+	dog.at = Vector2(out.position.x - 20.0, edge + 60.0)
+	back.call(&"_aim", dog, Vector2(out.end.x + 20.0, edge + 60.0))
+	var round_by: bool = dog.via != Vector2.INF
+	for k in 900:
+		var was := dog.at
+		back.step(1.0 / 60.0)
+		if dog.rest > 0.0:
+			break
+		if absf(dog.at.x - was.x) > 0.01:
+			moved += 1
+			if (dog.at.x < was.x) != dog.left:
+				backwards += 1
+	back.keep_out = keep_was
+	_check(straight and round_by and moved > 30 and backwards == 0,
+		"the wash room's dogs face the way they step, along the pallet's back and round it",
+		"straight %s, round %s, moved %d, backwards %d" % [straight, round_by, moved, backwards])

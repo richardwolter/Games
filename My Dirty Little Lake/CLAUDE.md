@@ -9688,6 +9688,34 @@ the takes are cut together. `tools/play_video.gd` (`.tscn`), `tools/record_video
   date, taming the tornado on camera, a scripted bot driving the take.
 - All numbers first guesses for Richard's eye.
 
+### The 1000-Wishlists Video (2026-10-25, `/grill-me` with Richard)
+A 14 s vertical ASMR post for TikTok and Reels, plus the Steam announcement's art: a grimy oak
+plaque drops onto the wash stand and is hosed clean to read "1000 WISHLISTS"; then "THANK
+YOU!", "Coming November 16", "Wishlist now" and the Steam mark. No words before the reveal;
+only the hose, the drips and the chime until Habibs drops in under the card. English only.
+Builders in `Marketing/.../2 Work/wishlist_1000/` (`build_plaque.py`, `build_1000.py`,
+`make_event_art.py`), finals in `1 Final/Videos/` and `1 Final/1000 Wishlists Images/`.
+- **The plaque is not in the game**: rule-built in the pack finds' look (`build_plaque.py`,
+  variant B picked: oak, arched, a brass star, a brass plate), and `tools/shot_plaque.tscn`
+  lays it into the lake's atlas for the session only (`decor_plaque_1000`).
+- **The probe** (desktop build, own save, under its own node, Movie Maker for the sound):
+  portrait 1080x1920, the stand at zoom 8 with its foot at 0.66, the tray, cross, hose row
+  and HUD hidden, the plate's grime lifted into scum so it cannot be read through. The jet
+  goes **up and down, never across** (Richard), column by column, left to right, at the
+  pace that cleans in one pass. `PLAQUE_STILL=1` (`--fixed-fps 60`, no Movie Maker) films
+  the shine in landscape for the Steam images.
+- **The jet is 2.9 times the top hose (`BOOST`), by decision**: the plaque is as big as the
+  largest finds, a real-time wash of it at hose 3 is about 20 s, and a sped-up film read badly
+  before. The jet's look and motion are the game's; only the grime comes off faster.
+- **The lake behind is the game's own loop** (`lake_ambient.ogg`), not the probe's Ambience
+  stem, which caught random barks and frogs mid-wash.
+- **Fixed in the game on the way: the wash room's dogs walked backwards** (Richard, watching
+  the probe). `WashBackdrop._send` and the bolt overwrote `_aim`'s facing with the far spot's
+  side, and reaching a pallet corner never turned the dog to its spot. A hound now faces the
+  way it steps; and a walk along the pallet's back edge no longer counts as crossing it
+  (`_crosses`), which sent dogs past their spot to the far corner and back. `test_lake`'s
+  `_check_hound_facing` guards both.
+
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 **Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions
