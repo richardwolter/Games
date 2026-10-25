@@ -1093,6 +1093,15 @@ var _steps_done: bool = true
 ## got to is the board's for the session: closed half way, it picks up there next time the
 ## shop opens; quit half way, it starts over.
 var _shop_tour_done: bool = true
+## The staged shop's tour (`SHOP_STAGES`): how many stages have had their cards, in order,
+## saved as `shop_tours`. Each board's cards play the first time the shop is up with it open;
+## "Skip" ends them all. Absent reads as all of them when `shop_tour` was done, none when not.
+var _shop_tours: int = 0
+## Which stage's cards the board is showing, or -1.
+var _touring_stage: int = -1
+## How many stages were open last frame: a rise is a board coming open, which the shop shows
+## then and there (a level is only ever bought with the shop up).
+var _stages_open: int = -1
 
 # The decoration tour (2026-09-22, `/grill-me` with Richard, issue #24; `scripts/tour_card.gd`):
 # the first time a new game opens the shed, five cards walk washing and placing, the new
@@ -3668,7 +3677,10 @@ func _set_menu(open: bool) -> void:
 		_skin.purse_over = Rect2()
 	if open:
 		_skin.hush_pulse(&"upgrades")
-		if not _shop_tour_done and _shop_skin.tour < 0:
+		if _stages_on():
+			_start_stage_tour()
+		elif not _shop_tour_done and _shop_skin.tour < 0:
+			_shop_skin.tour_cards = ShopSkin.TOUR
 			_shop_skin.tour = 0
 	_push_rooms()
 	if open:
@@ -4124,6 +4136,7 @@ func _start_arrival() -> void:
 		return
 	_steps_done = false
 	_shop_tour_done = false
+	_shop_tours = 0
 	_first_buy_done = false
 	_decor_tour_done = false
 	_house_walk_done = false
@@ -4443,9 +4456,97 @@ func _end_decor_tour() -> void:
 
 
 ## The shop's tour is over, read through or skipped: it is not shown again.
-func _on_shop_tour_ended(_skipped: bool) -> void:
+func _on_shop_tour_ended(skipped: bool) -> void:
+	if _touring_stage >= 0:
+		_shop_tours = SHOP_STAGES.size() if skipped else maxi(_shop_tours, _touring_stage + 1)
+		_touring_stage = -1
+		_shop_tour_done = _shop_tours >= SHOP_STAGES.size()
+		# Two boards come open together only on a load, but then both get their cards.
+		if not skipped:
+			_start_stage_tour()
+		save_game()
+		return
 	_shop_tour_done = true
 	save_game()
+
+
+## Whether the boards open one at a time on this lake (see `SHOP_STAGES`).
+func _stages_on() -> bool:
+	return not Demo.on() and (force_stages or get_parent() == get_tree().root)
+
+
+## Every level bought on every track, which is what the stages count.
+func _levels_bought() -> int:
+	var n := 0
+	for key: StringName in TRACKS:
+		n += _level_of(key)
+	return n
+
+
+## How many more levels a board waits for, 0 when it is open.
+func buys_to_open(board: StringName) -> int:
+	if not _stages_on():
+		return 0
+	# A board already bought from is open, whatever the count says: a run saved before the
+	# stages may own a dog level with fewer than DOGS' levels bought in all.
+	for key: StringName in TRACKS:
+		if _level_of(key) > 0 and ShopSkin.board_for(key) == board:
+			return 0
+	var need := 0
+	for stage: Array in SHOP_STAGES:
+		need += int(stage[1])
+		if stage[0] == board:
+			return maxi(need - _levels_bought(), 0)
+	return 0
+
+
+## Whether a track's board is open, so its rows can be bought.
+func track_open(key: StringName) -> bool:
+	return buys_to_open(ShopSkin.board_for(key)) <= 0
+
+
+## How many stages are open, counted in order.
+func _open_stages() -> int:
+	var n := 0
+	for stage: Array in SHOP_STAGES:
+		if buys_to_open(stage[0]) > 0:
+			break
+		n += 1
+	return n
+
+
+## Every board still shut, with the levels it waits for: what the shop boards over.
+func _shut_boards() -> Dictionary:
+	var out := {}
+	for stage: Array in SHOP_STAGES:
+		var left := buys_to_open(stage[0])
+		if left > 0:
+			out[stage[0]] = left
+	return out
+
+
+## The cards of the first open stage that has not had them, unless the shop is already
+## showing a tour.
+func _start_stage_tour() -> void:
+	if not _menu_open or _shop_skin.tour >= 0 or _shop_tours >= SHOP_STAGES.size():
+		return
+	if _shop_tours >= _open_stages():
+		return
+	_touring_stage = _shop_tours
+	_shop_skin.tour_cards = ShopSkin.TOUR_STAGES[SHOP_STAGES[_touring_stage][0]]
+	_shop_skin.tour = 0
+
+
+## A board came open (a rise in `_open_stages`): the planks come off it on the spot, the shop
+## being up whenever a level is bought, and its cards follow.
+func _watch_stages() -> void:
+	var open := _open_stages() if _stages_on() else SHOP_STAGES.size()
+	if _stages_open >= 0 and open > _stages_open:
+		for k in range(_stages_open, open):
+			_shop_skin.unseal(SHOP_STAGES[k][0])
+		if _menu_open:
+			_start_stage_tour()
+	_stages_open = open
 
 
 ## The last step is over: the flag, and a save so a Continue does not teach it again.
@@ -4744,6 +4845,7 @@ func _raise_front(loaded: bool) -> void:
 			_intro_done = true
 			_steps_done = true
 			_shop_tour_done = true
+			_shop_tours = SHOP_STAGES.size()
 			_decor_tour_done = true
 			_camera_tip_seen = true
 			for kind in CUE_KINDS:
@@ -5341,6 +5443,21 @@ const TRACKS := [
 	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
 
+# The staged shop (2026-10-25, `/grill-me` with Richard; the mdll-staged-shop test branch): the
+# boards open one at a time, BOATS first, then NET, DOGS and LUCK, each once enough levels have
+# been bought since the board before it opened, so a new player meets one board at a time and
+# learns first that the boats carry the money. Each stage is a board and the levels it waits
+# for after the one before; the sim fitted the counts (`docs/progression/staged_gates.py`):
+# NET at about half a minute, DOGS at six, LUCK at ten in a focused run. NET waits only three
+# buys because past the third boat level a level-0 net cannot fill even one hull, and every
+# further boat level earns nothing.
+#
+# Worked out from the levels owned, so nothing is saved and an older run with levels on every
+# board has every board open. Full game only: the demo, and every borrowed lake but one that
+# asks (`force_stages`), open everything at once.
+const SHOP_STAGES := [[&"boat", 0], [&"net", 3], [&"dog", 26], [&"luck", 22]]
+static var force_stages: bool = false
+
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
 ## wording for now (2026-09-13): Richard writes the real lines once the rows read right.
 ## What stands between a row's figure now and its figure one level on. A mark rather than
@@ -5374,7 +5491,7 @@ const BLURBS := {
 func _affordable() -> int:
 	var count := 0
 	for key: StringName in TRACKS:
-		if not is_maxed(key) and sludge >= cost_of(key):
+		if not is_maxed(key) and sludge >= cost_of(key) and track_open(key):
 			count += 1
 	return count
 
@@ -5478,7 +5595,7 @@ func _shop_rows() -> Array:
 			# A track with nothing left to sell says so in a word: a dash reads as a price
 			# that failed to print.
 			"cost": Text.SHOP_MAX if full else "$%d" % roundi(price),
-			"afford": not full and sludge >= price,
+			"afford": not full and sludge >= price and track_open(key),
 			"maxed": full,
 		})
 	return out
@@ -5678,7 +5795,7 @@ func _saved_level(levels: Dictionary, what: StringName) -> int:
 
 
 func _buy(what: StringName) -> void:
-	if is_maxed(what):
+	if is_maxed(what) or not track_open(what):
 		return
 	var price := cost_of(what)
 	if sludge < price:
@@ -6345,7 +6462,7 @@ func _first_buy_up() -> bool:
 func _cheapest_affordable() -> StringName:
 	var best: StringName = &""
 	for key: StringName in TRACKS:
-		if is_maxed(key) or sludge < cost_of(key):
+		if is_maxed(key) or sludge < cost_of(key) or not track_open(key):
 			continue
 		if best == &"" or cost_of(key) < cost_of(best):
 			best = key
@@ -7795,6 +7912,7 @@ func _push_water_colours() -> void:
 
 
 func _update_hud() -> void:
+	_watch_stages()
 	_skin.pollution = pollution
 	_push_pad_light()
 	_skin.money = sludge
@@ -7820,6 +7938,7 @@ func _update_hud() -> void:
 		_skin.purse_over = Rect2()
 		return
 	_shop_skin.rows = _shop_rows()
+	_shop_skin.shut = _shut_boards()
 	# Read every frame the board is up, like the rows, so a language change reaches them.
 	_shop_skin.titles = ShopSkin.spoken(ShopSkin.TITLE_KEYS)
 	_shop_skin.headings = ShopSkin.spoken(ShopSkin.HEADING_KEYS)
@@ -7924,6 +8043,7 @@ func save_game() -> bool:
 		"intro_done": _intro_done,
 		"first_steps": _steps_done,
 		"shop_tour": _shop_tour_done,
+		"shop_tours": _shop_tours,
 		"decor_tour": _decor_tour_done,
 		"house_walk": _house_walk_done,
 		"wildlife_seen": _wildlife_seen,
@@ -8142,6 +8262,7 @@ func load_game() -> bool:
 	# Absent means done, as above. Not done means the steps start over from the walk.
 	_steps_done = bool(save.get("first_steps", true))
 	_shop_tour_done = bool(save.get("shop_tour", true))
+	_shop_tours = int(save.get("shop_tours", SHOP_STAGES.size() if _shop_tour_done else 0))
 	_decor_tour_done = bool(save.get("decor_tour", true))
 	_house_walk_done = bool(save.get("house_walk", true))
 	# Absent means seen, the tours' rule: an older save is past its first animal, or near

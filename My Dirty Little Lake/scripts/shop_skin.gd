@@ -21,8 +21,10 @@ const Style := preload("res://scripts/style.gd")
 const DogArt := preload("res://scripts/dog_art.gd")
 const ShopCard := preload("res://scripts/shop_card.gd")
 
-## The boards, in the order they stand, and what each is called.
-const BOARDS: Array[StringName] = [&"net", &"luck", &"boat", &"dog"]
+## The boards, in the order they stand, and what each is called. In the order they open
+## since the staged shop (2026-10-25, `Lake.SHOP_STAGES`): the open boards fill from the left,
+## the purse hangs under the boats and the pricing plate under the net and the dogs.
+const BOARDS: Array[StringName] = [&"boat", &"net", &"dog", &"luck"]
 ## No "The" (2026-09-17): four boards standing side by side are already a list, and the
 ## article is a word every translation would have to carry for nothing.
 const TITLES := {&"net": "Net", &"boat": "Boats", &"dog": "Dogs", &"luck": "Luck"}
@@ -36,6 +38,15 @@ const HEADING_KEYS := {
 	"The pack": "SHOP_GROUP_PACK", "The trip": "SHOP_GROUP_TRIP",
 	"On a cast": "SHOP_GROUP_ON_CAST", "At the yards": "SHOP_GROUP_AT_YARDS",
 }
+
+
+## Which board a track stands on, read off `GROUPS`, or empty for none.
+static func board_for(key: StringName) -> StringName:
+	for board: StringName in GROUPS:
+		for group: Array in GROUPS[board]:
+			if key in (group[1] as Array):
+				return board
+	return &""
 
 
 ## A map of keys of `locale/translations.csv` as the words they read in the language in play.
@@ -347,6 +358,18 @@ const TOUR := [
 	["At the yards", "TOUR_SHOP_AT_YARDS"],
 	[&"legend", "TOUR_SHOP_LEGEND"],
 ]
+## The staged shop's cards (2026-10-25): each board's own, played the first time the shop is
+## up with it open (`Lake._start_stage_tour`). The boats' come with a card about the boards
+## still shut (`&"locked"`) and the pricing plate's.
+const TOUR_STAGES := {
+	&"boat": [[&"boat", "TOUR_SHOP_BOATS"], [&"locked", "TOUR_SHOP_LOCKED"], [&"legend", "TOUR_SHOP_LEGEND"]],
+	&"net": [[&"net", "TOUR_SHOP_NET"]],
+	&"dog": [[&"dog", "TOUR_SHOP_DOGS"]],
+	&"luck": [["On a cast", "TOUR_SHOP_ON_CAST"], ["At the yards", "TOUR_SHOP_AT_YARDS"]],
+}
+## The cards the tour is walking: `TOUR` with every board open, one stage's with the staged
+## shop. Set by the lake before it sets `tour`.
+var tour_cards: Array = TOUR
 const TOUR_DIM := Color(0.0, 0.0, 0.0, 0.58)
 const TOUR_OUTLINE := Color(1.0, 1.0, 1.0, 0.9)
 ## Between the target and its card, in canvas pixels.
@@ -371,6 +394,30 @@ var only: StringName = &"":
 			_tour_layer.queue_redraw()
 ## Whether the prompt on the card is the pad's A rather than the mouse.
 var tour_pad := false
+
+## The boards not open yet, each with the levels it waits for (2026-10-25, the staged shop),
+## set by the lake beside `rows`. A shut board keeps its frame and its title, so nothing on the
+## shop moves, and its face is boarded over with the count on a slip of paper.
+var shut: Dictionary = {}
+## Boards whose planks are coming off, with the seconds that has left to run.
+var _unsealing := {}
+## The planks across a shut board: how tall each is, the dark gap between two, and how far
+## they run out over the frame either side.
+const SHUT_PLANK := 26.0
+const SHUT_GAP := 3.0
+const SHUT_OVER := 6.0
+## The planks coming off: how long, how hard they fall, and how far apart they let go.
+const UNSEAL_TIME := 1.2
+const UNSEAL_FALL := 1400.0
+const UNSEAL_STAGGER := 0.06
+## When the head card comes back, in seconds into the planks' fall.
+const UNSEAL_CARD := 0.55
+## The padlock, in whole design px: iron, its lit top and its shadow.
+const LOCK_IRON := Color(0.36, 0.36, 0.40)
+const LOCK_LIT := Color(0.66, 0.66, 0.70)
+const LOCK_DARK := Color(0.14, 0.14, 0.17)
+const LOCK_WIDE := 26.0
+const LOCK_TALL := 20.0
 ## The tour is over: `skipped` if "Skip" ended it.
 signal tour_ended(skipped: bool)
 
@@ -490,6 +537,16 @@ func cheer(key: StringName) -> void:
 	_sparkle = SPARKLE_TIME
 	if _sparkling == &"luck":
 		toss_coin()
+	set_process(true)
+	queue_redraw()
+
+
+## A board coming open: its planks fall away and its head sparkles (2026-10-25, the staged
+## shop). Called by the lake the frame the board opens.
+func unseal(board: StringName) -> void:
+	_unsealing[board] = UNSEAL_TIME
+	_sparkling = board
+	_sparkle = SPARKLE_TIME
 	set_process(true)
 	queue_redraw()
 
@@ -629,6 +686,11 @@ func _process(delta: float) -> void:
 		if _sparkle <= 0.0:
 			_sparkling = &""
 		queue_redraw()
+	for board: StringName in _unsealing.keys():
+		_unsealing[board] = float(_unsealing[board]) - delta
+		if float(_unsealing[board]) <= 0.0:
+			_unsealing.erase(board)
+		queue_redraw()
 	_lay_out_rows()
 	# Only when the boards would come out different. The lake hands over a fresh `rows`
 	# every frame the menu is open, but its contents only change when a level or the purse
@@ -731,7 +793,7 @@ static func help_box_of(row_box: Rect2) -> Rect2:
 
 
 func _paint_key() -> int:
-	return hash([rows.hash(), legend.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame])
+	return hash([rows.hash(), legend.hash(), shut.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame])
 
 
 func _draw() -> void:
@@ -771,6 +833,12 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 	# Only the last board carries the cross, so only its title makes room for one.
 	var room := Style.title_room(ribbon, CLOSE_SIZE) if board == BOARDS[BOARDS.size() - 1] else Rect2()
 	_draw_ribbon(ribbon, String(titles.get(board, TITLES.get(board, ""))), room)
+	if shut.has(board):
+		var hidden: ShopCard = _cards.get(board)
+		if hidden != null:
+			hidden.visible = false
+		_draw_shut(box, face, int(shut[board]), -1.0)
+		return
 
 	# The sprite, fitted into its slot at its own proportions.
 	var slot := Rect2(
@@ -821,6 +889,86 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 			line, line.size.x * TAG_SHARE, String(rows[i].get("cost", "")), Style.TEXT_BODY
 		))
 		_draw_row(rows[i], line, _hovered == i, _help_hovered == i)
+	if _unsealing.has(board):
+		var fallen := UNSEAL_TIME - float(_unsealing[board])
+		# The head card is a child node and draws over anything drawn here, the planks
+		# included: it waits until the planks over it have dropped clear.
+		if card != null:
+			card.visible = fallen >= UNSEAL_CARD
+		_draw_shut(box, face, 0, fallen)
+
+
+## A shut board's cover: planks across the face below the title, nailed at both ends, a
+## padlock and the count of levels to go on a slip of paper. `fallen` is how long the planks
+## have been coming off, or under 0 for a board still shut: each lets go `UNSEAL_STAGGER`
+## after the one above and falls, the padlock and the slip first.
+func _draw_shut(box: Rect2, face: Rect2, left: int, fallen: float) -> void:
+	var top := box.position.y + RIBBON_TALL * 0.5
+	var cover := Rect2(face.position.x, top, face.size.x, face.end.y - top)
+	var drop := func(delay: float) -> float:
+		if fallen < 0.0:
+			return 0.0
+		var t := maxf(fallen - delay, 0.0)
+		return roundf(0.5 * UNSEAL_FALL * t * t)
+	var n := maxi(int(ceilf((cover.size.y + SHUT_GAP) / (SHUT_PLANK + SHUT_GAP))), 1)
+	var pitch := (cover.size.y + SHUT_GAP) / float(n)
+	for i in n:
+		var dy: float = drop.call(UNSEAL_STAGGER * float(i + 2))
+		if top + pitch * float(i) + dy > size.y:
+			continue
+		var h := hash(i * 31 + int(box.position.x))
+		var l := face.position.x - SHUT_OVER + float(h % 4)
+		var r := face.end.x + SHUT_OVER - float((h / 4) % 4)
+		var plank := Rect2(Vector2(l, top + pitch * float(i) + dy).round(), Vector2(r - l, pitch - SHUT_GAP).round())
+		Style.plank(self, plank, h % 997, Style.FRAME if i % 2 == 0 else Style.FRAME_LOW)
+		for x: float in [plank.position.x + 7.0, plank.end.x - 10.0]:
+			var nail := Rect2(Vector2(x, plank.position.y + plank.size.y * 0.5 - 1.0).round(), Vector2(3.0, 3.0))
+			draw_rect(nail, LOCK_DARK, true)
+			draw_rect(Rect2(nail.position, Vector2.ONE), LOCK_LIT, true)
+	if left <= 0 and fallen < 0.0:
+		return
+	# A board coming open falls with the last count it showed, one.
+	var words := Text.SHOP_LOCKED_BUY_ONE if left <= 1 else Text.SHOP_LOCKED_BUYS % left
+	var font := Style.font()
+	var size_px := Style.TEXT_BODY
+	var slip_wide := cover.size.x - 28.0
+	var lines := FirstSteps._wrap(words, font, size_px, slip_wide - 16.0)
+	if lines.size() > 3:
+		size_px = Style.TEXT_SMALL
+		lines = FirstSteps._wrap(words, font, size_px, slip_wide - 16.0)
+	var line_tall := font.get_height(size_px) + 1.0
+	var slip_tall := 14.0 + line_tall * float(lines.size())
+	var lock_dy: float = drop.call(0.0)
+	var middle := cover.get_center() + Vector2(0.0, lock_dy)
+	var lock := Rect2((middle - Vector2(LOCK_WIDE * 0.5, LOCK_TALL + 10.0)).round(), Vector2(LOCK_WIDE, LOCK_TALL))
+	_draw_lock(lock, fallen >= 0.0)
+	if fallen < 0.0 or lock_dy < size.y:
+		var slip := Rect2(Vector2(middle.x - slip_wide * 0.5, lock.end.y + 8.0).round(), Vector2(slip_wide, slip_tall).round())
+		draw_rect(slip.grow(2.0), FirstSteps.NOTE_OUTER, true)
+		draw_rect(slip, Style.PAPER, true)
+		draw_rect(slip.grow(-1.0), Style.PAPER_EDGE, false, 1.0)
+		Wrap.draw_marked(self, font, lines, size_px, slip, slip.position.y + 7.0 + font.get_ascent(size_px),
+			line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
+
+
+## The padlock over a shut board, in whole design px; its shackle lifts as the board opens.
+func _draw_lock(body: Rect2, open: bool) -> void:
+	# Open, the shackle rises and its right leg comes out of the body; the left stays in.
+	var lift := 6.0 if open else 0.0
+	var bar := 4.0
+	var top := body.position.y - 13.0 - lift
+	var left := body.position.x + 5.0
+	var right := body.end.x - 5.0 - bar
+	draw_rect(Rect2(left, top, bar, body.position.y + 2.0 - top), LOCK_IRON, true)
+	draw_rect(Rect2(right, top, bar, body.position.y + 2.0 - lift - top), LOCK_IRON, true)
+	draw_rect(Rect2(left, top, right + bar - left, bar), LOCK_IRON, true)
+	draw_rect(Rect2(left, top, right + bar - left, 1.0), LOCK_LIT, true)
+	draw_rect(body.grow(1.0), LOCK_DARK, true)
+	draw_rect(body, LOCK_IRON, true)
+	draw_rect(Rect2(body.position, Vector2(body.size.x, 2.0)), LOCK_LIT, true)
+	draw_rect(Rect2(Vector2(body.position.x, body.end.y - 2.0), Vector2(body.size.x, 2.0)), LOCK_DARK, true)
+	var hole := Rect2(Vector2(body.get_center().x - 2.0, body.position.y + 6.0).round(), Vector2(4.0, 7.0))
+	draw_rect(hole, LOCK_DARK, true)
 
 
 ## What a board draws, in order: a group's heading as `-group - 1`, then that group's rows
@@ -1464,12 +1612,19 @@ func _grow_group(board: StringName, index: int, line: Rect2) -> void:
 
 ## What the card showing is about, in this control's pixels, or an empty rect.
 func tour_target() -> Rect2:
-	if tour < 0 or tour >= TOUR.size():
+	if tour < 0 or tour >= tour_cards.size():
 		return Rect2()
-	var at: Variant = TOUR[tour][0]
+	var at: Variant = tour_cards[tour][0]
 	if at is StringName:
 		if at == &"legend":
 			return _legend_box
+		# The boards still shut, all together.
+		if at == &"locked":
+			var all := Rect2()
+			for board: StringName in shut:
+				var one: Rect2 = _boards.get(board, Rect2())
+				all = one if all.size.x <= 0.0 else all.merge(one)
+			return all
 		return _boards.get(at, Rect2())
 	return (_group_boxes.get(at, Rect2()) as Rect2).grow(4.0)
 
@@ -1496,7 +1651,7 @@ func tour_next() -> void:
 	if tour < 0:
 		return
 	tour += 1
-	if tour >= TOUR.size():
+	if tour >= tour_cards.size():
 		tour = -1
 		tour_ended.emit(false)
 	queue_redraw()
@@ -1530,7 +1685,7 @@ func _draw_tour() -> void:
 	var size_px := FirstSteps.NOTE_SIZE
 	var wide := FirstSteps.NOTE_WIDE
 	var pad := FirstSteps.NOTE_PAD
-	var lines := FirstSteps._wrap(Text.of(String(TOUR[tour][1])), face, size_px, wide - pad.x * 2.0)
+	var lines := FirstSteps._wrap(Text.of(String(tour_cards[tour][1])), face, size_px, wide - pad.x * 2.0)
 	var line_tall := face.get_height(size_px) + 1.0
 	var icon := Glyphs.confirm() if tour_pad else _prompt_mouse
 	var icon_size := icon.get_size() * px if icon != null else Vector2.ZERO
@@ -1538,7 +1693,7 @@ func _draw_tour() -> void:
 	var tall := pad.y * 2.0 + line_tall * float(lines.size() + 1) + 4.0 + foot_tall
 	var card := Rect2(Vector2.ZERO, Vector2(wide, tall).round())
 	# Beside the target on whichever side has room; the plate, which fills the foot, above.
-	if TOUR[tour][0] is StringName and TOUR[tour][0] == &"legend":
+	if tour_cards[tour][0] is StringName and tour_cards[tour][0] == &"legend":
 		card.position = Vector2(target.get_center().x - wide * 0.5, target.position.y - tall - TOUR_GAP * 2.0)
 	elif target.end.x + TOUR_GAP + wide <= size.x - 4.0 and target.get_center().x < size.x * 0.5:
 		card.position = Vector2(target.end.x + TOUR_GAP, target.position.y + target.size.y * 0.2)
@@ -1552,7 +1707,7 @@ func _draw_tour() -> void:
 	_tour_layer.draw_rect(card.grow(-1.0), Style.PAPER_EDGE, false, FirstSteps.NOTE_RIM)
 	var ascent := face.get_ascent(size_px)
 	var inner := card.grow_individual(-pad.x, -pad.y, -pad.x, -pad.y)
-	_tour_layer.draw_string(face, Vector2(inner.position.x, inner.position.y + ascent), "%d/%d" % [tour + 1, TOUR.size()],
+	_tour_layer.draw_string(face, Vector2(inner.position.x, inner.position.y + ascent), "%d/%d" % [tour + 1, tour_cards.size()],
 		HORIZONTAL_ALIGNMENT_RIGHT, inner.size.x, size_px, Style.PAPER_SOFT)
 	var y := inner.position.y + line_tall + ascent
 	Wrap.draw_marked(_tour_layer, face, lines, size_px, card, y, line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
@@ -1586,7 +1741,7 @@ func _ensure_tour_layer() -> void:
 	_tour_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_tour_layer)
 	_tour_layer.draw.connect(func() -> void:
-		if tour >= 0 and tour < TOUR.size():
+		if tour >= 0 and tour < tour_cards.size():
 			_draw_tour()
 		elif only != &"":
 			_draw_only()

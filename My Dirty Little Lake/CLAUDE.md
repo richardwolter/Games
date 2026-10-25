@@ -2140,6 +2140,48 @@ ribbon titles are carved.
   tone per board, none green, the inks, the max face and badge, the rows' `maxed`, the coin
   sheet's nine frames and the carve.
 
+### The Staged Shop (2026-10-25, `/grill-me` with Richard; test branch `mdll-staged-shop`)
+**On trial in a separate copy** (`Documents/MDLL Staged Shop Test`, its own save folder, no
+Steam id), not in the game until Richard approves it. Off a Chinese demo review ("the idle and
+hands-on balance isn't right") and Richard's worry that new players read slow boats as a slow
+idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19).
+- **The boards open one at a time** (`Lake.SHOP_STAGES`): BOATS from the start, NET after 3
+  levels bought, DOGS after 26 more, LUCK after 22 more. Counted off the levels owned
+  (`buys_to_open`, `track_open`), so nothing is saved; a board already bought from is open
+  whatever the count, so a run saved before the stages keeps what it had. **Full game only**: the demo and every borrowed lake open all four
+  (`Lake.force_stages` for probes and tests).
+- **Gates from the sim** (`docs/progression/build_shop.py --gates`, `staged_gates.py`): the
+  focused bot opens them at 0.5 / 5.9 / 9.8 min, the buy-anything bot at 0.5 / 7.2 / 12.6.
+  **NET waits only 3 buys, not ~3 minutes, by evidence**: past the third boat level a level-0
+  net cannot fill even one hull, so every further boat level earns nothing, and since a ferry
+  sails only full, a bigger hold sits longer at the dock. **Known, accepted for the trial**:
+  Strength comes at 3.9 min (was 7.2), the focused clear drops to 46.6 min (under the 48-68
+  band), and the box builds sooner (about 120 at minutes 8-10). Richard judges in play.
+- **Left to right in the order they open** (`ShopSkin.BOARDS` boat / net / dog / luck): the
+  purse under BOATS, the pricing plate under NET and DOGS, the cross on LUCK. **The demo takes
+  the new order too** if this merges.
+- **A shut board stays drawn, boarded over** (`ShopSkin.shut`, `_draw_shut`, `_draw_lock`):
+  frame and title kept, the face planked (`SHUT_PLANK`, nailed ends), a padlock and a paper
+  slip, "Buy N more upgrades to unlock" (`SHOP_LOCKED_BUYS`, `SHOP_LOCKED_BUY_ONE`). Its rows
+  register nothing, so nothing on it buys, hovers or takes the pad. **It comes open on the
+  purchase that opens it** (`_watch_stages`, `unseal`): the planks fall away over
+  `UNSEAL_TIME`, the padlock and slip first, its head sparkles. A level is only ever bought
+  with the shop up, so the Upgrades button's pulse is not needed for it.
+- **The tour is split per board** (`ShopSkin.TOUR_STAGES`, `tour_cards`, `Lake._shop_tours`
+  saved as `shop_tours`, absent reads as all seen when `shop_tour` was done): BOATS with a card
+  on the shut boards (`TOUR_SHOP_LOCKED`) and the pricing plate on the first visit; each later
+  board's own card(s) the moment it opens. "Skip" ends them all. The forced first upgrade picks
+  a boat row (Capacity), as before.
+- **Strings**: three new keys, machine drafts in seven languages, unreviewed.
+- **Out of scope, by decision**: the nonstop caster outrunning the boats, any price or curve,
+  the demo, hiding rows within a board.
+- **Before merging**: revert the test copy's `project.godot` name and user dir and restore
+  `steam_appid.txt`; re-shoot the letter's Upgrades stills and the store's shop shot.
+- `test_lake`'s `_check_staged_shop` guards the gates, the shut rows, the affordable count, the
+  first upgrade, the tour per stage, the unseal, Skip, the demo and the save rule. Probe:
+  `tools/shot_staged_shop.tscn` (desktop build, own save) saves
+  `tools/last_staged_{boats,locked,legend,unseal,net,open}.png`.
+
 ### The Shelf Centred and the Tray in Plates (2026-10-09, `/grill-me` with Richard)
 - **The Decorate column is 250 wide** (`ShedRoom.LIST_WIDTH`, was 210): the house and the
   column are centred as one block, so the house moves left by half of it. The Deck check

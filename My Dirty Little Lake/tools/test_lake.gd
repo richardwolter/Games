@@ -3011,9 +3011,9 @@ func _stage_market() -> void:
 			and ShopSkin.LEGEND_REACH < ShopSkin.BOARD_GAP * 0.5,
 			"and stands under the middle two boards, inside the table",
 			"legend %s left %s right %s table %s" % [legend_box, boat_box, dog_box, table])
-		_check(ShopSkin.BOARDS == [&"net", &"luck", &"boat", &"dog"]
+		_check(ShopSkin.BOARDS == [&"boat", &"net", &"dog", &"luck"]
 			and (ShopSkin.GROUPS[&"net"][0][1] as Array).slice(0, 2) == [&"net_strength", &"net_hold"],
-			"the boards stand net, luck, boats, dogs, and Catch is under Strength",
+			"the boards stand boats, net, dogs, luck (the order they open), and Catch is under Strength",
 			str(ShopSkin.BOARDS))
 	# The rail (2026-09-17): a column down the left of a row, the "?" answering in its top
 	# half and the level's figure standing in its bottom. Both inside the plate, where the
@@ -10189,8 +10189,116 @@ func _stage_foam() -> void:
 ## The shop's shape (2026-09-17): four boards named without an article, every row's name
 ## unique across all of them, every row claimed by exactly one group, one value grammar, and
 ## the pricing plate standing under the middle two even though the boards are now level.
+## The staged shop (2026-10-25, the mdll-staged-shop test branch): the boards open one at a
+## time, BOATS first, then NET, DOGS and LUCK, each once enough levels are bought since the one
+## before; a shut board cannot be bought from and counts nothing affordable; a board coming
+## open has its planks come off; each stage's tour cards follow; the demo and a borrowed lake
+## open everything.
+func _check_staged_shop() -> void:
+	var shop: ShopSkin = _main.get(&"_shop_skin")
+	var levels := {}
+	for key: StringName in Lake.TRACKS:
+		levels[key] = int(_main.call(&"_level_of", key))
+	var money: float = _main.get(&"sludge")
+	var tours: int = _main.get(&"_shop_tours")
+	var tour_done: bool = _main.get(&"_shop_tour_done")
+	var first_buy: bool = _main.get(&"_first_buy_done")
+	_check(int(_main.call(&"buys_to_open", &"luck")) == 0,
+		"a borrowed lake opens every board at once", str(_main.call(&"buys_to_open", &"luck")))
+	_check(ShopSkin.board_for(&"cargo") == &"boat" and ShopSkin.board_for(&"double_cast") == &"luck",
+		"every track knows its board", "")
+	Lake.force_stages = true
+	for key: StringName in Lake.TRACKS:
+		_main.set(StringName(String(key) + "_level"), 0)
+	_main.set(&"sludge", 1.0e7)
+	_main.set(&"_first_buy_done", true)
+	_main.set(&"_stages_open", -1)
+	_main.call(&"_watch_stages")
+	_check(int(_main.call(&"buys_to_open", &"boat")) == 0
+		and int(_main.call(&"buys_to_open", &"net")) == 3
+		and int(_main.call(&"buys_to_open", &"dog")) == 29
+		and int(_main.call(&"buys_to_open", &"luck")) == 51,
+		"a new game opens the boats and waits 3, 26 and 22 more levels for the rest",
+		"%d %d %d" % [_main.call(&"buys_to_open", &"net"), _main.call(&"buys_to_open", &"dog"),
+			_main.call(&"buys_to_open", &"luck")])
+	var shut: Dictionary = _main.call(&"_shut_boards")
+	_check(not shut.has(&"boat") and shut.has(&"net") and shut.has(&"dog") and shut.has(&"luck"),
+		"the shut boards are the three after the boats", str(shut))
+	_check(int(_main.call(&"_affordable")) == 4,
+		"only the boats' four rows count as affordable", str(_main.call(&"_affordable")))
+	_check(_main.call(&"_cheapest_affordable") == &"cargo",
+		"the first upgrade points at a boat row", str(_main.call(&"_cheapest_affordable")))
+	var shut_rows := (_main.call(&"_shop_rows") as Array).filter(func(r: Dictionary) -> bool:
+		return StringName(r["board"]) != &"boat" and bool(r["afford"]))
+	_check(shut_rows.is_empty(), "no row on a shut board can be bought", str(shut_rows.size()))
+	_main.call(&"_buy", &"net_width")
+	_check(int(_main.call(&"_level_of", &"net_width")) == 0, "a buy on a shut board does nothing", "")
+	_main.set(&"dog_count_level", 1)
+	_check(int(_main.call(&"buys_to_open", &"dog")) == 0,
+		"a board already bought from is open, whatever the count (a run saved before the stages)", "")
+	_main.set(&"dog_count_level", 0)
+	# The first visit: the boats' cards, then the shut boards', then the plate's.
+	_main.set(&"_shop_tours", 0)
+	shop.tour = -1
+	_main.call(&"_set_menu", true)
+	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"boat"],
+		"the first visit walks the boats' cards", "%d %s" % [shop.tour, str(shop.tour_cards)])
+	shop.shut = _main.call(&"_shut_boards")
+	shop.call(&"_lay_out")
+	shop.tour = 1
+	var locked: Rect2 = shop.tour_target()
+	var boards: Dictionary = shop.get(&"_boards")
+	_check(locked.encloses(boards[&"net"]) and locked.encloses(boards[&"luck"])
+		and not locked.encloses(boards[&"boat"]),
+		"the second card points at the boards still shut", str(locked))
+	shop.tour = 0
+	for i in 3:
+		shop.tour_next()
+	_check(shop.tour == -1 and int(_main.get(&"_shop_tours")) == 1,
+		"the boats' cards end and their stage is counted", "%d %d" % [shop.tour, _main.get(&"_shop_tours")])
+	# Three buys open the net: its planks come off and its card follows, the shop being up.
+	for key: StringName in [&"cargo", &"boat_speed", &"boat_speed"]:
+		_main.call(&"_buy", key)
+	_main.call(&"_watch_stages")
+	_check(int(_main.call(&"buys_to_open", &"net")) == 0 and (shop.get(&"_unsealing") as Dictionary).has(&"net"),
+		"three boat levels open the net, its planks coming off", str(shop.get(&"_unsealing")))
+	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"net"],
+		"and the net's card comes up with it", "%d %s" % [shop.tour, str(shop.tour_cards)])
+	shop.set(&"_tour_skip", Rect2(0.0, 0.0, 10.0, 10.0))
+	var skip := InputEventMouseButton.new()
+	skip.button_index = MOUSE_BUTTON_LEFT
+	skip.pressed = true
+	skip.position = Vector2(5.0, 5.0)
+	shop.call(&"_tour_input", skip)
+	_check(shop.tour == -1 and int(_main.get(&"_shop_tours")) == Lake.SHOP_STAGES.size()
+		and bool(_main.get(&"_shop_tour_done")),
+		"Skip ends every stage's cards for good", str(_main.get(&"_shop_tours")))
+	_main.call(&"_set_menu", false)
+	Demo.forced = true
+	_check(int(_main.call(&"buys_to_open", &"luck")) == 0, "the demo opens every board at once", "")
+	Demo.forced = false
+	var src := (load("res://scripts/lake.gd") as GDScript).source_code
+	_check(src.find('"shop_tours": _shop_tours') >= 0
+		and src.find('save.get("shop_tours", SHOP_STAGES.size() if _shop_tour_done else 0)') >= 0,
+		"the stages' tours are saved, an older save reading as all seen", "")
+	for word: String in [Text.SHOP_LOCKED_BUYS % 26, Text.SHOP_LOCKED_BUY_ONE, Text.TOUR_SHOP_LOCKED]:
+		_check(not word.is_empty() and word.find("SHOP_") < 0, "the shut boards' words are in the table", word)
+	Lake.force_stages = false
+	for key: StringName in Lake.TRACKS:
+		_main.set(StringName(String(key) + "_level"), int(levels[key]))
+	_main.set(&"sludge", money)
+	_main.set(&"_shop_tours", tours)
+	_main.set(&"_shop_tour_done", tour_done)
+	_main.set(&"_first_buy_done", first_buy)
+	_main.set(&"_stages_open", -1)
+	shop.tour = -1
+	shop.tour_cards = ShopSkin.TOUR
+	(shop.get(&"_unsealing") as Dictionary).clear()
+
+
 func _stage_shop_shape() -> void:
 	var skin := _main.get_node(^"HUD/ShopSkin")
+	_check_staged_shop()
 	_check_shop_purse(skin)
 	_check_ten_fixes(skin)
 	_check_bonus_panel()
