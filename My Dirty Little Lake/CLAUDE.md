@@ -7952,9 +7952,11 @@ M3 Nov 1, M4 (release candidate up for Valve's review) **Nov 6**, M5 Nov 16.
   `docs/steam/pricing.md`; Valve's regional prices were entered the same day.
   **Revisited 2026-10-24** (`/grill-me`): US$4.99 stays; **Japan ¥700** (from the tool's
   ¥705), because Japan is 46% of wishlists; **¥600 on Dec 16** if Japan converts under 70%
-  of the US rate by Nov 30. The store's About heading says the game is short, in every
-  language, with no hour count. The Winter Sale at 20% is still open. Reasons and data in
-  pricing.md, under Japan, revisited.
+  of the US rate by Nov 30. **Entered in Steamworks 2026-10-25**: the regional prices
+  (JPY ¥700) and the launch discount, 15% for 14 days from Nov 16. A short-game About
+  heading is drafted in every language in `docs/steam/store_text/`, not yet on the store
+  (Richard reviews the page in its own session). The Winter Sale at 20% is still open.
+  Reasons and data in pricing.md, under Japan, revisited.
   **`upload_game.bat beta`** writes `app_build_5375170_beta.tmp.vdf` (`SetLive "beta"`,
   git-ignored) and uploads that; the `beta` branch is created once in Steamworks.
 - **Both upload scripts copy `addons/godotsteam/license.md` beside the exe as

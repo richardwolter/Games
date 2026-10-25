@@ -5,11 +5,14 @@
 >
 > **Revisited 2026-10-24** (`/grill-me` with Richard, a sanity check after Next Fest):
 > - US$4.99 and the 15% launch discount stay.
-> - **Japan goes to ¥700**, from Valve's ¥705. **Not yet entered in Steamworks.**
+> - **Japan goes to ¥700**, from Valve's ¥705.
+> - **Entered in Steamworks by Richard, 2026-10-25**: every regional price in the table below
+>   (JPY ¥700 among them) and the launch discount, 15% for 14 days from Nov 16.
 > - **If Japan converts under 70% of the US rate by Nov 30, Japan drops to ¥600 on Dec 16**,
 >   the first day Valve allows a price change. See **Japan, revisited** below.
 > - **The store page says the game is short**, in the About heading of every language, with
->   no hour count (Richard's call). See `store_text/`.
+>   no hour count (Richard's call). Drafted in `store_text/`; **not yet on the store page**,
+>   which Richard reviews in a session of its own.
 > - Still open: the Winter Sale at 20%, recommended on 2026-10-10 and not reconfirmed.
 
 Researched 2026-10-10 for the 2026-11-16 launch (app 5375170). Prices and review counts
@@ -121,7 +124,7 @@ tornadoes, 8 languages, controller support), so it belongs in the cozy band, not
 
 **Entered in Steamworks by Richard, 2026-10-10**: Valve's recommendations, with GBP set to
 £3.99 and CNY to ¥18.00, and the four USD regions filled. **JPY changes to ¥700**
-(decided 2026-10-24, still to be entered).
+(decided 2026-10-24, entered 2026-10-25).
 
 **A lesson on method.** Before the tool was opened, its output was guessed by reading two
 $4.99 games (*A Game About Digging A Hole*, *Brotato*) off the store API in 42 storefronts.
@@ -139,7 +142,7 @@ never a published game.**
 | RUB | 245 | |
 | PLN | 20,49 | |
 | BRL | 16,99 | kept, see below |
-| JPY | 700 | **¥700 decided 2026-10-24, to be entered in Steamworks** (the tool said 705). ¥600 on Dec 16 if Japan converts poorly: see **Japan, revisited** |
+| JPY | 700 | **¥700 decided 2026-10-24, entered 2026-10-25** (the tool said 705). ¥600 on Dec 16 if Japan converts poorly: see **Japan, revisited** |
 | NOK | 52,50 | |
 | IDR | 50 999 | |
 | MYR | 12.49 | |
