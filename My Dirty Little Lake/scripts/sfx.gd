@@ -768,6 +768,26 @@ func room_birdsong() -> void:
 	_from_room = false
 
 
+## A step of the house mending itself (2026-10-25, `ShedRoom.MEND_CUES`): a hammer tap (the
+## furniture's small thud, high), a board laid (its big thud) or the finish (the find's
+## chime). Takes the game already has, by Richard's call; levels and pitches by guess.
+const MEND_TAP_PITCHES := [1.32, 1.42, 1.37, 1.48]
+var _mend_taps: int = 0
+
+
+func room_mend(step: StringName) -> void:
+	_from_room = true
+	match step:
+		&"tap":
+			play(&"drop_small", -3.0, float(MEND_TAP_PITCHES[_mend_taps % MEND_TAP_PITCHES.size()]))
+			_mend_taps += 1
+		&"board":
+			play(&"drop_big", -2.0, 1.06)
+		&"chime":
+			play(&"find_caught", -4.0)
+	_from_room = false
+
+
 ## The first player in a pool with nothing playing, or null.
 func _idle(pool: Array[AudioStreamPlayer]) -> AudioStreamPlayer:
 	for voice in pool:

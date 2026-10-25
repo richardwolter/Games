@@ -74,7 +74,9 @@ func _physics_process(_delta: float) -> void:
 			for key: StringName in [&"cargo", &"boat_speed", &"boat_speed"]:
 				_main.call(&"_buy", key)
 			_say("bought three: shut %s, tour %d" % [str(_main.call(&"_shut_boards")), _skin.tour])
-			_wait()
+			# Half a second into the fall, where the planks reach the board's foot.
+			_step += 1
+			_at = _frames + 20
 		6:
 			_shoot("unseal")
 		7:

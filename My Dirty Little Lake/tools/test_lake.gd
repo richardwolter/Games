@@ -5583,6 +5583,34 @@ func _check_house(room: ShedRoom) -> void:
 	_check(queued == ["u12", "u23"] and room.house_seen == 3, "a jump of two stages plays both stage-ups, once", str(queued))
 	room.call(&"_house_shown")
 	_check((room.get(&"_house_playing") as Array).is_empty(), "and not on the next visit", "")
+	# The saw and boards by the low corner (st1) are there from stage 1 and take no piece in
+	# stages 1 and 2, so the mending lands nothing under a piece (2026-10-25, Richard).
+	var saw := Rect2i(204, 190, 34, 4)
+	_check(HouseInside.base_blocked(1, saw) and HouseInside.base_blocked(2, saw)
+		and not HouseInside.base_blocked(3, saw),
+		"the saw and boards take no piece in stages 1 and 2, and are gone in 3", "")
+	# The house's card first: with it owed, the mending holds on its first frame, the old room,
+	# then plays with its own sound; without it, it plays at once.
+	room.mend_card = true
+	room.house_seen = 1
+	room.call(&"_house_shown")
+	_check(is_equal_approx(float(room.get(&"_mend_hold")), ShedRoom.MEND_WAIT),
+		"with the house's card owed, the mending waits for it", str(room.get(&"_mend_hold")))
+	if not (room.get(&"_house_under") as Array).is_empty() and HouseInside.ready_to_draw():
+		room.call(&"_tick_house", 0.5)
+		_check(is_zero_approx(float(room.get(&"_house_clock"))), "and does not move while it waits", "")
+		room.set(&"_mend_hold", 0.0)
+		room.call(&"_tick_house", 1.0)
+		_check(int(room.get(&"_mend_next")) > 0, "then plays the mending's own sound",
+			str(room.get(&"_mend_next")))
+	room.mend_card = false
+	room.house_seen = 1
+	room.call(&"_house_shown")
+	_check(is_zero_approx(float(room.get(&"_mend_hold"))), "with no card owed the mending plays at once", "")
+	var lake_wall: Rect2 = _main.call(&"_hint_target", &"demo_house")
+	var floor_at: Rect2 = room.get_global_transform() * (room.call(&"_floor_rect") as Rect2)
+	_check(lake_wall.size.y > 0.0 and lake_wall.end.y <= floor_at.position.y + 0.5,
+		"the house's card stands over the back wall, off the floor", "%s %s" % [lake_wall, floor_at])
 	# A foot in a puddle splashes.
 	room.house_stage = 1
 	room.set(&"_house_rings", [])
@@ -10216,9 +10244,9 @@ func _check_staged_shop() -> void:
 	_main.call(&"_watch_stages")
 	_check(int(_main.call(&"buys_to_open", &"boat")) == 0
 		and int(_main.call(&"buys_to_open", &"net")) == 3
-		and int(_main.call(&"buys_to_open", &"dog")) == 29
-		and int(_main.call(&"buys_to_open", &"luck")) == 51,
-		"a new game opens the boats and waits 3, 26 and 22 more levels for the rest",
+		and int(_main.call(&"buys_to_open", &"dog")) == 15
+		and int(_main.call(&"buys_to_open", &"luck")) == 25,
+		"a new game opens the boats and the rest at 3, 15 and 25 levels bought",
 		"%d %d %d" % [_main.call(&"buys_to_open", &"net"), _main.call(&"buys_to_open", &"dog"),
 			_main.call(&"buys_to_open", &"luck")])
 	var shut: Dictionary = _main.call(&"_shut_boards")
@@ -10262,6 +10290,15 @@ func _check_staged_shop() -> void:
 	_main.call(&"_watch_stages")
 	_check(int(_main.call(&"buys_to_open", &"net")) == 0 and (shop.get(&"_unsealing") as Dictionary).has(&"net"),
 		"three boat levels open the net, its planks coming off", str(shop.get(&"_unsealing")))
+	shop.call(&"_lay_out")
+	var net_box: Rect2 = (shop.get(&"_boards") as Dictionary)[&"net"]
+	var net_face: Rect2 = Style.board_face(net_box, ShopSkin.FRAME)
+	shop.call(&"_cover_of", &"net", net_box, net_face)
+	var covers: Dictionary = shop.get(&"_covers")
+	var cover: Control = covers.get(&"net")
+	_check(cover != null and cover.clip_contents and absf(cover.get_rect().end.y - net_face.end.y) < 0.5,
+		"the falling planks are clipped to the board's face, over nothing else",
+		"%s face %s" % [cover.get_rect() if cover != null else Rect2(), net_face])
 	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"net"],
 		"and the net's card comes up with it", "%d %s" % [shop.tour, str(shop.tour_cards)])
 	shop.set(&"_tour_skip", Rect2(0.0, 0.0, 10.0, 10.0))
@@ -10294,6 +10331,42 @@ func _check_staged_shop() -> void:
 	shop.tour = -1
 	shop.tour_cards = ShopSkin.TOUR
 	(shop.get(&"_unsealing") as Dictionary).clear()
+	for layer: Control in (shop.get(&"_covers") as Dictionary).values():
+		layer.queue_free()
+	(shop.get(&"_covers") as Dictionary).clear()
+	# The house tour's last card: a walk takes it down for good (2026-10-25, Richard).
+	var room: ShedRoom = _main.get(&"_room")
+	var kept_tour: int = _main.get(&"_decor_tour")
+	var kept_tour_done: bool = _main.get(&"_decor_tour_done")
+	var kept_you: Vector2 = room.get(&"_you_at")
+	_main.call(&"_set_shed", true)
+	_main.set(&"_decor_tour", Lake.DecorTour.ROOM)
+	_main.set(&"_decor_tour_done", false)
+	_main.set(&"_decor_room_from", Vector2.INF)
+	_main.call(&"_decor_tour_step", 0.016)
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.ROOM, "the house tour's last card stands while the player is still", "")
+	room.set(&"_you_at", (room.get(&"_you_at") as Vector2) + Vector2(1.0, 0.0))
+	_main.call(&"_decor_tour_step", 0.016)
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.OFF and bool(_main.get(&"_decor_tour_done")),
+		"and a walk ends it for good", str(_main.get(&"_decor_tour")))
+	_main.call(&"_set_shed", false)
+	room.set(&"_you_at", kept_you)
+	_main.set(&"_decor_tour", kept_tour)
+	_main.set(&"_decor_tour_done", kept_tour_done)
+	# A find's name follows a language picked after the lake loaded (2026-10-25, Richard: the
+	# record player's card said "Record Player" in PT-BR).
+	var record: TrashDef = null
+	for def: TrashDef in (_main.get(&"_grid") as LakeGrid).defs:
+		if def.keepsake and String(def.piece) == "decor_vynil_player":
+			record = def
+	if record != null:
+		var was := TranslationServer.get_locale()
+		TranslationServer.set_locale("pt_BR")
+		_main.call(&"_rename_finds")
+		_check(record.display_name == Text.of("DECOR_VYNIL_PLAYER") and record.display_name != "Record Player",
+			"a find's name follows the language picked after load", record.display_name)
+		TranslationServer.set_locale(was)
+		_main.call(&"_rename_finds")
 
 
 func _stage_shop_shape() -> void:

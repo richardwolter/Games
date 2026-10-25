@@ -1130,6 +1130,10 @@ const DECOR_BACK_AFTER := 1.6
 const DECOR_SPRAYED := 0.04
 ## How many pieces stood in the room when the shelf's card came up; -1 before it has.
 var _decor_tour_placed := -1
+## Where the player stood (house cells) when the room's card came up in this visit, or INF;
+## and how far a walk from there ends the card.
+var _decor_room_from := Vector2.INF
+const DECOR_ROOM_MOVED := 0.35
 ## How clean the find was when the stand's card came up; -1 before it has.
 var _decor_stand_from := -1.0
 ## The decoration tour's sentences are `Text.TOUR_DECOR_*`, read as each card goes up.
@@ -1611,6 +1615,8 @@ func _ready() -> void:
 	# catalogue, or the shelf shows a picture with no word under it (Richard, 2026-09-13).
 	if _sheets != null and not _pretty(STARTER_BED).is_empty():
 		_room.titles[STARTER_BED] = _pretty(STARTER_BED)
+	# Those names are words: a language picked on the menu after the lake loaded renames them.
+	Prefs.language_changed.connect(_rename_finds)
 	_shop_skin.bought.connect(_buy)
 	# The picture at the head of the net and ferry boards: the ferry's own baked hull and
 	# the net laid out. The dog's board draws the dog itself.
@@ -2439,6 +2445,24 @@ func found() -> Array[String]:
 ## shows a find checks for the empty string and draws the picture on its own instead.
 func _pretty(name: String) -> String:
 	return "" if _sheets == null else _sheets.title_of(StringName(name))
+
+
+## Every find's name asked again, in the language now in play: the defs and the house's list
+## keep the words they were given at load.
+func _rename_finds() -> void:
+	if _sheets == null or _grid == null:
+		return
+	for def: TrashDef in _grid.defs:
+		if not def.keepsake or def.piece == &"":
+			continue
+		var said := _pretty(String(def.piece))
+		if said.is_empty():
+			continue
+		def.display_name = said
+		if _room != null:
+			_room.titles[String(def.piece)] = said
+	if _room != null and not _pretty(STARTER_BED).is_empty():
+		_room.titles[STARTER_BED] = _pretty(STARTER_BED)
 
 
 ## Point every def at its picture, and take its drawn size from the art rather than from
@@ -3697,6 +3721,10 @@ func _set_shed(open: bool) -> void:
 	if open and not _shed_open and _sfx != null and not _room_swap:
 		_sfx.play_door(true)
 	_shed_open = open
+	# The house's card goes up before the mending plays, the first time only (see
+	# `ShedRoom.mend_card`): told before the door opens, which is when the room decides.
+	if _room != null:
+		_room.mend_card = not _cues_seen.has(&"demo_house")
 	_shed.visible = open
 	if open:
 		_skin.hush_pulse(&"shed")
@@ -4409,6 +4437,18 @@ func _decor_tour_step(delta: float) -> void:
 			else:
 				_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 3, DECOR_TOUR_CARDS, true)
 		DecorTour.ROOM:
+			# A walk ends the card for good (Richard, after his first run of the staged shop):
+			# the player has stopped reading and the dimming is in the way. Measured from where
+			# they stood when it came up in this room.
+			var you: Vector2 = _room.get(&"_you_at")
+			if not _shed_open:
+				_decor_room_from = Vector2.INF
+			elif _decor_room_from == Vector2.INF:
+				_decor_room_from = you
+			elif you.distance_to(_decor_room_from) > DECOR_ROOM_MOVED:
+				_decor_room_from = Vector2.INF
+				_end_decor_tour()
+				return
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
 				lit = _room.room_box()
@@ -5447,15 +5487,16 @@ const TRACKS := [
 # boards open one at a time, BOATS first, then NET, DOGS and LUCK, each once enough levels have
 # been bought since the board before it opened, so a new player meets one board at a time and
 # learns first that the boats carry the money. Each stage is a board and the levels it waits
-# for after the one before; the sim fitted the counts (`docs/progression/staged_gates.py`):
-# NET at about half a minute, DOGS at six, LUCK at ten in a focused run. NET waits only three
-# buys because past the third boat level a level-0 net cannot fill even one hull, and every
-# further boat level earns nothing.
+# for after the one before: NET at 3 levels bought, DOGS at 15, LUCK at 25 in all (Richard,
+# after his first run: DOGS and LUCK came too late at 29 and 51). The sim
+# (`docs/progression/staged_gates.py`) opens them at about 0.5, 4.0 and 5.2 minutes in a
+# focused run. NET waits only three buys because past the third boat level a level-0 net
+# cannot fill even one hull, and every further boat level earns nothing.
 #
-# Worked out from the levels owned, so nothing is saved and an older run with levels on every
-# board has every board open. Full game only: the demo, and every borrowed lake but one that
+# Worked out from the levels owned, so nothing is saved; a board already bought from is open
+# whatever the count. Full game only: the demo, and every borrowed lake but one that
 # asks (`force_stages`), open everything at once.
-const SHOP_STAGES := [[&"boat", 0], [&"net", 3], [&"dog", 26], [&"luck", 22]]
+const SHOP_STAGES := [[&"boat", 0], [&"net", 3], [&"dog", 12], [&"luck", 10]]
 static var force_stages: bool = false
 
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
@@ -6541,6 +6582,7 @@ func _hint_step(delta: float) -> void:
 	if held or target.size.x <= 0.0:
 		_hint_card.hide_hint(true)
 		return
+	_hint_card.inside = _hint_up == &"demo_house"
 	if not _hint_card.showing():
 		_hint_card.show_hint(_hint_up, Text.of(String(HINT_TEXT[_hint_up])), target)
 	_hint_card.target = target
@@ -6575,10 +6617,11 @@ func _hint_target(kind: StringName) -> Rect2:
 		&"honey_jar":
 			return _skin.get_global_transform() * _skin.honey_box()
 		&"demo_house":
+			# Over the back wall, off the floor the mending plays on (2026-10-25, Richard: the
+			# card stood over the animation). The card stands inside it, with no arrow.
 			if _room == null:
 				return Rect2()
-			var room := _room.get_global_transform() * _room.room_box()
-			return Rect2(room.get_center() - Vector2(20.0, room.size.y * 0.3), Vector2(40.0, 40.0))
+			return _room.get_global_transform() * _room.wall_box()
 		&"hive_demo":
 			if _hive == null:
 				return Rect2()

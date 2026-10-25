@@ -73,8 +73,9 @@ THE RULES THIS FILE KEEPS
     grain a step lighter, a shade line only on ends facing away from the window; long shards
     off snapped ends (`shards`); h2/h3/H5 earth on MUD's clear steps with fewer, rounder
     clods and wandering roots. Stage 2's mended boards are MEND_BODY (the floor's own wood a
-    touch warmer and lighter), seams the old floor's. 1->2: the stack and saw fall as ONE
-    object (7, 4, 1 px, its shadow under it) and land at .75.
+    touch warmer and lighter), seams the old floor's. The stack and saw (st1) lie there from
+    stage 1 (2026-10-25, Richard: dropped in at the mending they landed under the player's
+    furniture) and stay put through 1->2.
   * Static pixels built once per stage and cached; a frame redraws the plants.
 
 STAGE-UPS (8 fps ticks; life.py's veil steps at p .625 and .875 are left alone)
@@ -83,7 +84,7 @@ STAGE-UPS (8 fps ticks; life.py's veil steps at p .625 and .875 are left alone)
         .44 while their stage-1 earth dissolves in 4 hash-ordered steps (.44 .5 .56 .69) and
         the pool dries about its middle in 4 steps two ticks apart (.44 .56 .69 .81; nothing
         else touches its pixels while they are water); the other patches land .30-.75, lb2 at
-        .81; the stack is built WITHOUT it in s2 and falls whole, all parts together, at .75.
+        .81; the stack is drawn over everything, already lying there from stage 1.
         Round 2: the cores are never bare: stage-2 plants stand up .31-.56 (as the first
         weeds under new boards go) and open .5-.69, and only then does the stage-1 grass
         rooted in a core thin out (.69 .75 .81). A plant outside the cores is gone the tick
@@ -2050,6 +2051,9 @@ def build(stage, pool=1.0, stack=True):
         H4.ragged(can, 4)
         H2.ragged(can, 3)
         debris(can)
+        # The saw and boards are waiting from stage 1 (2026-10-25, Richard): set down at the
+        # mending they landed under whatever the player had put there.
+        stack_and_saw(can)
     elif stage == 2:
         grime(can, 1.4, seed=3)
         stains_s2(can)
@@ -2784,24 +2788,10 @@ def _up_12(p, ts, under, ctx):
             if dy == 0:
                 can.rgb[sl] = s2[sl][..., :3]
                 can.a[sl] = s2[sl][..., 3] > 0
-    # the stack (round 4, critics: set down part by part, A then B then the saw, it read as
-    # building itself in slices): the two boards and the saw on them fall together as ONE
-    # whole object, 7 px, then 4, then 1 above their place, their shadow on the boards under
-    # them darkening as they come down, and land with a puff at both ends
-    ticks = int(round((STACK_FALL_LAND - p) / DROP))
-    if 0 < ticks <= len(STACK_FALL):
-        dy = STACK_FALL[ticks - 1]
-        sh = STACK_SHADOW
-        k_ = 0.9 if dy >= 7 else 0.82 if dy >= 4 else 0.74
-        can.rgb[sh] = (can.rgb[sh] * k_).astype(np.int32)
-        can.a[sh] = True
-        stack_and_saw(can, ST_PARTS, {part: dy for part in ST_PARTS})
-    elif ticks <= 0:
-        age = (p - STACK_FALL_LAND) * 2.0
-        _puff(ov, 204, 197, age, 79)
-        _puff(ov, 236, 197, age, 84)
-        _puff(ov, 209, 202, age, 87)
-        stack_and_saw(can, ST_PARTS)
+    # the stack is already there from stage 1 (2026-10-25, Richard): it stays where it lies
+    # all through the mending, over the old boards being scrubbed under it. It used to fall
+    # in here, onto whatever the player had stood on that spot.
+    stack_and_saw(can, ST_PARTS)
     _blit(under, can.image())
     # plants: stage 1's under a landed board are gone; those in the cores wither tips
     # down with the dissolve; the rest (the door's tufts, the leaves) are pulled one by one

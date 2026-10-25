@@ -879,6 +879,24 @@ var _house_clock: float = 0.0
 var _house_playing: Array[String] = []
 var _house_frame_was: int = -1
 var _house_sound_set: String = ""
+## Whether the lake will put the house's card up for this visit's mending (it shows once):
+## set by the lake before the door opens. With it, the mending waits `MEND_WAIT` on its first
+## frame, the old room, so the card is read before anything moves (Richard, after the staged
+## shop's first run: the card came with the animation and stood over it).
+var mend_card := false
+const MEND_WAIT := 1.5
+var _mend_hold: float = 0.0
+## The mending's own sound (2026-10-25, Richard: "a special sound for when the house fixes
+## itself"), laid in time with each stage-up from takes the game already has: the furniture's
+## small thud as hammer taps, its big thud as a board laid, the find's chime as it finishes.
+## `[seconds into the stage-up, what]`; first guesses for Richard's ear.
+const MEND_CUES := [
+	[0.15, &"tap"], [0.32, &"tap"], [0.55, &"board"],
+	[0.80, &"tap"], [0.95, &"tap"], [1.10, &"tap"], [1.35, &"board"],
+	[1.60, &"tap"], [1.75, &"tap"], [1.95, &"board"], [2.35, &"chime"],
+]
+var _mend_set: String = ""
+var _mend_next: int = 0
 ## How far the shower has spread through the room, 0..1, a source pixel at a time.
 var _rain_mix: float = 0.0
 var _splash_next: float = 0.0
@@ -2643,6 +2661,13 @@ func shelf_box() -> Rect2:
 
 func room_box() -> Rect2:
 	return _shed_rect()
+
+
+## The back wall, over the floor: where the house's card stands while the floor mends.
+func wall_box() -> Rect2:
+	var shed := _shed_rect()
+	var floor_box := _floor_rect()
+	return Rect2(shed.position, Vector2(shed.size.x, maxf(floor_box.position.y - shed.position.y, 0.0)))
 
 
 func switch_box() -> Rect2:
@@ -5153,6 +5178,9 @@ func _house_shown() -> void:
 	_house_frame_was = -1
 	_house_playing.clear()
 	_house_rings.clear()
+	_mend_set = ""
+	_mend_next = 0
+	_mend_hold = 0.0
 	_rain_mix = _rain_wanted()
 	_bird_next = randf_range(BIRD_GAP.x * 0.3, BIRD_GAP.y * 0.5)
 	if house_seen < house_stage:
@@ -5166,7 +5194,24 @@ func _house_shown() -> void:
 		_house_playing.append("u1h")
 		half_seen = true
 		half_played.emit()
+	if mend_card and not _house_playing.is_empty():
+		_mend_hold = MEND_WAIT
 	house_seen = house_stage
+
+
+## The mending's sound: each `MEND_CUES` step whose time a stage-up has reached, once, and
+## over again from the top for the next stage-up of a jump of two. Nothing while it is held.
+func _mend_sounds(playing: String) -> void:
+	if playing != _mend_set:
+		_mend_set = playing
+		_mend_next = 0
+	if playing.is_empty() or _mend_hold > 0.0:
+		return
+	var sound := Sfx.main()
+	while _mend_next < MEND_CUES.size() and _house_clock >= float(MEND_CUES[_mend_next][0]):
+		if sound != null:
+			sound.room_mend(MEND_CUES[_mend_next][1])
+		_mend_next += 1
 
 
 ## How much of the room the shower should have: stage 1 only, the one with the leaks.
@@ -5181,7 +5226,11 @@ func _rain_wanted() -> float:
 func _tick_house(delta: float) -> void:
 	if _house_under.is_empty() or not HouseInside.ready_to_draw():
 		return
-	_house_clock += delta
+	# Held on the stage-up's first frame, the room as it was, while the card is read.
+	if _mend_hold > 0.0:
+		_mend_hold = maxf(_mend_hold - delta, 0.0)
+	else:
+		_house_clock += delta
 	var fps := HouseInside.fps()
 	var main := ""
 	var other := ""
@@ -5195,6 +5244,7 @@ func _tick_house(delta: float) -> void:
 		_house_playing.pop_front()
 		_house_clock = 0.0
 		_house_frame_was = -1
+	_mend_sounds(main)
 	if main.is_empty():
 		_rain_mix = move_toward(_rain_mix, _rain_wanted(), delta / RAIN_SPREAD)
 		main = HouseInside.loop_of(house_stage, false)

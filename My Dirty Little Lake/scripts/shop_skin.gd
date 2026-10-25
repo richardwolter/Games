@@ -401,6 +401,10 @@ var tour_pad := false
 var shut: Dictionary = {}
 ## Boards whose planks are coming off, with the seconds that has left to run.
 var _unsealing := {}
+## Each falling cover is drawn on a child of its own that clips to the board (Richard, after
+## his first run: the planks slid down over the purse and the plate). A child draws after the
+## head cards, so the planks also stay over the head picture until they have fallen past it.
+var _covers := {}
 ## The planks across a shut board: how tall each is, the dark gap between two, and how far
 ## they run out over the frame either side.
 const SHUT_PLANK := 26.0
@@ -410,8 +414,6 @@ const SHUT_OVER := 6.0
 const UNSEAL_TIME := 1.2
 const UNSEAL_FALL := 1400.0
 const UNSEAL_STAGGER := 0.06
-## When the head card comes back, in seconds into the planks' fall.
-const UNSEAL_CARD := 0.55
 ## The padlock, in whole design px: iron, its lit top and its shadow.
 const LOCK_IRON := Color(0.36, 0.36, 0.40)
 const LOCK_LIT := Color(0.66, 0.66, 0.70)
@@ -690,6 +692,11 @@ func _process(delta: float) -> void:
 		_unsealing[board] = float(_unsealing[board]) - delta
 		if float(_unsealing[board]) <= 0.0:
 			_unsealing.erase(board)
+			if _covers.has(board):
+				(_covers[board] as Control).queue_free()
+				_covers.erase(board)
+		elif _covers.has(board):
+			(_covers[board] as Control).queue_redraw()
 		queue_redraw()
 	_lay_out_rows()
 	# Only when the boards would come out different. The lake hands over a fresh `rows`
@@ -837,7 +844,7 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 		var hidden: ShopCard = _cards.get(board)
 		if hidden != null:
 			hidden.visible = false
-		_draw_shut(box, face, int(shut[board]), -1.0)
+		_draw_shut(self, box, face, int(shut[board]), -1.0)
 		return
 
 	# The sprite, fitted into its slot at its own proportions.
@@ -890,19 +897,40 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 		))
 		_draw_row(rows[i], line, _hovered == i, _help_hovered == i)
 	if _unsealing.has(board):
-		var fallen := UNSEAL_TIME - float(_unsealing[board])
-		# The head card is a child node and draws over anything drawn here, the planks
-		# included: it waits until the planks over it have dropped clear.
-		if card != null:
-			card.visible = fallen >= UNSEAL_CARD
-		_draw_shut(box, face, 0, fallen)
+		_cover_of(board, box, face)
+
+
+## The layer a falling cover is drawn on: the cover's own span, from the title down to the
+## face's foot and out over the frame by the planks' overhang, clipping everything past it.
+func _cover_of(board: StringName, box: Rect2, face: Rect2) -> void:
+	var layer: Control = _covers.get(board)
+	if layer == null:
+		layer = Control.new()
+		layer.name = "Cover_%s" % board
+		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.clip_contents = true
+		add_child(layer)
+		layer.draw.connect(func() -> void:
+			if not _unsealing.has(board):
+				return
+			layer.draw_set_transform(-layer.position)
+			_draw_shut(layer, layer.get_meta(&"box"), layer.get_meta(&"face"), 0,
+				UNSEAL_TIME - float(_unsealing[board]))
+		)
+		_covers[board] = layer
+	var top := box.position.y + RIBBON_TALL * 0.5
+	layer.position = Vector2(face.position.x - SHUT_OVER, top)
+	layer.size = Vector2(face.size.x + SHUT_OVER * 2.0, face.end.y - top)
+	layer.set_meta(&"box", box)
+	layer.set_meta(&"face", face)
+	layer.queue_redraw()
 
 
 ## A shut board's cover: planks across the face below the title, nailed at both ends, a
 ## padlock and the count of levels to go on a slip of paper. `fallen` is how long the planks
 ## have been coming off, or under 0 for a board still shut: each lets go `UNSEAL_STAGGER`
 ## after the one above and falls, the padlock and the slip first.
-func _draw_shut(box: Rect2, face: Rect2, left: int, fallen: float) -> void:
+func _draw_shut(on: CanvasItem, box: Rect2, face: Rect2, left: int, fallen: float) -> void:
 	var top := box.position.y + RIBBON_TALL * 0.5
 	var cover := Rect2(face.position.x, top, face.size.x, face.end.y - top)
 	var drop := func(delay: float) -> float:
@@ -920,11 +948,11 @@ func _draw_shut(box: Rect2, face: Rect2, left: int, fallen: float) -> void:
 		var l := face.position.x - SHUT_OVER + float(h % 4)
 		var r := face.end.x + SHUT_OVER - float((h / 4) % 4)
 		var plank := Rect2(Vector2(l, top + pitch * float(i) + dy).round(), Vector2(r - l, pitch - SHUT_GAP).round())
-		Style.plank(self, plank, h % 997, Style.FRAME if i % 2 == 0 else Style.FRAME_LOW)
+		Style.plank(on, plank, h % 997, Style.FRAME if i % 2 == 0 else Style.FRAME_LOW)
 		for x: float in [plank.position.x + 7.0, plank.end.x - 10.0]:
 			var nail := Rect2(Vector2(x, plank.position.y + plank.size.y * 0.5 - 1.0).round(), Vector2(3.0, 3.0))
-			draw_rect(nail, LOCK_DARK, true)
-			draw_rect(Rect2(nail.position, Vector2.ONE), LOCK_LIT, true)
+			on.draw_rect(nail, LOCK_DARK, true)
+			on.draw_rect(Rect2(nail.position, Vector2.ONE), LOCK_LIT, true)
 	if left <= 0 and fallen < 0.0:
 		return
 	# A board coming open falls with the last count it showed, one.
@@ -941,34 +969,34 @@ func _draw_shut(box: Rect2, face: Rect2, left: int, fallen: float) -> void:
 	var lock_dy: float = drop.call(0.0)
 	var middle := cover.get_center() + Vector2(0.0, lock_dy)
 	var lock := Rect2((middle - Vector2(LOCK_WIDE * 0.5, LOCK_TALL + 10.0)).round(), Vector2(LOCK_WIDE, LOCK_TALL))
-	_draw_lock(lock, fallen >= 0.0)
+	_draw_lock(on, lock, fallen >= 0.0)
 	if fallen < 0.0 or lock_dy < size.y:
 		var slip := Rect2(Vector2(middle.x - slip_wide * 0.5, lock.end.y + 8.0).round(), Vector2(slip_wide, slip_tall).round())
-		draw_rect(slip.grow(2.0), FirstSteps.NOTE_OUTER, true)
-		draw_rect(slip, Style.PAPER, true)
-		draw_rect(slip.grow(-1.0), Style.PAPER_EDGE, false, 1.0)
-		Wrap.draw_marked(self, font, lines, size_px, slip, slip.position.y + 7.0 + font.get_ascent(size_px),
+		on.draw_rect(slip.grow(2.0), FirstSteps.NOTE_OUTER, true)
+		on.draw_rect(slip, Style.PAPER, true)
+		on.draw_rect(slip.grow(-1.0), Style.PAPER_EDGE, false, 1.0)
+		Wrap.draw_marked(on, font, lines, size_px, slip, slip.position.y + 7.0 + font.get_ascent(size_px),
 			line_tall, Style.PAPER_INK, Style.PAPER_HEAD)
 
 
 ## The padlock over a shut board, in whole design px; its shackle lifts as the board opens.
-func _draw_lock(body: Rect2, open: bool) -> void:
+func _draw_lock(on: CanvasItem, body: Rect2, open: bool) -> void:
 	# Open, the shackle rises and its right leg comes out of the body; the left stays in.
 	var lift := 6.0 if open else 0.0
 	var bar := 4.0
 	var top := body.position.y - 13.0 - lift
 	var left := body.position.x + 5.0
 	var right := body.end.x - 5.0 - bar
-	draw_rect(Rect2(left, top, bar, body.position.y + 2.0 - top), LOCK_IRON, true)
-	draw_rect(Rect2(right, top, bar, body.position.y + 2.0 - lift - top), LOCK_IRON, true)
-	draw_rect(Rect2(left, top, right + bar - left, bar), LOCK_IRON, true)
-	draw_rect(Rect2(left, top, right + bar - left, 1.0), LOCK_LIT, true)
-	draw_rect(body.grow(1.0), LOCK_DARK, true)
-	draw_rect(body, LOCK_IRON, true)
-	draw_rect(Rect2(body.position, Vector2(body.size.x, 2.0)), LOCK_LIT, true)
-	draw_rect(Rect2(Vector2(body.position.x, body.end.y - 2.0), Vector2(body.size.x, 2.0)), LOCK_DARK, true)
+	on.draw_rect(Rect2(left, top, bar, body.position.y + 2.0 - top), LOCK_IRON, true)
+	on.draw_rect(Rect2(right, top, bar, body.position.y + 2.0 - lift - top), LOCK_IRON, true)
+	on.draw_rect(Rect2(left, top, right + bar - left, bar), LOCK_IRON, true)
+	on.draw_rect(Rect2(left, top, right + bar - left, 1.0), LOCK_LIT, true)
+	on.draw_rect(body.grow(1.0), LOCK_DARK, true)
+	on.draw_rect(body, LOCK_IRON, true)
+	on.draw_rect(Rect2(body.position, Vector2(body.size.x, 2.0)), LOCK_LIT, true)
+	on.draw_rect(Rect2(Vector2(body.position.x, body.end.y - 2.0), Vector2(body.size.x, 2.0)), LOCK_DARK, true)
 	var hole := Rect2(Vector2(body.get_center().x - 2.0, body.position.y + 6.0).round(), Vector2(4.0, 7.0))
-	draw_rect(hole, LOCK_DARK, true)
+	on.draw_rect(hole, LOCK_DARK, true)
 
 
 ## What a board draws, in order: a group's heading as `-group - 1`, then that group's rows

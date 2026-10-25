@@ -2145,18 +2145,20 @@ ribbon titles are carved.
 Steam id), not in the game until Richard approves it. Off a Chinese demo review ("the idle and
 hands-on balance isn't right") and Richard's worry that new players read slow boats as a slow
 idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19).
-- **The boards open one at a time** (`Lake.SHOP_STAGES`): BOATS from the start, NET after 3
-  levels bought, DOGS after 26 more, LUCK after 22 more. Counted off the levels owned
+- **The boards open one at a time** (`Lake.SHOP_STAGES`): BOATS from the start, NET at 3
+  levels bought, DOGS at 15, LUCK at 25 in all (Richard, after his first run: 29 and 51 came
+  too late). Counted off the levels owned
   (`buys_to_open`, `track_open`), so nothing is saved; a board already bought from is open
   whatever the count, so a run saved before the stages keeps what it had. **Full game only**: the demo and every borrowed lake open all four
   (`Lake.force_stages` for probes and tests).
 - **Gates from the sim** (`docs/progression/build_shop.py --gates`, `staged_gates.py`): the
-  focused bot opens them at 0.5 / 5.9 / 9.8 min, the buy-anything bot at 0.5 / 7.2 / 12.6.
+  focused bot opens them at 0.5 / 4.0 / 5.2 min, the buy-anything bot at 0.5 / 3.2 / 6.2
+  (first fitted to 3 / 26 / 22 more: 5.9 and 9.8).
   **NET waits only 3 buys, not ~3 minutes, by evidence**: past the third boat level a level-0
   net cannot fill even one hull, so every further boat level earns nothing, and since a ferry
   sails only full, a bigger hold sits longer at the dock. **Known, accepted for the trial**:
-  Strength comes at 3.9 min (was 7.2), the focused clear drops to 46.6 min (under the 48-68
-  band), and the box builds sooner (about 120 at minutes 8-10). Richard judges in play.
+  Strength comes at 3.9 min (was 7.2), the focused clear drops to 47.5 min (under the 48-68
+  band), and the box builds sooner. Richard judges in play.
 - **Left to right in the order they open** (`ShopSkin.BOARDS` boat / net / dog / luck): the
   purse under BOATS, the pricing plate under NET and DOGS, the cross on LUCK. **The demo takes
   the new order too** if this merges.
@@ -2165,14 +2167,38 @@ idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19)
   slip, "Buy N more upgrades to unlock" (`SHOP_LOCKED_BUYS`, `SHOP_LOCKED_BUY_ONE`). Its rows
   register nothing, so nothing on it buys, hovers or takes the pad. **It comes open on the
   purchase that opens it** (`_watch_stages`, `unseal`): the planks fall away over
-  `UNSEAL_TIME`, the padlock and slip first, its head sparkles. A level is only ever bought
-  with the shop up, so the Upgrades button's pulse is not needed for it.
+  `UNSEAL_TIME`, the padlock and slip first, its head sparkles. **They fall on a child that
+  clips to the board** (`_covers`, `_cover_of`; Richard, after his first run: they slid down
+  over the purse and the plate), so they vanish behind the frame's foot, and being a later
+  child they stay over the head picture until they have fallen past it. A level is only ever
+  bought with the shop up, so the Upgrades button's pulse is not needed for it.
 - **The tour is split per board** (`ShopSkin.TOUR_STAGES`, `tour_cards`, `Lake._shop_tours`
   saved as `shop_tours`, absent reads as all seen when `shop_tour` was done): BOATS with a card
   on the shut boards (`TOUR_SHOP_LOCKED`) and the pricing plate on the first visit; each later
   board's own card(s) the moment it opens. "Skip" ends them all. The forced first upgrade picks
   a boat row (Capacity), as before.
 - **Strings**: three new keys, machine drafts in seven languages, unreviewed.
+- **Fixed off the same run, outside the shop** (2026-10-25, `/grill-me` with Richard):
+  - **The house tour's last card ends on a walk** (`Lake._decor_room_from`,
+    `DECOR_ROOM_MOVED` 0.35 cells): the "press E" card and its dimming go for good once the
+    player walks from where they stood when it came up.
+  - **A find's name follows the language** (`Lake._rename_finds` on `Prefs.language_changed`,
+    and `Trophy` asking `Sheets.title_of` as it draws): the find card said "Record Player" in
+    PT-BR, the name cached at load before the language was picked on the menu.
+  - **The house mending has a sound** (`ShedRoom.MEND_CUES`, `Sfx.room_mend`): the furniture's
+    small thud as hammer taps (pitched 1.32-1.48), its big thud as boards laid, the find's
+    chime at the end, laid in time with each stage-up. Takes the game already has, by
+    Richard's call; levels and timings first guesses.
+  - **The house's card comes first and off the floor** (`ShedRoom.mend_card`, `MEND_WAIT`
+    1.5 s, set by `Lake._set_shed`; `CueCard.inside`, `ShedRoom.wall_box`): the first mending
+    holds on its first frame, the old room, while the card stands over the back wall with no
+    arrow, then plays with its sound; the card stays up. With the card seen, it plays at once.
+  - **The saw and boards are there from stage 1** (`st1` stages [1, 2] in
+    `art_source/house_inside/layout.json`, drawn by `floor.build(1)`, no longer dropped in by
+    `_up_12`; `build_house_inside.py`'s `blocks` puts a `stack` in `place`): they landed under
+    whatever the player had stood there. No placing on them in stages 1 and 2; walkers cross.
+    Re-baked (`build_house_inside.py`, then `--half`); only the stage-1 sets, `u12`, `u1h` and
+    `house.json` changed.
 - **Out of scope, by decision**: the nonstop caster outrunning the boats, any price or curve,
   the demo, hiding rows within a board.
 - **Before merging**: revert the test copy's `project.godot` name and user dir and restore
