@@ -10,11 +10,11 @@ config_version=5
 
 [application]
 
-config/name="My Dirty Little Lake"
+config/name="My Dirty Little Lake (staged shop test)"
 config/version="1.0.0"
 run/main_scene="res://scenes/boot.tscn"
 config/use_custom_user_dir=true
-config/custom_user_dir_name="My Dirty Little Lake"
+config/custom_user_dir_name="My Dirty Little Lake Staged Shop Test"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.0706, 0.1804, 0.0549, 1)
 boot_splash/stretch_mode=4
