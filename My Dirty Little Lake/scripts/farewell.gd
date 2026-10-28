@@ -129,6 +129,9 @@ var bank: bool = false
 signal bank_asked
 ## The home door reads "Back to lake" and only closes the words (the demo's ending).
 var lake_door: bool = false
+## A "Back to lake" door left of the menu's (the full game, 2026-10-28, Richard): it closes
+## the words like a click off the doors. Shown where no other door stands there.
+var stay_door: bool = false
 var _wish_rect := Rect2()
 ## The ending filmed (2026-10-12): the lake the reel films, set by the full game's ending
 ## before the screen is added. Null, no reel (the demo).
@@ -558,6 +561,8 @@ func _side_label() -> String:
 		return Text.DEMO_WISHLIST
 	if bank:
 		return Text.BANK_TITLE
+	if stay_door:
+		return Text.DEMO_BACK_LAKE
 	return ""
 
 
@@ -566,6 +571,8 @@ func _take_side() -> void:
 		open_store()
 	elif bank:
 		bank_asked.emit()
+	elif stay_door:
+		dismiss()
 
 
 func _door(rect: Rect2, label: String, height: float, hot: bool, fade: float, shade: Color) -> void:

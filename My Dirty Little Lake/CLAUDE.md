@@ -2199,6 +2199,37 @@ idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19)
     whatever the player had stood there. No placing on them in stages 1 and 2; walkers cross.
     Re-baked (`build_house_inside.py`, then `--half`); only the stage-1 sets, `u12`, `u1h` and
     `house.json` changed.
+- **Round 3, off Richard's second run, on a DualSense** (2026-10-28, `/grill-me`):
+  - **A board's card waits for its planks and takes no click at once** (`ShopSkin.tour_wait`,
+    `tour_up`, `TOUR_GRACE` 0.6 s, a setter on `tour`; `Lake._start_stage_tour(wait)`): the
+    card came up on the purchase that opened the board and the next buy click or ✕ dismissed
+    it unread. His save had all four stages marked done.
+  - **The house on the pad**: while the decoration tour's plank card is up the shelf opens
+    itself once a visit with the wash plank picked (`ShedRoom.focus_wash`,
+    `Lake._decor_shelf_opened`); while the pad's shelf is up `switch_near` does nothing, so ✕
+    on the plank no longer took the door he stood at.
+  - **The upgrades card names the pad's button** (`FIRST_BUY_PAD`, the △/Y glyph).
+  - **The lake's buttons wear their pad buttons in pad mode** (`PlankButton.pad_action`, the
+    gear and the camera; `HudSkin._draw`, the decorate and upgrades buttons), on their top-left
+    corners.
+  - **The hive's catch draws the pad's pointer** (`HiveStepCatch._draw_pad_pointer`, the
+    game's wooden arrow at the stick's spot).
+  - **The knife and the lever follow RT's travel and are felt** (`HiveStep.press_strength`,
+    `feel`, `Pad.rumble`): a light squeeze creeps the knife, a full one is the old glide; the
+    lever turns as far as RT goes down; the motors hum as the blade cuts (the heavy one as it
+    strains) and as honey pours. **Supersedes "rumble out of scope"** (The PlayStation Pad).
+    Godot 4.7 has no DualSense trigger resistance; a native plugin would be the way, after
+    launch. Strengths are first guesses.
+  - **The boats' boost after a tamed tornado** (`Lake.BOOST_TIME` 60 s, `BOOST_SAIL` 2.5,
+    `BOOST_LOAD` 2, `_boost_step`; `Boat.boost_left`, `BoostIcon`, `_draw_boost`): sailing
+    2.5 times as fast and loading twice as fast for a minute, about 90 s of sailing for a
+    30-60 s hold. A spinning whole-pixel tornado over every hull, blinking in its last
+    `BOOST_BLINK` 5 s. The first time, `CUE_BOOST` at the ferry bar (theme `boost`). Untamed,
+    settled by a save or the menu, or the demo's finale: nothing. Not saved.
+  - **The ending**: a "Back to lake" door left of "Back to menu" in the full game
+    (`Farewell.stay_door`, the demo's `DEMO_BACK_LAKE`), and the reel's bubble shut and unseen
+    from its first frame (it flashed whole before the words).
+  - Two new strings (`FIRST_BUY_PAD`, `CUE_BOOST`), machine drafts.
 - **Out of scope, by decision**: the nonstop caster outrunning the boats, any price or curve,
   the demo, hiding rows within a board.
 - **Before merging**: revert the test copy's `project.godot` name and user dir and restore

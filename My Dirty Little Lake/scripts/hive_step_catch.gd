@@ -802,6 +802,24 @@ func _draw_marks(ci: CanvasItem) -> void:
 func _draw_front(ci: CanvasItem) -> void:
 	_draw_marks(ci)
 	draw_payoff(ci)
+	_draw_pad_pointer(ci)
+
+
+## The pointer the stick moves, drawn on the pad (2026-10-28, Richard: the hidden one left
+## nothing to see while dragging a clump): the game's own wooden arrow, its tip on the spot.
+var _arrow_art: Texture2D = null
+
+
+func _draw_pad_pointer(ci: CanvasItem) -> void:
+	if not Pad.is_pad() or not awake() or _caught:
+		return
+	if _arrow_art == null and ResourceLoader.exists(Pad.CURSOR_ART):
+		_arrow_art = load(Pad.CURSOR_ART)
+	if _arrow_art == null:
+		return
+	var s := maxf(Glyphs.stretch(), 0.01)
+	var at := ci.get_local_mouse_position() - Pad.CURSOR_TIP / s
+	ci.draw_texture_rect(_arrow_art, Rect2(at.round(), _arrow_art.get_size() / s), false)
 
 
 ## The swarm's drawing, inside the CanvasGroup the outline shader reads.

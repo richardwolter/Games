@@ -379,8 +379,19 @@ static var TOUR_CONTINUE: String:
 static var TOUR_SKIP: String:
 	get: return Text.TOUR_SKIP
 
-## The card showing, or -1 for no tour.
-var tour: int = -1
+## The card showing, or -1 for no tour. Each card takes no click for its first
+## `TOUR_GRACE` (2026-10-28, Richard: a board's card came up on the purchase that opened it,
+## and the next buy click dismissed it unread).
+var tour: int = -1:
+	set(value):
+		tour = value
+		_tour_age = 0.0
+		queue_redraw()
+## Seconds before the tour's card shows at all, while a board's planks are still falling: the
+## shop works as usual meanwhile. Set by the lake before `tour`.
+var tour_wait := 0.0
+var _tour_age := 0.0
+const TOUR_GRACE := 0.6
 ## The one row that buys, or empty for every row (2026-10-15, issue #41: the first upgrade).
 ## Everything but it is dimmed and its price tag is the only one that answers; the cross,
 ## Escape and a click off the boards still close the shop.
@@ -688,6 +699,14 @@ func _process(delta: float) -> void:
 		if _sparkle <= 0.0:
 			_sparkling = &""
 		queue_redraw()
+	if tour >= 0:
+		if tour_wait > 0.0:
+			tour_wait = maxf(tour_wait - delta, 0.0)
+			if tour_wait <= 0.0:
+				_tour_age = 0.0
+				queue_redraw()
+		else:
+			_tour_age += delta
 	for board: StringName in _unsealing.keys():
 		_unsealing[board] = float(_unsealing[board]) - delta
 		if float(_unsealing[board]) <= 0.0:
@@ -717,8 +736,11 @@ func _lay_out_rows() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if tour >= 0:
-		_tour_input(event)
+	if tour_up():
+		if _tour_age >= TOUR_GRACE:
+			_tour_input(event)
+		elif event is InputEventMouseButton:
+			accept_event()
 		return
 	if event is InputEventMouseMotion:
 		var was := _hovered
@@ -1674,6 +1696,11 @@ func _tour_input(event: InputEvent) -> void:
 	queue_redraw()
 
 
+## Whether a tour card is showing: one is set and its board's planks have fallen.
+func tour_up() -> bool:
+	return tour >= 0 and tour_wait <= 0.0
+
+
 ## The next card, or the end.
 func tour_next() -> void:
 	if tour < 0:
@@ -1769,7 +1796,7 @@ func _ensure_tour_layer() -> void:
 	_tour_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_tour_layer)
 	_tour_layer.draw.connect(func() -> void:
-		if tour >= 0 and tour < tour_cards.size():
+		if tour_up() and tour < tour_cards.size():
 			_draw_tour()
 		elif only != &"":
 			_draw_only()
@@ -1829,7 +1856,7 @@ func _draw_only() -> void:
 ## The rows for the pad's stick (scripts/pad.gd): one stop a row, the pointer on its price
 ## tag so A buys, and the close cross. None during the tour, whose cards are the pointer's.
 func pad_focus() -> Array:
-	if tour >= 0:
+	if tour_up():
 		if _tour_card.size == Vector2.ZERO:
 			return []
 		var go := Rect2(_tour_card.position, Vector2(_tour_card.size.x, _tour_card.size.y * 0.5))

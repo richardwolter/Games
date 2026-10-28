@@ -93,6 +93,10 @@ const THEMES := {
 		"ink": Color(0.33, 0.19, 0.0), "icon": &"coin", "entrance": &"pop"},
 	&"ferry": {"band": Color(0.22, 0.48, 0.62), "mark": Color(0.60, 0.82, 0.94),
 		"ink": Color(0.02, 0.21, 0.34), "icon": &"boat", "entrance": &"sail"},
+	# The boats' boost after a tamed tornado (2026-10-28): the tornado's funnel on the ferry's
+	# blue, swirling in.
+	&"boost": {"band": Color(0.30, 0.44, 0.66), "mark": Color(0.68, 0.76, 0.92),
+		"ink": Color(0.02, 0.21, 0.34), "icon": &"funnel", "entrance": &"swirl"},
 }
 ## The icons that are drawn from rows of letters, one letter a pixel. `k` is the outline,
 ## `w` white, `p` the paper, `y` gold, `o` deep gold, `g` green, `G` deep green, `b` the

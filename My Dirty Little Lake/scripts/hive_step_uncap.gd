@@ -460,8 +460,9 @@ func _drive_hand(delta: float, down: bool) -> void:
 	if pad:
 		if push > PAD_DEAD:
 			_want += push * PAD_PACE * delta
+		# RT's travel is the pace: a light squeeze creeps, a full one is the old glide.
 		if down:
-			_want += GLIDE_PACE * delta
+			_want += GLIDE_PACE * press_strength() * delta
 	elif down:
 		_want = maxf(_want, art_mouse().y)
 	_want = clampf(_want, _inner.position.y, bottom)
@@ -480,6 +481,10 @@ func _drive_knife(delta: float) -> void:
 	_speed = lerpf(_speed, step / delta, 1.0 - exp(-20.0 * delta))
 	var pull := clampf((gap - STRAIN_FROM) / STRAIN_SPAN, 0.0, 1.0)
 	_strain = lerpf(_strain, pull, 1.0 - exp(-10.0 * delta))
+	# Felt on the pad while the blade is in the wax: a light hum as it cuts, the heavy motor
+	# coming in as it strains.
+	if step > 0.0 or _strain > 0.05:
+		feel(0.12 + 0.35 * clampf(_speed / MOST_SPEED, 0.0, 1.0) + 0.3 * _strain, 0.6 * _strain)
 	_crackle_in -= delta
 	if _strain > 0.4 and _crackle_in <= 0.0:
 		_crackle_in = STRAIN_CRACKLE

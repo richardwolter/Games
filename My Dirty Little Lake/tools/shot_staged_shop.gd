@@ -80,7 +80,7 @@ func _physics_process(_delta: float) -> void:
 		6:
 			_shoot("unseal")
 		7:
-			_at = _frames + 60
+			_at = _frames + 90
 			_step += 1
 		8:
 			_say("net card: tour %d %s" % [_skin.tour, str(_skin.tour_cards)])

@@ -626,7 +626,7 @@ func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
-		stock, available, hint, _hovered, plates_only,
+		stock, available, hint, _hovered, plates_only, Pad.is_pad(),
 		roundi(ferry_trip * 200.0), roundi(ferry_fill * 200.0), _ferry_bob(),
 		_honey_key()
 	])
@@ -681,6 +681,13 @@ func _draw() -> void:
 	HudButtons.draw_upgrades(self, upgrades, _hovered == &"upgrades", sprites)
 	_draw_available()
 	_squash(Rect2(), 0.0)
+	# On the pad each button wears the button that opens it, on its top-left corner
+	# (2026-10-28, Richard): the decorate button X, the upgrades button Y.
+	if Pad.is_pad():
+		for pair: Array in [[shed, &"open_shed"], [upgrades, &"open_upgrades"]]:
+			var glyph := Glyphs.of_action(pair[1])
+			if glyph != null:
+				Glyphs.draw_centred(self, glyph, (pair[0] as Rect2).position + Vector2(8.0, 8.0), Glyphs.prompt_px() * 1.5)
 	for name: StringName in _motes:
 		(_motes[name] as HudButtons.Motes).draw(self)
 	_draw_stock()

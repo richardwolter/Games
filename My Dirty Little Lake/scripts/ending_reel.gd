@@ -81,6 +81,10 @@ func _ready() -> void:
 	_pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_mat = ShaderMaterial.new()
 	_mat.shader = preload("res://shaders/ending_bubble.gdshader")
+	# Shut and see-through from its first frame (2026-10-28, Richard: the bubble flashed whole
+	# for a frame before the words came up): `_process` opens it once the words are up.
+	_mat.set_shader_parameter(&"alpha", 0.0)
+	_mat.set_shader_parameter(&"iris", 0.0)
 	_pic.material = _mat
 	add_child(_pic)
 	_lay_out()

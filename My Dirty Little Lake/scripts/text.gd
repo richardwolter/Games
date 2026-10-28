@@ -1069,3 +1069,9 @@ static var SHOP_LOCKED_BUY_ONE: String:
 
 static var TOUR_SHOP_LOCKED: String:
 	get: return TranslationServer.translate(&"TOUR_SHOP_LOCKED")
+
+static var FIRST_BUY_PAD: String:
+	get: return TranslationServer.translate(&"FIRST_BUY_PAD")
+
+static var CUE_BOOST: String:
+	get: return TranslationServer.translate(&"CUE_BOOST")

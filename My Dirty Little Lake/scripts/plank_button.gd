@@ -49,6 +49,11 @@ const HudButtons := preload("res://scripts/hud_buttons.gd")
 		mark = value
 		queue_redraw()
 
+## The action whose pad button opens this, drawn as a glyph on its top-left corner in pad mode
+## (2026-10-28, Richard: on the controller the lake's buttons said nothing of how to reach
+## them). Empty for none.
+var pad_action: StringName = &""
+
 ## A mark that is switched on: the lake's free-camera toggle. Said the settings board's way —
 ## the clean water's blue in place of the oak, plus the lit edge, because a colour alone is
 ## one channel.
@@ -420,6 +425,7 @@ func _draw() -> void:
 		_motes.draw(self)
 	if not mark.is_empty():
 		_draw_mark(on, behind)
+		_draw_pad_glyph(box)
 		return
 	if label.is_empty():
 		return
@@ -433,6 +439,16 @@ func _draw() -> void:
 		Vector2(0.0, on.position.y + (on.size.y + float(height) * 0.62) * 0.5),
 		Style.WARN_INK if warn else Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, on
 	)
+	_draw_pad_glyph(box)
+
+
+## The pad's button for `pad_action`, over the top-left corner, in pad mode only.
+func _draw_pad_glyph(box: Rect2) -> void:
+	if pad_action.is_empty() or not Pad.is_pad():
+		return
+	var glyph := Glyphs.of_action(pad_action)
+	if glyph != null:
+		Glyphs.draw_centred(self, glyph, box.position + Vector2(6.0, 6.0), Glyphs.prompt_px() * 1.5)
 
 
 ## The mark on a button that carries no word. `behind` is the face the button is drawn on,

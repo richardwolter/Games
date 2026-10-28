@@ -796,6 +796,9 @@ var _carried_was: StringName = &""
 var carrying: StringName = &""
 ## The pad has the shelf up: the stick walks its rows rather than the player (RB/LB).
 var _pad_shelf := false
+## The pad's shelf opens with the wash plank picked rather than its first row: set by the lake
+## while the decoration tour's plank card is up.
+var focus_wash := false
 
 ## Which face the carried piece is being held in — an index into its views. Set from the
 ## row it was lifted off so turning a chair, putting it down and picking it up again does
@@ -2687,6 +2690,11 @@ func switch_box() -> Rect2:
 ## "nearest wins"). A dog still waiting out its ten seconds is not a candidate, so beside one
 ## E works the switch or does nothing.
 func switch_near() -> bool:
+	# The pad's shelf is up: Interact (the pad's A, which also picks on the shelf) is the
+	# shelf's, never the room's (2026-10-28, Richard: A on the wash plank put him out of the
+	# door he was standing at).
+	if _pad_shelf and Pad.is_pad():
+		return false
 	if _you_pet >= 0.0:
 		return true
 	if not _rest_key.is_empty():
@@ -4705,9 +4713,9 @@ func pad_focus() -> Array:
 		)
 		if box.position.y < list.position.y - 0.5 or box.end.y > list.end.y + 0.5:
 			continue
-		out.append({"box": box, "key": store[i], "first": out.is_empty()})
+		out.append({"box": box, "key": store[i], "first": out.is_empty() and not focus_wash})
 	if _wash_plank != null and _wash_plank.visible:
-		out.append({"box": _wash_plank.get_rect(), "key": &"wash", "first": out.is_empty()})
+		out.append({"box": _wash_plank.get_rect(), "key": &"wash", "first": out.is_empty() or focus_wash})
 	if _close != null and _close.visible:
 		out.append({"box": _close.get_rect(), "key": &"close"})
 	return out

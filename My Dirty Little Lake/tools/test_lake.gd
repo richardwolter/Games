@@ -10299,8 +10299,19 @@ func _check_staged_shop() -> void:
 	_check(cover != null and cover.clip_contents and absf(cover.get_rect().end.y - net_face.end.y) < 0.5,
 		"the falling planks are clipped to the board's face, over nothing else",
 		"%s face %s" % [cover.get_rect() if cover != null else Rect2(), net_face])
-	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"net"],
-		"and the net's card comes up with it", "%d %s" % [shop.tour, str(shop.tour_cards)])
+	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"net"]
+		and not shop.tour_up() and is_equal_approx(shop.tour_wait, ShopSkin.UNSEAL_TIME),
+		"and the net's card waits for its planks to fall", "%d %s %.2f" % [shop.tour, str(shop.tour_cards), shop.tour_wait])
+	shop.tour_wait = 0.0
+	# A click in the card's first moments is not a click on it (2026-10-28, Richard: the next
+	# buy click dismissed the card unread); after it, the card takes it.
+	var early := InputEventMouseButton.new()
+	early.button_index = MOUSE_BUTTON_LEFT
+	early.pressed = true
+	early.position = Vector2(400.0, 400.0)
+	shop.set(&"_tour_age", 0.0)
+	shop.call(&"_gui_input", early)
+	_check(shop.tour == 0, "a click at once does not dismiss the board's card", str(shop.tour))
 	shop.set(&"_tour_skip", Rect2(0.0, 0.0, 10.0, 10.0))
 	var skip := InputEventMouseButton.new()
 	skip.button_index = MOUSE_BUTTON_LEFT
@@ -10369,9 +10380,79 @@ func _check_staged_shop() -> void:
 		_main.call(&"_rename_finds")
 
 
+## Round 3 off Richard's second run (2026-10-28): the house on the pad, the upgrades card's
+## pad wording, the HUD's pad glyphs, the hive's pad cursor and its felt tools, the boats'
+## boost after a tamed tornado, and the ending's lake door and quiet bubble.
+func _check_round3() -> void:
+	var room: ShedRoom = _main.get(&"_room")
+	var was_shelf: bool = room.get(&"_pad_shelf")
+	Pad.set_mode(Pad.Mode.PAD)
+	room.set(&"_pad_shelf", true)
+	_check(not room.switch_near(), "with the pad's shelf up, Interact does nothing in the room", "")
+	room.set(&"_pad_shelf", was_shelf)
+	Pad.set_mode(Pad.Mode.MOUSE)
+	var src := (load("res://scripts/shed_room.gd") as GDScript).source_code
+	_check(src.find('"first": out.is_empty() or focus_wash') >= 0,
+		"the plank's card opens the pad's shelf on the wash plank", "")
+	var words := Text.FIRST_BUY_PAD % Binds.shown(&"open_upgrades", true)
+	_check(Glyphs.has_tokens(words) and words.find("%s") < 0,
+		"the upgrades card names the pad's button", words)
+	var gear: PlankButton = _main.get(&"_open_settings")
+	var camera: PlankButton = _main.get(&"_free_camera")
+	_check(gear.pad_action == &"open_settings" and camera.pad_action == &"camera_lock",
+		"the gear and the camera wear their pad buttons", "")
+	var hud_src := (load("res://scripts/hud_skin.gd") as GDScript).source_code
+	_check(hud_src.find("[[shed, &\"open_shed\"], [upgrades, &\"open_upgrades\"]]") >= 0,
+		"the decorate and upgrades buttons wear theirs", "")
+	_check(HiveStepCatch.new().has_method(&"_draw_pad_pointer"), "the hive's catch draws the pad's pointer", "")
+	_check(HiveStep.press_strength() == 0.0, "nothing pressed is no pressure", "")
+	var uncap_src := (load("res://scripts/hive_step_uncap.gd") as GDScript).source_code
+	var pour_src := (load("res://scripts/hive_step_pour.gd") as GDScript).source_code
+	_check(uncap_src.find("GLIDE_PACE * press_strength()") >= 0 and uncap_src.find("feel(") >= 0
+		and pour_src.find("press_strength() if Pad.is_pad()") >= 0 and pour_src.find("feel(") >= 0,
+		"the knife and the lever follow RT's travel and are felt", "")
+	# The boost: a tamed tornado speeds the fleet for a minute; untamed, nothing.
+	var tornado: Node = _main.get(&"_tornado")
+	if tornado != null and not (_main.get(&"_boats") as Array).is_empty():
+		var hull: Boat = (_main.get(&"_boats") as Array)[0]
+		var base: float = _main.call(&"boat_speed")
+		var was_settled: bool = tornado.get(&"settled")
+		tornado.set(&"settled", false)
+		_main.set(&"_boost_left", 0.0)
+		_main.call(&"_push_boat_numbers")
+		_main.call(&"_on_tornado_ended", false)
+		_check(is_zero_approx(float(_main.get(&"_boost_left"))), "an untamed tornado gives no boost", "")
+		_main.call(&"_on_tornado_ended", true)
+		_check(is_equal_approx(float(_main.get(&"_boost_left")), Lake.BOOST_TIME)
+			and is_equal_approx(hull.speed, base * Lake.BOOST_SAIL) and hull.boost_left > 0.0,
+			"a tamed tornado sends the boats off 2.5 times as fast, wearing the icon",
+			"%.1f %.2f %.2f" % [_main.get(&"_boost_left"), hull.speed, base])
+		_main.call(&"_boost_step", Lake.BOOST_TIME + 1.0)
+		_check(is_zero_approx(float(_main.get(&"_boost_left"))) and is_equal_approx(hull.speed, base)
+			and is_zero_approx(hull.boost_left),
+			"and back to their own pace after the minute", "%.2f" % hull.speed)
+		tornado.set(&"settled", was_settled)
+		var bar: Rect2 = _main.call(&"_hint_target", &"boost")
+		_check(bar.size.x > 0.0, "the boost's card points at the ferry bar", str(bar))
+	_check(Text.CUE_BOOST.find("*") >= 0 and CueCard.THEMES.has(&"boost"),
+		"the boost's card has its words and its theme", Text.CUE_BOOST)
+	# The ending: a way back to the lake beside the menu's, and the bubble shut from the start.
+	var farewell := Farewell.new()
+	farewell.stay_door = true
+	_check(String(farewell.call(&"_side_label")) == Text.DEMO_BACK_LAKE,
+		"the full game's ending offers a way back to the lake", "")
+	farewell.free()
+	var lake_src := (load("res://scripts/lake.gd") as GDScript).source_code
+	var reel_src := (load("res://scripts/ending_reel.gd") as GDScript).source_code
+	_check(lake_src.find("_farewell.stay_door = true") >= 0
+		and reel_src.find('_mat.set_shader_parameter(&"alpha", 0.0)') >= 0,
+		"the ending's lake door is set and its bubble starts unseen", "")
+
+
 func _stage_shop_shape() -> void:
 	var skin := _main.get_node(^"HUD/ShopSkin")
 	_check_staged_shop()
+	_check_round3()
 	_check_shop_purse(skin)
 	_check_ten_fixes(skin)
 	_check_bonus_panel()
@@ -12349,9 +12430,9 @@ func _stage_first_steps() -> void:
 	_main.call(&"_set_menu", true)
 	_check(shop.tour == 2, "a tour closed half way picks up where it was", str(shop.tour))
 	var shop_src := (load("res://scripts/shop_skin.gd") as GDScript).source_code
-	_check(shop_src.find("if tour >= 0:
-		_tour_input(event)
-		return") >= 0,
+	_check(shop_src.find("if tour_up():
+		if _tour_age >= TOUR_GRACE:
+			_tour_input(event)") >= 0,
 		"nothing is bought while the tour is up", "")
 	for i in ShopSkin.TOUR.size():
 		shop.tour_next()

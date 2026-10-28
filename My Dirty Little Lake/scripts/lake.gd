@@ -948,11 +948,13 @@ const HINT_TEXT := {
 	&"demo_house": "DEMO_HOUSE",
 	# The first jar of honey held (2026-10-16), at the jar plate: what eating one does.
 	&"honey_jar": "CUE_HONEY",
+	# The boats' boost after a tamed tornado (2026-10-28), at the ferry bar.
+	&"boost": "CUE_BOOST",
 }
 ## The share cleaned at which the meter's hint is owed.
 const METER_HINT_AT := 0.05
 const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter",
-	&"hive_demo", &"demo_goal", &"demo_house", &"honey_jar"]
+	&"hive_demo", &"demo_goal", &"demo_house", &"honey_jar", &"boost"]
 var _cues_seen: Dictionary = {}
 var _hints: Array[StringName] = []
 var _hint_up: StringName = &""
@@ -1134,6 +1136,8 @@ var _decor_tour_placed := -1
 ## and how far a walk from there ends the card.
 var _decor_room_from := Vector2.INF
 const DECOR_ROOM_MOVED := 0.35
+## Whether the plank's card has opened the pad's shelf this visit.
+var _decor_shelf_opened := false
 ## How clean the find was when the stand's card came up; -1 before it has.
 var _decor_stand_from := -1.0
 ## The decoration tour's sentences are `Text.TOUR_DECOR_*`, read as each card goes up.
@@ -1669,6 +1673,9 @@ func _ready() -> void:
 	Pad.pad_lost.connect(_on_pad_lost)
 	Pad.pad_found.connect(_on_pad_found)
 	_open_settings.pressed.connect(_set_settings.bind(true))
+	# Their pad buttons, drawn on their corners in pad mode (2026-10-28, Richard).
+	_open_settings.pad_action = &"open_settings"
+	_free_camera.pad_action = &"camera_lock"
 	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
 	# fills the screen now, and a settings panel drawn beneath that is a settings panel
 	# nobody can see or press.
@@ -4098,6 +4105,8 @@ func _show_farewell() -> void:
 	else:
 		# The ending filmed (2026-10-12): the full game's only.
 		_farewell.reel_of = self
+		# And a way back to the lake beside the way to the menu (2026-10-28, Richard).
+		_farewell.stay_door = true
 		# The Donation Bank's door beside the menu's (2026-10-22), hidden while
 		# `DonationBank.OPEN` is off.
 		if DonationBank.OPEN:
@@ -4381,6 +4390,14 @@ func _decor_tour_step(delta: float) -> void:
 			_set_shed(true)
 		return
 	var room := _room_box_of
+	# The wash plank's card on the pad (2026-10-28, Richard: R1 had to open the shelf before
+	# the plank could be reached): the shelf opens itself, once a visit, with the plank picked.
+	_room.focus_wash = _decor_tour == DecorTour.PLANK and _shed_open and Pad.is_pad()
+	if not _shed_open:
+		_decor_shelf_opened = false
+	elif _room.focus_wash and not _decor_shelf_opened:
+		_decor_shelf_opened = true
+		_room.set(&"_pad_shelf", true)
 	match _decor_tour:
 		DecorTour.HINT:
 			if _panelled() or _fronted():
@@ -4567,13 +4584,14 @@ func _shut_boards() -> Dictionary:
 
 ## The cards of the first open stage that has not had them, unless the shop is already
 ## showing a tour.
-func _start_stage_tour() -> void:
+func _start_stage_tour(wait := 0.0) -> void:
 	if not _menu_open or _shop_skin.tour >= 0 or _shop_tours >= SHOP_STAGES.size():
 		return
 	if _shop_tours >= _open_stages():
 		return
 	_touring_stage = _shop_tours
 	_shop_skin.tour_cards = ShopSkin.TOUR_STAGES[SHOP_STAGES[_touring_stage][0]]
+	_shop_skin.tour_wait = wait
 	_shop_skin.tour = 0
 
 
@@ -4584,8 +4602,9 @@ func _watch_stages() -> void:
 	if _stages_open >= 0 and open > _stages_open:
 		for k in range(_stages_open, open):
 			_shop_skin.unseal(SHOP_STAGES[k][0])
+		# Once its planks are down: until then the card would stand over them.
 		if _menu_open:
-			_start_stage_tour()
+			_start_stage_tour(ShopSkin.UNSEAL_TIME)
 	_stages_open = open
 
 
@@ -6068,10 +6087,35 @@ func _add_dog() -> void:
 
 
 func _push_boat_numbers() -> void:
+	var boosted := _boost_left > 0.0
 	for boat in _boats:
-		boat.speed = boat_speed()
+		boat.speed = boat_speed() * (BOOST_SAIL if boosted else 1.0)
 		boat.capacity = boat_cargo()
-		boat.volley_gap = boat_volley_gap()
+		# Loading quickens too, never under the volley's own floor (`Haul`, the track's top).
+		boat.volley_gap = maxf(boat_volley_gap() / BOOST_LOAD, 0.4) if boosted else boat_volley_gap()
+		boat.boost_left = _boost_left
+
+
+# The boats' boost (2026-10-28, `/grill-me` with Richard): a tamed tornado sends the fleet off
+# 2.5 times as fast, loading twice as fast, for a minute. The boats sit moored while it is
+# down, often 30 to 60 seconds; this gives back about 90 seconds of sailing, more than they
+# lost. A spinning tornado rides over every hull while it runs (`Boat.boost_left`), and the
+# first time a card says so (`CUE_BOOST`). Untamed, or settled by a save or the menu: nothing.
+# Not saved: a save during it drops it.
+const BOOST_TIME := 60.0
+const BOOST_SAIL := 2.5
+const BOOST_LOAD := 2.0
+const BOOST_BLINK := 5.0
+var _boost_left: float = 0.0
+
+
+## A frame of the boost: it runs while the boats do, so not in the settings' pause or behind
+## the menu, and the speeds go back the frame it ends.
+func _boost_step(delta: float) -> void:
+	if _boost_left <= 0.0 or _world_paused or _in_menu:
+		return
+	_boost_left = maxf(_boost_left - delta, 0.0)
+	_push_boat_numbers()
 
 
 ## Whether a docked hull sets off on its own, for the whole fleet. Called by the harness and
@@ -6490,7 +6534,10 @@ func _first_buy_step() -> void:
 		_first_buy_card.show_card(Rect2())
 		return
 	var box: Rect2 = _skin.get(&"_upgrades_box")
-	_first_buy_card.show_card(Rect2(_skin.global_position + box.position, box.size), Text.FIRST_BUY)
+	# On the pad the card names the button (2026-10-28, Richard: it said "Open Upgrades" and
+	# nothing about how).
+	var words := Text.FIRST_BUY_PAD % Binds.shown(&"open_upgrades", true) if Pad.is_pad() else Text.FIRST_BUY
+	_first_buy_card.show_card(Rect2(_skin.global_position + box.position, box.size), words)
 	_first_buy_forced = true
 
 
@@ -6616,6 +6663,8 @@ func _hint_target(kind: StringName) -> Rect2:
 			return _skin.get_global_transform() * _skin.upgrades_box()
 		&"honey_jar":
 			return _skin.get_global_transform() * _skin.honey_box()
+		&"boost":
+			return _skin.get_global_transform() * _skin.ferry_bar_box()
 		&"demo_house":
 			# Over the back wall, off the floor the mending plays on (2026-10-25, Richard: the
 			# card stood over the animation). The card stands inside it, with no arrow.
@@ -6811,6 +6860,7 @@ func _process(delta: float) -> void:
 		_hide_lake_cards()
 	# Every frame, so the menu's pose reaches the nets; its clock decides for itself.
 	_honey_step(delta)
+	_boost_step(delta)
 	_haul_count_step()
 	_achievements_step(delta)
 	if _tornado != null:
@@ -7601,6 +7651,10 @@ func _on_tornado_began() -> void:
 func _on_tornado_ended(tamed: bool) -> void:
 	_held_for_tornado = false
 	_note_tornado_end(tamed)
+	if tamed and not _tornado.settled and not _in_menu and not _demo_finale:
+		_boost_left = BOOST_TIME
+		_push_boat_numbers()
+		_owe_hint(&"boost")
 	if _demo_finale:
 		if _tornado.settled:
 			# A save or the menu's pose: the finale is owed again, as the run's first.

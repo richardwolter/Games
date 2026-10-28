@@ -343,7 +343,13 @@ func _process(delta: float) -> void:
 	_was_down = down
 	if _by_hook > 0.0:
 		_by_hook -= delta
-	var want := 1.0 if (_held or _by_hook > 0.0) else 0.0
+	# How far RT is squeezed is how far the lever turns on the pad; the mouse turns it all
+	# the way, as before.
+	var want := 0.0
+	if _by_hook > 0.0:
+		want = 1.0
+	elif _held:
+		want = press_strength() if Pad.is_pad() else 1.0
 	if want > 0.0:
 		_turn = lerpf(_turn, want, 1.0 - exp(-OPEN_EASE * delta))
 		_turn_v = 0.0
@@ -365,6 +371,7 @@ func _process(delta: float) -> void:
 		_head_v += FALL * delta
 		_head = minf(_head + _head_v * delta, drop)
 		if _head >= drop - 0.5:
+			feel(0.1 + 0.35 * open, 0.15 * open)
 			var poured := RATE * open * open * delta
 			_fill = minf(_fill + poured, CROWN_MOST)
 			_poured_any = true

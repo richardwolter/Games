@@ -194,6 +194,15 @@ func set_mode(to: Mode) -> void:
 	redraw_all()
 
 
+## Rumble the pad in hand, `weak` and `strong` motors 0..1, for `seconds` (2026-10-28,
+## Richard: the hive's knife and lever wanted to be felt; Godot 4.7 has no DualSense trigger
+## resistance, so the motors carry it). Nothing off the pad or with no pad pressed yet.
+func rumble(weak: float, strong: float, seconds: float) -> void:
+	if not is_pad() or _device < 0:
+		return
+	Input.start_joy_vibration(_device, clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), seconds)
+
+
 ## The pad an event came from, noted so the glyphs follow the make in hand. A press on a
 ## PlayStation pad after an Xbox one swaps every glyph on screen.
 func note_device(device: int) -> void:
