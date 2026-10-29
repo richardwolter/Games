@@ -31,6 +31,10 @@ var stats := Traits.combine([])
 ## Returns a number in [0, 1) for each skip roll; the harness swaps it to force an outcome.
 var roll: Callable = func() -> float: return randf()
 var hungry := false
+## Sent to the machine to be recycled: it walks there and goes in.
+var recycling := false
+## What it did today, for the playtest log (reset each morning).
+var tally := {}
 
 var _tag: Label3D
 var _bubble: Label3D
@@ -51,10 +55,24 @@ var _handled := 0
 func _ready() -> void:
 	super()
 	add_to_group("clones")
+	reset_tally()
 	_tag = _label(1.4, 32)
 	_bubble = _label(2.3, 36)
 	_bubble.modulate = Color(1.0, 0.95, 0.5)
 	_bubble.visible = false
+	_refresh_tag()
+
+
+func reset_tally() -> void:
+	tally = {"tasks": {}, "skips": 0, "naps": 0, "chats": 0, "nibbles": 0, "trampled": 0,
+			"hungry_secs": 0.0, "idle_secs": 0.0}
+
+
+## Off to the machine to be recycled; it stops whatever it was doing.
+func recycle() -> void:
+	recycling = true
+	cancel_work()
+	say("indo para a máquina...", 3.0)
 	_refresh_tag()
 
 
@@ -116,6 +134,7 @@ func keep_of(amount: int) -> int:
 	for i in amount:
 		_handled += 1
 		if _handled % stats.waste_every == 0:
+			tally.nibbles += 1
 			say("nham! (comeu 1)")
 		else:
 			kept += 1
@@ -155,7 +174,14 @@ func eat(amount: int) -> void:
 func _think() -> void:
 	var delta := get_physics_process_delta_time()
 	_tick_timers(delta)
+	if hungry:
+		tally.hungry_secs += delta
 	if is_paused() or is_working():
+		return
+	if recycling:
+		var machines := get_tree().get_nodes_in_group("machines")
+		if not machines.is_empty():
+			work(machines[0])
 		return
 	if _meal_due:
 		var trough := _trough()
@@ -174,6 +200,8 @@ func _think() -> void:
 		var bed := pick_bed()
 		if bed != null:
 			work(bed)
+	if not is_working():
+		tally.idle_secs += delta
 
 
 ## Fill the hands with the nearest free crates, then take them to `dest`.
@@ -194,6 +222,7 @@ func _after_move() -> void:
 	for node in get_tree().get_nodes_in_group("beds"):
 		var bed := node as Bed
 		if bed.covers(global_position) and bed.trample():
+			tally.trampled += 1
 			say("ops! pisou")
 
 
@@ -201,8 +230,10 @@ func _after_move() -> void:
 func _finish_task() -> void:
 	if work_place is Bed and roll.call() < stats.skip:
 		_ignored[work_place] = SKIP_IGNORE
+		tally.skips += 1
 		say("pulou!")
 		return
+	tally.tasks[work_task] = tally.tasks.get(work_task, 0) + 1
 	super()
 
 
@@ -287,6 +318,7 @@ func _tick_timers(delta: float) -> void:
 		if _nap_wait <= 0.0:
 			_nap_left = stats.nap_time
 			_nap_wait = stats.nap_every
+			tally.naps += 1
 			say("zzz...", stats.nap_time)
 			return
 	if stats.chat_every > 0.0:
@@ -294,6 +326,7 @@ func _tick_timers(delta: float) -> void:
 		if _chat_wait <= 0.0 and _someone_to_chat_with():
 			_chat_left = stats.chat_time
 			_chat_wait = stats.chat_every
+			tally.chats += 1
 			say("conversando...", stats.chat_time)
 
 
@@ -336,6 +369,8 @@ func _label(height: float, size: int) -> Label3D:
 
 func _refresh_tag() -> void:
 	var text := "%s: %s" % [name, ROLE_LABELS[role]]
+	if recycling:
+		text = "%s: reciclar" % name
 	if role == Traits.CARRY and dest != null:
 		text += " > " + dest.label
 	if hungry:

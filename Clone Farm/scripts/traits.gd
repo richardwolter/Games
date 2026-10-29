@@ -78,10 +78,10 @@ const LIST := {
 	},
 }
 
-## Food: each clone eats `consumption` units from the trough every MEAL_EVERY seconds; with
-## the trough short it goes hungry (work speed x HUNGRY_WORK) and tries again every
-## MEAL_RETRY seconds.
-const MEAL_EVERY := 60.0
+## Food: each clone eats `consumption` units from the trough every MEAL_EVERY seconds (twice
+## in a 4-minute day, 2 a day for a plain clone); with the trough short it goes hungry (work
+## speed x HUNGRY_WORK) and tries again every MEAL_RETRY seconds.
+const MEAL_EVERY := 120.0
 const MEAL_RETRY := 10.0
 const HUNGRY_WORK := 0.5
 
@@ -239,17 +239,21 @@ static func stat_rows(stats: Dictionary, names: Array[StringName]) -> PackedStri
 ## clone of these stats in `role`, as a fraction of the same with a plain clone in `role`.
 ## Steady-state model (docs/decisoes/2026-10-07-painel-do-clone.md); Aura, Pisoteio and the
 ## walks to eat are left out (they depend on where things are).
-static func role_rating(stats: Dictionary, role: StringName, beds: int) -> float:
-	return _net_rate(stats, role, beds) / _net_rate(combine([]), role, beds)
+## `tools` is the Ferramentas multiplier every worker has (the plain ones too).
+static func role_rating(stats: Dictionary, role: StringName, beds: int, tools := 1.0) -> float:
+	var plain := combine([])
+	plain.work *= tools
+	var own := stats.duplicate(true)
+	own.work *= tools
+	return _net_rate(own, role, beds, plain) / _net_rate(plain, role, beds, plain)
 
 
-static func _net_rate(stats: Dictionary, role: StringName, beds: int) -> float:
+static func _net_rate(stats: Dictionary, role: StringName, beds: int, plain: Dictionary) -> float:
 	var crates: float
 	if role == CARRY:
 		crates = 1.0 / _carry_time(stats) * _kept(stats)
 	else:
 		# Bed roles: a plain worker in the other two, enough carriers.
-		var plain := combine([])
 		var cycle := 0.0
 		var rate := INF
 		for r: StringName in ROLE_NAMES:

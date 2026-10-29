@@ -17,6 +17,10 @@ var color := Color(0.6, 0.6, 0.6)
 ## Its number key when choosing a Carregar destination (1 máquina, 2 cocho, 3 venda).
 var slot := 0
 
+## Crates handed in here, and food eaten here (the farm counts both for the day).
+signal delivered(amount: int)
+signal eaten(amount: int)
+
 var _tag: Label3D
 
 
@@ -71,13 +75,16 @@ func perform(task: StringName, by: Worker = null) -> int:
 	if by == null:
 		return 0
 	if task == DELIVER and by.carrying > 0:
-		stock += by.carrying
+		var amount := by.carrying
+		stock += amount
 		by.carrying = 0
+		delivered.emit(amount)
 	elif task == EAT and by is Clone:
 		var take: int = by.meal_size()
 		if stock >= take:
 			stock -= take
 			by.eat(take)
+			eaten.emit(take)
 	return 0
 
 

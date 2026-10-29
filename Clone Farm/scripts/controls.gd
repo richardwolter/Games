@@ -14,6 +14,10 @@ const BINDINGS := {
 	"role_2": [KEY_2, KEY_KP_2],
 	"role_3": [KEY_3, KEY_KP_3],
 	"role_4": [KEY_4, KEY_KP_4],
+	"recycle": [KEY_R],
+	"restart": [KEY_R],
+	"confirm": [KEY_ENTER, KEY_KP_ENTER],
+	"help": [KEY_H],
 }
 
 

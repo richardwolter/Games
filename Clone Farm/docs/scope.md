@@ -6,6 +6,8 @@ Consolida as decisões de 2026-10-07 (detalhes e descartes em `docs/decisoes/202
 Escolher qual clone faz qual função, de acordo com características que são trocas, e correr atrás dos desastres deles, é divertido?
 
 ## Dentro
+Tudo abaixo está construído desde 2026-10-29 (`docs/decisoes/2026-10-29-prototipo-completo.md`); números a confirmar jogando.
+
 - **Fazendeiro** (você): WASD, faz qualquer função sem fraqueza; único que conserta desastres.
 - **4 funções**: Plantar, Regar, Colher, Carregar. Clone recebe uma função e a executa na fazenda inteira até você trocar.
 - **Máquina de clonagem**: consome produção; clone nasce com 2 características aleatórias (trocas).

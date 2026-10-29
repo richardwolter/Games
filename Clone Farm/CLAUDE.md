@@ -28,7 +28,7 @@ distribui funções aos clones e corre atrás dos desastres deles.
 
 **Fase 0 (setup) feita.** Projeto 3D em cinza, câmera ortográfica isométrica, WASD.
 
-**Fase 2 (loop cinza de `docs/scope.md`) em andamento.** Feito:
+**Fase 2 (loop cinza de `docs/scope.md`) construída inteira; Richard testa a partida toda.**
 - Canteiros (plantar, regar, colher) com tempo de trabalho; o trabalhador vai até o lugar e
   fica fixo; E de novo cancela ([decisão](docs/decisoes/2026-10-07-tempo-de-trabalho.md)).
 - Máquina de clonagem e clones com função e 2 características sorteadas entre as 8
@@ -39,7 +39,11 @@ distribui funções aos clones e corre atrás dos desastres deles.
 - Painel do clone com atributos de nomes fixos e a % de produção por função, de um modelo
   ([painel](docs/decisoes/2026-10-07-painel-do-clone.md)).
 
-Números são padrões nossos, a confirmar jogando. Falta: reciclar clone, 3 lojas, dia com meta.
+- Reciclar (R no painel), dia de 4 min com meta crescente e fim de jogo, 3 lojas na Venda,
+  log de playtest por partida, cartão "Como jogar" (H)
+  ([decisão](docs/decisoes/2026-10-29-prototipo-completo.md)).
+
+Números são padrões nossos, a confirmar jogando.
 
 ## Design decidido (protótipo 1)
 
@@ -76,6 +80,11 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
   0-4. Trabalhadores ficam na camada física 2 e se atravessam.
 - `scripts/clone.gd` (`Clone`): `role` (+ `dest` no Carregar), `traits`, refeições e fome,
   pausas, balões do lado ruim.
+- `scripts/shop.gd` (`Shop`): as lojas como dados; `main.buy()` aplica.
+- `scripts/day_gate.gd` (`DayGate`): roda com a árvore pausada no resumo do fim do dia
+  (próximo dia ou nova partida) e liga/desliga o "Como jogar".
+- `main.gd` também cuida do dia, da meta, do dinheiro e do log (`log_dir`; o harness aponta
+  para outro lugar e apaga).
 - `scripts/traits.gd` (`Traits`): as 8 características como dados (modificadores);
   `combine()` recalcula do zero; `stat_rows()` e `role_rating()` geram o texto e a % do
   painel a partir dos mesmos dados.
@@ -85,7 +94,8 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
 
 - `tools/test_smoke.tscn` (headless): fazenda, WASD, ciclo do canteiro, trava e cancelamento,
   máquina e clone, cada característica dos dois lados, a % contra contas feitas à mão,
-  caixotes para cada destino, clone Carregar, fome e comida, cochilo, pisoteio e conserto.
+  caixotes para cada destino, clone Carregar, fome e comida, cochilo, pisoteio e conserto,
+  reciclar, lojas, fim do dia (bateu e não bateu) e o log de playtest.
   `Godot --headless --path . res://tools/test_smoke.tscn --quit-after 3000`
   O resultado está em `tools/last_test.log`; a última linha tem que ser `smoke: PASS`.
   Erro de script não muda o código de saída: confie no log, não no exit code.
@@ -94,7 +104,7 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
   Script novo com `class_name`: rode antes `Godot --headless --path . --import`, senão o
   harness não acha a classe (e o `last_test.log` antigo fica lá parecendo PASS).
 - Cada sistema novo do loop ganha checagens no harness.
-- Playtest: logs e notas do Richard em `docs/playtests/`.
+- Playtest: o jogo grava `docs/playtests/AAAA-MM-DD_runN.log`; notas do Richard ficam ali também.
 
 ## Ferramentas
 

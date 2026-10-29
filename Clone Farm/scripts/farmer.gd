@@ -3,7 +3,8 @@
 ## the machine, trough or market (deliver what's in hand; empty-handed at the machine,
 ## clone) starts its task (the Worker steps up to it and stays locked there until done; E
 ## again cancels); a clone opens the role choice, picked with 1-4 (0 = no role), and
-## Carregar then asks the destination with 1-3.
+## Carregar then asks the destination with 1-3; R sends the clone to be recycled. E at the
+## Venda stall with empty hands opens the shops (1-3 buy).
 class_name Farmer
 extends Worker
 
@@ -14,12 +15,28 @@ const CLONE_REACH := 1.6
 var choosing: Clone = null
 ## True once Carregar was picked and the destination is being chosen.
 var choosing_dest := false
+## True while the shop menu is open.
+var shopping := false
+
+## 1-3 pressed with the shop menu open; the farm does the buying.
+signal buy_requested(index: int)
 
 
 func _think() -> void:
 	if Input.is_action_just_pressed("interact"):
 		interact()
+	if shopping:
+		for i in range(1, 4):
+			if Input.is_action_just_pressed("role_%d" % i):
+				buy_requested.emit(i - 1)
+		if nearest_workplace() == null or not nearest_workplace().is_in_group("markets"):
+			shopping = false
+		return
 	if choosing == null:
+		return
+	if not choosing_dest and Input.is_action_just_pressed("recycle"):
+		choosing.recycle()
+		close_choice()
 		return
 	for i in Clone.ROLES.size():
 		if Input.is_action_just_pressed("role_%d" % i):
@@ -39,11 +56,15 @@ func interact() -> void:
 		cancel_work()
 	elif choosing != null:
 		close_choice()
+	elif shopping:
+		shopping = false
 	else:
 		var target := nearest_target()
 		if target is Clone:
 			choosing = target
 			choosing_dest = false
+		elif target is Workplace and target.is_in_group("markets") and carrying == 0:
+			shopping = true
 		elif target is Workplace:
 			work(target)
 

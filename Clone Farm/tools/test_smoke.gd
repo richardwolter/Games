@@ -4,7 +4,8 @@
 ## with E again. Then the machine: it costs produção, makes a clone, and a clone given a
 ## role works beds on its own. Then each trait's good and bad side, the role ratings, and
 ## last the crates: carried to each depot, by the farmer and by a Carregar clone, plus
-## meals, hunger, naps and trampling.
+## meals, hunger, naps and trampling. Last the whole-run pieces: recycling, the shops, the
+## day's end (pass and fail) and the playtest log.
 ##
 ## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 3000
 ##
@@ -23,6 +24,8 @@ const WORK_FRAMES := 40
 const CLONE_FRAMES := 40
 const CLONE_WORK_FRAMES := 150
 const HAUL_FRAMES := 240
+const RECYCLE_FRAMES := 120
+const TEST_LOG_DIR := "res://tools/test_playtests/"
 
 var _locked_at: Vector3
 
@@ -37,6 +40,7 @@ func _ready() -> void:
 	_log = FileAccess.open(LOG_PATH, FileAccess.WRITE)
 	_say("smoke: start")
 	_main = load("res://scenes/main.tscn").instantiate()
+	_main.log_dir = TEST_LOG_DIR
 	add_child(_main)
 	_check(_main.get_node_or_null("Ground") != null, "ground built")
 	_check(_main.get_node_or_null("Camera") != null, "camera built")
@@ -96,6 +100,10 @@ func _physics_process(_delta: float) -> void:
 	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
 			+ CLONE_WORK_FRAMES + 3 + HAUL_FRAMES:
 		_finish_hauling()
+		_start_run_checks()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
+			+ CLONE_WORK_FRAMES + 3 + HAUL_FRAMES + RECYCLE_FRAMES:
+		_finish_run_checks()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
 
@@ -297,11 +305,11 @@ func _check_traits() -> void:
 
 ## The role ratings follow the model in docs/decisoes/2026-10-07-painel-do-clone.md, checked
 ## against values worked out by hand: 6 beds; walk 3 m at 6 m/s = 0.5 s; 1 s per bed task,
-## 0.5 s to pick up or deliver, 8 m to a depot (1.333 s); 8 s to grow; each clone eats 1/60
-## per second. Plain bed roles: T = 1.5 s, bed cycle 12.5 s, 6/12.5 = 0.48 crates/s, net
-## 0.48 - 1/60. Plain Carregar: 0.5 + 0.5 + 1.333 + 0.5 = 2.833 s a crate, net 1/2.833 - 1/60.
+## 0.5 s to pick up or deliver, 8 m to a depot (1.333 s); 8 s to grow; each clone eats 1
+## per 120 s. Plain bed roles: T = 1.5 s, bed cycle 12.5 s, 6/12.5 = 0.48 crates/s, net
+## 0.48 - 1/120. Plain Carregar: 0.5 + 0.5 + 1.333 + 0.5 = 2.833 s a crate, net 1/2.833 - 1/120.
 func _check_panel() -> void:
-	var food := 1.0 / 60.0
+	var food := 1.0 / 120.0
 	var bed_net := 0.48 - food
 	var carry_net := 1.0 / (0.5 + 0.5 + 8.0 / 6.0 + 0.5) - food
 	var cases := [
@@ -320,8 +328,12 @@ func _check_panel() -> void:
 		[[&"animado"], Bed.WATER, (6.0 / 12.875 - food) / bed_net],
 		# naps 4 s after every 15 s: share 4/19; T = 1.5/(15/19) = 1.9; cycle 12.9; eats half
 		[[&"preguicoso"], Bed.PLANT, (6.0 / 12.9 - food / 2.0) / bed_net],
-		# boosted 20 s in 60: work 1/3 * 1/1.5 + 2/3 * 1 = 0.8889; T = 1.3889; eats double
-		[[&"glutao"], Bed.PLANT, (6.0 / (1.388889 + 3.0 + 8.0) - 2.0 * food) / bed_net],
+		# boosted 20 s in 120: work 1/6 * 1/1.5 + 5/6 * 1 = 0.9444; T = 1.4444; eats double
+		[[&"glutao"], Bed.PLANT, (6.0 / (1.444444 + 3.0 + 8.0) - 2.0 * food) / bed_net],
+		# Ferramentas +25% for everyone: Caprichoso harvest 0.5 + 1/0.75 = 1.8333; plain 0.5 +
+		# 0.8 = 1.3; cycle 1.3 + 1.3 + 1.8333 + 8 = 12.4333, 6/12.4333 = 0.4826 caps; plain
+		# cycle 3.9 + 8 = 11.9, 6/11.9 = 0.5042
+		[[&"caprichoso"], Bed.HARVEST, (6.0 / 12.43333 * 2.0 - food) / (6.0 / 11.9 - food), 1.25],
 		# carries 2: (2 * (0.5 + 0.5) + 1.333 + 0.5) / 2 = 1.9167 s a crate
 		[[&"forte"], Traits.CARRY, (1.0 / 1.916667 - food) / carry_net],
 		# loses 1 in 4, eats nothing from the trough
@@ -330,7 +342,8 @@ func _check_panel() -> void:
 	for c: Array in cases:
 		var names: Array[StringName] = []
 		names.assign(c[0])
-		var got := Traits.role_rating(Traits.combine(names), c[1], 6)
+		var got := Traits.role_rating(Traits.combine(names), c[1], 6,
+				c[3] if c.size() > 3 else 1.0)
 		_check(absf(got - c[2]) < 0.002, "%s in %s rates %.3f (hand: %.3f)" % [
 				names, c[1], got, c[2]])
 	var rows := Traits.stat_rows(Traits.combine([&"apressado"]), [&"apressado"])
@@ -447,6 +460,67 @@ func _finish_hauling() -> void:
 			_market_before, _main.market.stock])
 	_check(not _hungry.hungry and _main.trough.stock == 4,
 			"the clone walked to the trough and ate 1 (trough %d)" % _main.trough.stock)
+
+
+var _recycled: Clone
+
+
+## Recycling walks a clone into the machine; the shops; the end of a day, passed and failed;
+## the playtest log.
+func _start_run_checks() -> void:
+	_recycled = _main.clones[0]
+	_recycled.global_position = _main.MACHINE_AT + Vector3(0.0, 1.0, 2.5)
+	var farmer: Farmer = _main.farmer
+	farmer.global_position = _recycled.global_position + Vector3(0.5, 0.0, 0.0)
+	farmer.interact()
+	_check(farmer.choosing == _recycled, "E opens the clone panel")
+	_recycled.recycle()
+	farmer.close_choice()
+	farmer.global_position = Vector3(50.0, farmer.global_position.y, 50.0)
+
+	_main.money = 0
+	_check(not _main.buy(0), "no money, no purchase")
+	_main.money = 100
+	var beds_before: int = _main.beds.size()
+	_check(_main.buy(0) and _main.beds.size() == beds_before + 3, "Terra adds 3 beds")
+	_check(_main.buy(0) and _main.buy(0) == false, "Terra sells 2 levels, then it's sold out")
+	_check(_main.money == 100 - 10 - 20, "Terra cost 10 then 20 (money %d)" % _main.money)
+	_check(_main.buy(2) and is_equal_approx(farmer.work_speed, 1.25)
+			and is_equal_approx(_main.clones[0].work_speed, 1.25),
+			"Ferramentas: +25% work speed for the farmer and the clones")
+	_check(_main.buy(1) and _main.trait_slots == 3, "Máquina: new clones get 3 traits")
+	_main.machine.stock = Machine.COST
+	_main.machine.perform(Machine.CLONE, farmer)
+	# The machine is now empty, so the recycle refund is all it will hold.
+	var newest: Clone = _main.clones[_main.clones.size() - 1]
+	_check(newest.traits.size() == 3, "a clone made after the upgrade has 3 traits (%s)" % [
+			newest.traits])
+	_check(is_equal_approx(newest.work_speed, 1.25), "and it comes with the tools")
+	_check(_main.shop_panel().contains("esgotado"), "the shop menu shows sold-out shops")
+
+	_main.sold_today = _main.goal()
+	_main.end_day()
+	_check(get_tree().paused and not _main.game_over, "day 1 met: the farm stops on the summary")
+	_check(FileAccess.file_exists(_main.log_path), "the day went into the playtest log")
+	_main.next_day()
+	_check(_main.day == 2 and _main.goal() == 8 and not get_tree().paused,
+			"next day: day 2, target $8, farm running")
+	_main.end_day()
+	_check(_main.game_over, "day 2 missed: game over")
+	get_tree().paused = false
+	var log_text := FileAccess.get_file_as_string(_main.log_path)
+	_say("playtest log:\n" + log_text)
+	_check(log_text.contains("== Dia 1") and log_text.contains("== Dia 2")
+			and log_text.contains("Clone"), "the log has both days and the clones")
+	DirAccess.remove_absolute(_main.log_path)
+	DirAccess.remove_absolute(TEST_LOG_DIR)
+
+
+func _finish_run_checks() -> void:
+	_check(not is_instance_valid(_recycled) or _recycled.is_queued_for_deletion(),
+			"the recycled clone went into the machine")
+	_check(_main.machine.stock == Machine.REFUND,
+			"recycling gave back %d (machine %d)" % [Machine.REFUND, _main.machine.stock])
 
 func _check(ok: bool, what: String) -> void:
 	if not ok:
