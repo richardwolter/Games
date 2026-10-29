@@ -9719,6 +9719,32 @@ Builders in `Marketing/.../2 Work/wishlist_1000/` (`build_plaque.py`, `build_100
   (`_crosses`), which sent dogs past their spot to the far corner and back. `test_lake`'s
   `_check_hound_facing` guards both.
 
+### The Beehive ASMR Short (2026-10-29, `/grill-me` with Richard)
+A 19.7 s vertical post for TikTok, Reels and Shorts that teases the hive room's vibe without
+showing its steps in order: three close-ups, no words until the end card. **Smoke** (the smoker
+quiets the top of the beard, then the middle; wings fold, Zs), **uncap** (the hot knife down the
+comb's right half, framed so the whole knife reads, handle and all; the honey sheets off into
+the flume), **pour** (two jars to the line and their lids, the third filling under the card).
+Soft dissolves between. The card lands on a beat over the pour, stacked in the sky: the v3
+logo, "November 16", "Wishlist now", the Steam mark. The game's own sounds lead, with the lake's
+loop, a few birds and the hive's hum under the smoke; Hello World (`save_me.ogg`) is a low bed
+from its guitar's strumming (9.28 s into the file, where the eighth-note strum and the bass come
+in) and comes up for the card. English only. Builder `Marketing/.../2 Work/hive_asmr/
+build_hive_asmr.py`, final `1 Final/Videos/Beehive ASMR (Vertical).mp4`.
+- **The probe** (`tools/shot_hive_asmr.tscn`, desktop build, Movie Maker for the sound, own
+  save, under its own node): the room driven by script through each step's own hooks and
+  fields (the smoker by `aim`/`hold`, the knife by `_want` at 42 painted px a second, under the
+  cap and the strain, the lever by `_by_hook`), the plank, hint card and cross hidden every
+  frame. It saves the whole 1920x1080 window a frame; the cut crops 540x960 out of it and blows
+  it up twice, nearest, so an art pixel is 6 px of the video. `HIVE_ASMR_ONLY=smoke|uncap|pour`
+  films one shot (the pour settles an unfilmed cut first, for a full bucket).
+- **No step's ending is ever shown**: the entrance is never smoked and the third jar is let go
+  at 0.62, under the step's 0.7, so the crown, the rays and the rosette never play.
+- **Slow under Movie Maker**: a whole-window JPEG a frame runs at a few frames a second, so the
+  wall clock is 20 minutes and the three shots take about seven.
+- **Out of scope, by decision**: a beat montage, the catch and the queen, the island, captions
+  over the moments, a landscape version.
+
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 **Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions
