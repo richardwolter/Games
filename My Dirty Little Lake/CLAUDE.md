@@ -2230,6 +2230,60 @@ idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19)
     (`Farewell.stay_door`, the demo's `DEMO_BACK_LAKE`), and the reel's bubble shut and unseen
     from its first frame (it flashed whole before the words).
   - Two new strings (`FIRST_BUY_PAD`, `CUE_BOOST`), machine drafts.
+- **Round 4, off Richard's third run** (2026-10-29):
+  - **A luck hint goes to the front** (`Lake._owe_hint`, `_cast_in_air`): the lucky card
+    queued behind the meter's, the ferries' or the pigeon's and came up casts later. Now a
+    lucky or double card goes before any other owed, a card already up that is not about luck
+    steps aside and comes back after it, and a luck card that could not come up while its
+    cast was out is dropped unseen, for the next lucky cast to owe again.
+  - **The smoked swarm no longer comes back for a second** (`HiveStepSmoke._band_left`): the
+    crowd on the landing board, sent in when the last band was smoked, was counted back on
+    the beard while it waited out its stagger, and the whole beard's pictures drew again.
+  - **The credits song rolls on** (`MusicStation._rolling`, `rolling()`, `_end_left`,
+    `_end_clock`): Back to lake or Back to menu lets Habibs play to its own end, the
+    playlist coming back under its last `FADE`; it no longer fades out with the words.
+  - **A piece in the hands blocks the room's use key** (`ShedRoom.switch_near`, and no key
+    chip, `_draw_interact_prompt`): the pad's ✕ while placing put him out of the door.
+  - **The mending shines** (`MendShine`, `ShedRoom._shine_cue`, `SHINE_STARS`,
+    `SHINE_LOOSE`): gold four-point stars of whole art pixels pop over the holes, broken
+    boards and puddles being mended with each tap (3) and board (7) of the mending's sound,
+    and on the chime a burst (40) over the room with a warm wash (`WASH` 0.22 over 1 s).
+  - **Honey pays where it can be seen** (`Lake.HONEY_COINS_MOST` 8, `HONEY_COIN_GAP` 0.07,
+    `CoinFly.rise`, `RISE_*`): a honey coin a piece, up to eight a sweep leaving one after
+    another (`fly`'s `delay`), and the sweep's pay written "+$N" in the honey's ink rising
+    over the catch. It was one coin a sweep.
+  - **The gutter's honey runs quicker** (`HiveStepUncap.RUN_BASE` 85, `RUN_DEEP` 20, were
+    50 and 12; `DRAIN_WAIT` 4.5, was 6.7; `DRY_SHARE` 0.1, was 0.06).
+  - **A duck's feet paddle back** (`Wildlife.stroke_at`, `DUCK_STROKE` 1.6 a second swimming,
+    `DUCK_STROKE_IDLE` 0.5, `STROKE_PUSH` 0.85): each foot sweeps back away from the way the
+    duck swims a whole art pixel at a time and snaps forward, the two half a cycle apart. It
+    toggled both feet left and right on a beat whichever way the duck went.
+  - **Capybaras: no more vibrating on the spot** (`tools/probe_capy.tscn`, which counts
+    "walking on the spot", "sliding at rest" and "frozen mid-stride" now). Four rules:
+    - **The follower never steps straight back** (`CAPY_REVERSE_AFTER` 0.3 s, `last_step`):
+      steered round a fox or its lead the step came back reversed every few frames; it now
+      stands instead and only steps the other way after standing 0.3 s. Bank follower in one
+      run: facing flips 237 to 0, reversed steps 250 to 5.
+    - **The follower keeps the turn it took** (`turn`, `straight_t`, `CAPY_TURN_BACK` 1.5 s):
+      its place was tried in a fixed order every frame and swung between two turns at the edge
+      of another animal's room; it takes the straight place back only once that has been
+      clear 1.5 s.
+    - **Held still, it stands in its idle picture** (`still_t`, `move_t`, `stood`,
+      `CAPY_STILL_SHOW` 0.1 s, `CAPY_MOVE_SHOW` 0.15 s): the walk's frames step with ground
+      covered, so a held capybara stood frozen mid-stride; and it walks in its walk picture
+      again only after 0.15 s of moving, so stop-and-go does not swap the two pictures.
+    - **Further apart**: `CAPY_GAP` 42, `CAPY_KEEP` 36, `CAPY_MATE_KEEP` 30, `CAPY_KEEP_OFF`
+      68, `CAPY_SIDE_SWAP` 16, `CAPY_CATCH_UP` 46 (were 36 / 30 / 26 / 56 / 14 / 40). 46 was
+      tried and made the island's follower step back and forth more on the small lawn.
+    The probe's numbers swing a lot run to run (where the foxes and the frogs happen to be),
+    so read several runs before tuning by it.
+  - **The early catch, measured, not changed** (`tools/probe_catch.gd`'s new `PROBE_LEVELS`
+    and `heavy_tops`; Richard asked if the distribution is right): Strength 1, Range 4,
+    Width 2, Catch 1 (15), Reel 2, 42 casts in reach round the island. A fresh lake brings
+    home 11.3 of 15 on average, full on 20 casts, under 8 on 11; a lake 35% thinned at random
+    8.8, full on 6. The mouth at Width 2 covers 3.7 tiles; the ring round the island is 3-4
+    deep; a heavy piece on top stops the dig on 1.5 of those tiles a cast. Levers, none
+    pulled: `RING_SLOTS`, Width's early price, the depth tiers past the ring.
 - **Out of scope, by decision**: the nonstop caster outrunning the boats, any price or curve,
   the demo, hiding rows within a board.
 - **Before merging**: revert the test copy's `project.godot` name and user dir and restore

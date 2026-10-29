@@ -6976,9 +6976,18 @@ func _stage_music() -> void:
 	music.set_ending(false)
 	_run_music(music, fade + 0.2)
 	g = music.gains()
+	_check(is_equal_approx(float(g["end"]), 1.0) and music.is_playing(&"habibs") and music.rolling(),
+		"closing the words lets the end song roll on (2026-10-29, Richard)", "%s" % g)
+	var end_len: float = (music.get(&"_ending") as AudioStreamPlayer).stream.get_length()
+	music.set(&"_end_clock", end_len - fade - 0.1)
+	_run_music(music, 0.2)
+	_check(not music.rolling() and float(music.gains()["end"]) < 1.0,
+		"and goes out over its own last seconds", "%s" % music.gains())
+	_run_music(music, fade + 0.2)
+	g = music.gains()
 	_check(is_zero_approx(float(g["end"])) and not music.is_playing(&"habibs")
 		and is_equal_approx(float(g["beatgucci"]), 1.0) and music.song_time() > at,
-		"closing it fades back to the playlist where it has got to", "%s" % g)
+		"then fades back to the playlist where it has got to", "%s" % g)
 	_check_record_lists(music)
 	_check_loobas(music)
 	music.queue_free()
@@ -7860,6 +7869,32 @@ func _check_cues() -> void:
 	# The hints: owed, one at a time, each with its words and its target; read once.
 	for kind: StringName in [&"lucky", &"double", &"pigeon", &"ferry"]:
 		seen.erase(kind)
+	# A luck hint is only shown while its cast is out (2026-10-29): with the net home it is
+	# dropped unseen, for the next lucky cast to owe again.
+	var luck_net: CastNet = _main.get(&"_net")
+	var luck_net_was := luck_net.state
+	_main.call(&"_owe_hint", &"lucky")
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	_check((_main.get(&"_hints") as Array).is_empty() and StringName(_main.get(&"_hint_up")) == &""
+		and not seen.has(&"lucky"),
+		"a lucky hint owed with the cast already home is dropped unseen", "")
+	# And it goes to the front: a card already up that is not about luck steps aside for it and
+	# comes back after (Richard: the lucky card came in late, behind the others).
+	luck_net.state = CastNet.State.FLYING
+	_main.call(&"_owe_hint", &"pigeon")
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	_main.call(&"_owe_hint", &"lucky")
+	_check(StringName(_main.get(&"_hint_up")) == &"" and str(_main.get(&"_hints")) == str([&"lucky", &"pigeon"]),
+		"a lucky cast puts its card in front of one already up, which waits behind it",
+		str(_main.get(&"_hints")))
+	(_main.get(&"_hints") as Array).clear()
+	seen.erase(&"pigeon")
+	_main.call(&"_owe_hint", &"ferry")
+	_main.call(&"_owe_hint", &"lucky")
+	_main.call(&"_owe_hint", &"double")
+	_check(str(_main.get(&"_hints")) == str([&"lucky", &"double", &"ferry"]),
+		"luck hints go in front of the queue, in the order they came", str(_main.get(&"_hints")))
+	(_main.get(&"_hints") as Array).clear()
 	_main.call(&"_owe_hint", &"lucky")
 	_main.call(&"_owe_hint", &"double")
 	_main.call(&"_owe_hint", &"lucky")
@@ -7886,6 +7921,7 @@ func _check_cues() -> void:
 	_main.call(&"_hint_step", 1.0 / 60.0)
 	_check(hint.showing() and hint.kind == &"double" and hint.text == Text.CUE_DOUBLE,
 		"then the double cast's", String(hint.kind))
+	luck_net.state = luck_net_was
 	hint.closed.emit()
 	_check(StringName(_main.get(&"_hint_up")) == &"" and seen.has(&"double"), "a click on its paper takes it down", "")
 	hint._process(CueCard.FADE + 0.05)
@@ -10383,6 +10419,39 @@ func _check_staged_shop() -> void:
 ## Round 3 off Richard's second run (2026-10-28): the house on the pad, the upgrades card's
 ## pad wording, the HUD's pad glyphs, the hive's pad cursor and its felt tools, the boats'
 ## boost after a tamed tornado, and the ending's lake door and quiet bubble.
+## Round 4 of the staged shop's test branch (2026-10-29, Richard's notes after another run).
+func _check_round4() -> void:
+	var room: ShedRoom = _main.get(&"_room")
+	# A piece in the hands takes every press: nothing is used, sat on or left by.
+	var carried_was := room.carrying
+	room.carrying = &"decor_bookcase_tall"
+	_check(not room.switch_near(), "with a piece in the hands, Interact does nothing in the room", "")
+	room.carrying = carried_was
+	# The mending shines: stars with the taps and a burst with a wash on the chime.
+	var shine: MendShine = room.get(&"_shine")
+	_check(shine != null and shine.get_index() > (room.get(&"_house_over") as Array)[1].get_index(),
+		"the house's mending shine is drawn over the room", "")
+	if shine != null:
+		shine.clear()
+		room.call(&"_shine_cue", &"tap")
+		var taps := shine.stars()
+		room.call(&"_shine_cue", &"chime")
+		_check(taps >= 1 and shine.stars() >= taps + 20 and float(shine.get(&"_wash")) > 0.0,
+			"a tap lays a star or two, the chime a burst and a warm wash", "%d %d" % [taps, shine.stars()])
+		shine.clear()
+	# The smoke's crowd, sent in on the last band and waiting its stagger, is off the beard.
+	var smoke_src := (load("res://scripts/hive_step_smoke.gd") as GDScript).source_code
+	_check(smoke_src.find("_walk[i] != Walk.BEARD and (_is_walking(i) or _left_home(i))") >= 0,
+		"a bee off its spot on the beard is counted gone from it, so the swarm does not come back", "")
+	# The gutter's honey runs quicker, and the step waits less for the last of it.
+	_check(HiveStepUncap.RUN_BASE >= 80.0 and HiveStepUncap.DRAIN_WAIT <= 4.5,
+		"the gutter's honey runs quicker and the uncap step waits less for it", "")
+	# The duck's feet sweep back, away from the way it swims, and snap forward.
+	_check(Wildlife.stroke_at(0.0) == -1 and Wildlife.stroke_at(0.4) == 0 and Wildlife.stroke_at(0.7) == 1
+		and Wildlife.stroke_at(0.9) == -1,
+		"a duck's foot sweeps back over the stroke and snaps forward", "")
+
+
 func _check_round3() -> void:
 	var room: ShedRoom = _main.get(&"_room")
 	var was_shelf: bool = room.get(&"_pad_shelf")
@@ -10453,6 +10522,7 @@ func _stage_shop_shape() -> void:
 	var skin := _main.get_node(^"HUD/ShopSkin")
 	_check_staged_shop()
 	_check_round3()
+	_check_round4()
 	_check_shop_purse(skin)
 	_check_ten_fixes(skin)
 	_check_bonus_panel()
@@ -13642,9 +13712,21 @@ func _check_honey() -> void:
 	_net.catch = PackedInt32Array([rubbish, rubbish])
 	_main.call(&"_on_net_swept", at, 2, 10, 30.0, _net)
 	var paid := float(_main.get(&"sludge")) - before
-	_check(is_equal_approx(paid, half * 2.0) and coins.honey_flying() == 1,
-		"a sweep under honey pays half each piece's base price at once, and a honey coin flies",
-		"%.2f against %.2f, %d honey coins" % [paid, half * 2.0, coins.honey_flying()])
+	_check(is_equal_approx(paid, half * 2.0) and coins.honey_flying() == 2 and coins.rising() == 1,
+		"a sweep under honey pays half each piece's base price at once, a honey coin a piece flies and the pay rises over the catch (2026-10-29)",
+		"%.2f against %.2f, %d honey coins, %d rising" % [paid, half * 2.0, coins.honey_flying(), coins.rising()])
+	coins.clear()
+	_net.catch = PackedInt32Array()
+	for k in 20:
+		_net.catch.append(rubbish)
+	_main.call(&"_on_net_swept", at, 20, 30, 30.0, _net)
+	var carried := 0
+	for coin: Dictionary in coins.get(&"_flying"):
+		carried += int(coin["carry"])
+	_check(coins.honey_flying() == Lake.HONEY_COINS_MOST and carried == 20,
+		"a big honeyed sweep sends at most %d coins, carrying every piece between them" % Lake.HONEY_COINS_MOST,
+		"%d coins carrying %d" % [coins.honey_flying(), carried])
+	coins.clear()
 	_check(boosted, "with the Recycle Bonus on that piece's yard, and the honey not boosted by it", "")
 	_main.set(&"recycle_bonus_level", bonus_level_was)
 	_main.set(&"_bonus_kind", bonus_kind_was)

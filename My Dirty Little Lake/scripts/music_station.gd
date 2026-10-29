@@ -121,6 +121,13 @@ var _radio_at: float = 0.0
 var _shed_at: float = 0.0
 var _ending_at: float = 0.0
 var _sync_at: float = 1.0
+## The ending let go while Habibs plays (2026-10-29, Richard: "after credits, let the credits
+## song roll when back to lake or back to menu"): it plays on to its own end and the playlist
+## comes back under its last `FADE`, instead of fading out the moment the words go.
+var _rolling: bool = false
+## How far into Habibs the station is, for the harness, which drives the clock by hand: with
+## `follow_players` on, the player's own position is read instead.
+var _end_clock: float = 0.0
 
 var _lake: Track = Track.new()
 var _shed: Track = Track.new()
@@ -388,7 +395,25 @@ func set_ending(on: bool) -> void:
 		on = false
 	if on and not ending and is_zero_approx(_ending_at) and _ending != null:
 		_ending.play()
+		_end_clock = 0.0
+	if on:
+		_rolling = false
+	elif ending and _ending != null and _ending.playing:
+		_rolling = true
 	ending = on
+
+
+## Whether Habibs is let go but still playing on to its end.
+func rolling() -> bool:
+	return _rolling
+
+
+## Seconds of Habibs left to play.
+func _end_left() -> float:
+	if _ending == null or _ending.stream == null:
+		return 0.0
+	var at := _ending.get_playback_position() if follow_players else _end_clock
+	return _ending.stream.get_length() - at
 
 
 ## Move the station on by `delta` seconds. `_process` calls it; the test calls it by hand.
@@ -398,7 +423,12 @@ func step(delta: float) -> void:
 	_radio_at = move_toward(_radio_at, 1.0 if muffled else 0.0, DOOR_FADE * delta)
 	_shed_at = move_toward(_shed_at, 1.0 if indoors else 0.0, DOOR_FADE * delta)
 	_sync_at = move_toward(_sync_at, 1.0 if synced else 0.0, DOOR_FADE * delta)
-	_ending_at = move_toward(_ending_at, 1.0 if ending else 0.0, delta / FADE)
+	if _ending_at > 0.0 and _ending != null and _ending.stream != null:
+		_end_clock = fposmod(_end_clock + delta, maxf(_ending.stream.get_length(), 0.001))
+	# Let go, the song holds until its last `FADE` and goes out with its own end.
+	if _rolling and _end_left() <= FADE:
+		_rolling = false
+	_ending_at = move_toward(_ending_at, 1.0 if ending or _rolling else 0.0, delta / FADE)
 	if _ending != null and _ending_at <= 0.0 and _ending.playing:
 		_ending.stop()
 	# The ending loops by hand: the stream is shared with the lists' players, which must not

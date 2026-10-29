@@ -81,7 +81,11 @@ const KNIFE_OUT := 0.2
 const SWEEP_TIME := 0.9
 const SWEEP_HOLD := 0.4  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 0.6.
 ## After the sweep, the honey still running is waited on at most this long.
-const DRAIN_WAIT := 6.7  # A third off (2026-10-23, Richard's QA run: the endings were slow); was 10.0.
+## What is left in the channel and the air when the step may end: the last drips are not waited on.
+const DRY_SHARE := 0.1
+## Cut to 4.5 with the quicker channel (2026-10-29, Richard: "the honey on the gutter is sliding
+## too slow, so player needs to wait before going to next scene"); was 6.7, and 10 before that.
+const DRAIN_WAIT := 4.5
 const SWEEP_STARS := 3
 
 ## A row popping: its flash, the stars on it, and the most stars alive at once (a harness
@@ -419,7 +423,7 @@ func _process(delta: float) -> void:
 			_drive_sweep()
 			# Done once the sweep has run and nearly all the honey is in the bucket, or a
 			# while after, whichever is first: the last drips are not waited on.
-			var dry := honey_left() < _total * 0.06
+			var dry := honey_left() < _total * DRY_SHARE
 			if _clock >= SWEEP_TIME + SWEEP_HOLD and (dry or _clock >= SWEEP_TIME + DRAIN_WAIT):
 				_phase = Phase.DONE
 				done_once()
@@ -1236,8 +1240,11 @@ const POOL_FLARE_WIDE := 4.0
 ## towards the bucket"): at 80 a curtain's honey ran away as fast as it came and the crease
 ## under it read empty. At this pace a curtain keeps a pool under it and the honey is seen
 ## sliding down after the curtains stop.
-const RUN_BASE := 50.0
-const RUN_DEEP := 12.0
+## **Quicker again** (2026-10-29, Richard: "sliding too slow, so player needs to wait"): 50 and
+## 12 to 85 and 20. The crease no longer reads empty at this pace because a curtain's foot now
+## seeds it (`CURTAIN_SEED`) and a column shows from `SHOW_FROM`, which the 80 had neither of.
+const RUN_BASE := 85.0
+const RUN_DEEP := 20.0
 ## A column shows honey from this depth (it was 0.4, which hid every curtain's own pool).
 const SHOW_FROM := 0.06
 ## The glob a curtain's foot brings when it first meets the flume, taken from the store, so

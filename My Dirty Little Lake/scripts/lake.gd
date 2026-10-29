@@ -789,6 +789,9 @@ var _hive_tick := 0.0
 ## first guesses.
 const HONEY_TIME := 15.0
 const HONEY_BONUS := 0.5
+## A honeyed sweep's coins (2026-10-29): one a piece up to this many, leaving this far apart.
+const HONEY_COINS_MOST := 8
+const HONEY_COIN_GAP := 0.07
 var _honey_left := 0.0
 ## The whole window the seconds left were eaten into: the HUD's drain is left over this.
 var _honey_span := 0.0
@@ -3500,9 +3503,15 @@ func _honey_pay(defs: PackedInt32Array, from: Vector2) -> float:
 	if pieces == 0:
 		return 0.0
 	sludge += paid
-	# Not while the shed is up: its room covers the plate the coin is aimed at.
+	# Not while the shed is up: its room covers the plate the coin is aimed at. A coin a piece
+	# up to `HONEY_COINS_MOST`, leaving one after another, and the sweep's pay written over
+	# the catch (2026-10-29, Richard: one coin a sweep was too little to feel).
 	if _coins != null and not _shed_open:
-		_coins.fly(from, true, pieces)
+		var coins := mini(pieces, HONEY_COINS_MOST)
+		for k in coins:
+			var carry := pieces / coins + (1 if k < pieces % coins else 0)
+			_coins.fly(from, true, carry, HONEY_COIN_GAP * float(k))
+		_coins.rise(from, paid)
 	return paid
 
 
@@ -6561,7 +6570,24 @@ func _cheapest_affordable() -> StringName:
 func _owe_hint(kind: StringName) -> void:
 	if _cues_seen.has(kind) or kind in _hints or _hint_up == kind:
 		return
+	# A luck hint names the cast in the air (2026-10-29, Richard: the lucky card came in late,
+	# queued behind the meter's or the ferries'): it goes to the front, and a card already up
+	# that is not about luck steps aside and comes back after it.
+	if LUCK_HINTS.has(kind):
+		var at := 0
+		while at < _hints.size() and LUCK_HINTS.has(_hints[at]):
+			at += 1
+		_hints.insert(at, kind)
+		if _hint_up != &"" and not LUCK_HINTS.has(_hint_up):
+			_hints.insert(at + 1, _hint_up)
+			_end_hint(false)
+		return
 	_hints.append(kind)
+
+
+## Whether either net of the angler's cast is out: a luck hint is only worth showing then.
+func _cast_in_air() -> bool:
+	return _net.state != CastNet.State.IDLE or (_net2 != null and _net2.state != CastNet.State.IDLE)
 
 
 ## What holds a hint back: anything that is already talking to the player, or covering the
@@ -6611,6 +6637,11 @@ func _hint_step(delta: float) -> void:
 		_settings.get_parent().add_child(_hint_card)
 		_hint_card.closed.connect(_end_hint.bind(true))
 	_settings.get_parent().move_child(_hint_card, _settings.get_parent().get_child_count() - 1)
+	# A luck hint that could not come up while its cast was out waits for the next lucky cast
+	# rather than pointing at an empty spot over the angler; it was not seen.
+	if _hint_up == &"" and LUCK_HINTS.has(next) and not _cast_in_air():
+		_hints.pop_front()
+		return
 	var held := _hint_held_for(next)
 	if _hint_up == &"":
 		# The last one's fade is let finish before the next comes in.

@@ -900,6 +900,13 @@ const MEND_CUES := [
 ]
 var _mend_set: String = ""
 var _mend_next: int = 0
+## The mending's shine, over everything in the room (2026-10-29, Richard: "so it is more
+## visible"): stars with each tap and board, a burst and a warm wash on the chime.
+var _shine: MendShine
+## Stars a cue lays: a tap one, a board a handful, the chime the burst.
+const SHINE_STARS := {&"tap": 3, &"board": 7, &"chime": 40}
+## The share of stars laid anywhere in the room rather than over the places being mended.
+const SHINE_LOOSE := 0.3
 ## How far the shower has spread through the room, 0..1, a source pixel at a time.
 var _rain_mix: float = 0.0
 var _splash_next: float = 0.0
@@ -2695,6 +2702,10 @@ func switch_near() -> bool:
 	# door he was standing at).
 	if _pad_shelf and Pad.is_pad():
 		return false
+	# A piece in the hands takes every press but the turn (2026-10-29, Richard: the pad's use
+	# button while placing put him out of the door): nothing is used, sat on or left by.
+	if carrying != &"":
+		return false
 	if _you_pet >= 0.0:
 		return true
 	if not _rest_key.is_empty():
@@ -4054,6 +4065,10 @@ func _build_shade_layers() -> void:
 		add_child(over)
 		move_child(over, _light.get_index() + 1 + k)
 		_house_over.append(over)
+	_shine = MendShine.new()
+	_shine.name = &"MendShine"
+	add_child(_shine)
+	move_child(_shine, _house_over[_house_over.size() - 1].get_index() + 1)
 
 
 ## Where the light comes in, in the room's own space: the round window half way down the
@@ -4559,7 +4574,7 @@ func _over_piece(floor_box: Rect2, index: int) -> Vector2:
 ## The interact key's chip over whatever E would use, and which placed piece that is (-1 for
 ## the door, a dog, or nothing).
 func _draw_interact_prompt(floor_box: Rect2) -> int:
-	if _you_pet >= 0.0 or not _rest_key.is_empty():
+	if _you_pet >= 0.0 or not _rest_key.is_empty() or carrying != &"":
 		return -1
 	var record := _record_near()
 	if record >= 0:
@@ -5189,6 +5204,8 @@ func _house_shown() -> void:
 	_mend_set = ""
 	_mend_next = 0
 	_mend_hold = 0.0
+	if _shine != null:
+		_shine.clear()
 	_rain_mix = _rain_wanted()
 	_bird_next = randf_range(BIRD_GAP.x * 0.3, BIRD_GAP.y * 0.5)
 	if house_seen < house_stage:
@@ -5219,7 +5236,35 @@ func _mend_sounds(playing: String) -> void:
 	while _mend_next < MEND_CUES.size() and _house_clock >= float(MEND_CUES[_mend_next][0]):
 		if sound != null:
 			sound.room_mend(MEND_CUES[_mend_next][1])
+		_shine_cue(MEND_CUES[_mend_next][1])
 		_mend_next += 1
+
+
+## The shine of one mending cue: stars over the places being mended (the holes, broken boards
+## and puddles of the stage the room is leaving), a few loose over the room, and on the chime
+## a burst over all of it with a warm wash.
+func _shine_cue(what: StringName) -> void:
+	if _shine == null or not HouseInside.ready_to_draw():
+		return
+	var floor_box := _floor_rect()
+	var z := _zoom()
+	# The room itself, wall and floor: the baked region reaches past it, over the lake.
+	var room := _shed_rect()
+	_shine.cell = z
+	_shine.grid_from = floor_box.position
+	var spots := HouseInside.place_blocks(2 if _mend_set == "u23" else 1)
+	var n := int(SHINE_STARS.get(what, 1))
+	for k in n:
+		var at := Vector2.ZERO
+		if spots.is_empty() or randf() < SHINE_LOOSE:
+			at = room.position + Vector2(randf() * room.size.x, randf() * room.size.y)
+		else:
+			var r: Rect2i = spots[randi() % spots.size()]
+			at = floor_box.position + (Vector2(r.position) + Vector2(randf() * r.size.x, randf() * r.size.y)) * z
+		var delay := randf() * (0.5 if what == &"chime" else 0.12)
+		_shine.sprinkle(at, delay, what != &"tap" or k == 0)
+	if what == &"chime":
+		_shine.wash(room)
 
 
 ## How much of the room the shower should have: stage 1 only, the one with the leaks.

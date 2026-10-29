@@ -508,8 +508,11 @@ func _band_left(band: int) -> float:
 	if total <= 0:
 		return 0.0 if (band == 2 and _all_age >= 0.0) else 1.0
 	var gone := 0
+	# Off the beard once it walks or has already left its spot: the crowd's bees, sent in when
+	# the last band is smoked, wait out their stagger off the beard, and counted back on it
+	# they put the whole beard back for a second (2026-10-29, Richard: "ghostly").
 	for i in _walk.size():
-		if _ring_of[i] == band and _walk[i] != Walk.BEARD and _is_walking(i):
+		if _ring_of[i] == band and _walk[i] != Walk.BEARD and (_is_walking(i) or _left_home(i)):
 			gone += 1
 	return ceilf((1.0 - float(gone) / total) * 4.0) / 4.0
 
