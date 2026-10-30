@@ -7934,6 +7934,21 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   checked: speed** — the browser pane throttled the page to one frame a second. Known: the
   project's fullscreen start logs a harmless "requestFullscreen ... user gesture" warning, and
   the music is silent until the first click (the browser's autoplay rule).
+- **The first demo update** (2026-10-30, `/grill-me` with Richard): everything since the
+  release build (`6ac179a`) goes into all three demo builds, nothing gated, **version kept at
+  1.0.0**. What a demo player gets: sitting on every side of a seat, click-to-walk and the
+  record player first in the house, the fire, laps on more seats, the QA run's fixes (the
+  four-card decoration tour, cards hidden under boards, the meter hint at 5%, the forced first
+  upgrade, the door's quiet E), music 3 dB down with This is Nice on the lake's list, the
+  record player's back button, the subtler radio, more cloud reflections, the wash room's dogs
+  facing their way. No `SAVE_VERSION` bump since the release, so demo saves carry over.
+  Checked: `test_lake` 2497 / 0 failed, the pack's file table (1484 files, `demo.flag`, the
+  four demo songs and their radio copies only; the pck is 38.7 MB against 35.6, the radio
+  copies' higher quality), a 900-frame windowed run of the exported exe with no errors and the
+  user folder untouched, the web build booting isolated with no console errors. The itch zips
+  keep their v1.0.0 names; the Oct 20 ones are in `_builds/itch/old_20261020/`. Player-facing
+  notes: `docs/steam/demo_patch_20261030.md`, for Richard to post. Steam upload and set-live
+  are Richard's (`upload_demo.bat`, which re-exports the same commit).
 - **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
