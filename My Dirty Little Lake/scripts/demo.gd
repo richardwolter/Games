@@ -65,6 +65,11 @@ const RING_TEASE := 0.06
 const SONGS: Array[StringName] = [&"movimento_tranquilo", &"beatgucci", &"save_me", &"indie_boi"]
 ## Net hits to tame the finale tornado.
 const TORNADO_HITS := 5
+## The staged shop's gates in the demo (2026-10-30, Richard): the levels each board waits for
+## after the one before, as `Lake.SHOP_STAGES` has them, so NET opens at 3 levels bought, DOGS
+## at 7 and LUCK at 11. The full game's 3 / 15 / 25 would open LUCK only once every other demo
+## level was bought (the demo sells 31). The sim puts them at about 0.8 / 1.4 / 2.3 minutes.
+const SHOP_GATES := {&"net": 3, &"dog": 4, &"luck": 4}
 
 ## Prices the demo sets for itself, `track: [price_base, price_mult]`. A track missing here
 ## keeps the full game's price. Written by `docs/progression/price_demo.py --write`, then
@@ -117,6 +122,14 @@ static func cap(what: StringName, full: int) -> int:
 	if not on():
 		return full
 	return mini(int(CAPS.get(what, 0)), full)
+
+
+## How many levels a board waits for after the board before it: the demo's gate where it sets
+## one, otherwise the full game's.
+static func gate(board: StringName, full: int) -> int:
+	if on() and SHOP_GATES.has(board):
+		return int(SHOP_GATES[board])
+	return full
 
 
 ## What the next level costs, the demo's price where it sets one.

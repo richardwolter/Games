@@ -4536,9 +4536,10 @@ func _on_shop_tour_ended(skipped: bool) -> void:
 	save_game()
 
 
-## Whether the boards open one at a time on this lake (see `SHOP_STAGES`).
+## Whether the boards open one at a time on this lake (see `SHOP_STAGES`). The demo stages
+## them too, on its own gates (`Demo.SHOP_GATES`).
 func _stages_on() -> bool:
-	return not Demo.on() and (force_stages or get_parent() == get_tree().root)
+	return force_stages or get_parent() == get_tree().root
 
 
 ## Every level bought on every track, which is what the stages count.
@@ -4560,7 +4561,7 @@ func buys_to_open(board: StringName) -> int:
 			return 0
 	var need := 0
 	for stage: Array in SHOP_STAGES:
-		need += int(stage[1])
+		need += Demo.gate(stage[0], int(stage[1]))
 		if stage[0] == board:
 			return maxi(need - _levels_bought(), 0)
 	return 0
@@ -5522,8 +5523,8 @@ const TRACKS := [
 # cannot fill even one hull, and every further boat level earns nothing.
 #
 # Worked out from the levels owned, so nothing is saved; a board already bought from is open
-# whatever the count. Full game only: the demo, and every borrowed lake but one that
-# asks (`force_stages`), open everything at once.
+# whatever the count. The demo waits on its own gates (`Demo.SHOP_GATES`, 3 / 7 / 11 of its 31
+# levels). Every borrowed lake but one that asks (`force_stages`) opens everything at once.
 const SHOP_STAGES := [[&"boat", 0], [&"net", 3], [&"dog", 12], [&"luck", 10]]
 static var force_stages: bool = false
 

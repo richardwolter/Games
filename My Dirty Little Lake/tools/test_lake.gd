@@ -10358,8 +10358,21 @@ func _check_staged_shop() -> void:
 		and bool(_main.get(&"_shop_tour_done")),
 		"Skip ends every stage's cards for good", str(_main.get(&"_shop_tours")))
 	_main.call(&"_set_menu", false)
+	# The demo stages its boards on its own gates (2026-10-30): 3 / 7 / 11 of its 31 levels.
+	# Three boat levels are bought by here, so the net is open and the others wait.
 	Demo.forced = true
-	_check(int(_main.call(&"buys_to_open", &"luck")) == 0, "the demo opens every board at once", "")
+	_check(int(_main.call(&"buys_to_open", &"net")) == 0
+		and int(_main.call(&"buys_to_open", &"dog")) == 4
+		and int(_main.call(&"buys_to_open", &"luck")) == 8,
+		"the demo opens its boards at 3, 7 and 11 levels bought",
+		"%d %d %d" % [_main.call(&"buys_to_open", &"net"), _main.call(&"buys_to_open", &"dog"),
+			_main.call(&"buys_to_open", &"luck")])
+	var before_luck := 0
+	for key: StringName in Lake.TRACKS:
+		if ShopSkin.board_for(key) != &"luck":
+			before_luck += Demo.cap(key, 99)
+	_check(before_luck > 11, "the demo's LUCK opens with levels still to buy on the other boards",
+		str(before_luck))
 	Demo.forced = false
 	var src := (load("res://scripts/lake.gd") as GDScript).source_code
 	_check(src.find('"shop_tours": _shop_tours') >= 0

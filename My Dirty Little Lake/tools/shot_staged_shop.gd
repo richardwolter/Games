@@ -6,6 +6,8 @@ extends Node
 ## Desktop build, not `--headless`: `<exe> --path . --fixed-fps 60 tools/shot_staged_shop.tscn`.
 ## Saves `tools/last_staged_{boats,locked,legend,unseal,net,open}.png` and
 ## `tools/last_staged.log`. Its own save, deleted first and after, and the lake under this node.
+## `STAGED_DEMO=1` shoots the demo's shop (its own gates, `Demo.SHOP_GATES`) as
+## `tools/last_staged_demo_*.png`.
 
 const SHOT := "res://tools/last_staged_%s.png"
 const LOG := "res://tools/last_staged.log"
@@ -29,6 +31,7 @@ func _ready() -> void:
 	if FileAccess.file_exists(SAVE):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	Lake.force_stages = true
+	Demo.forced = OS.get_environment("STAGED_DEMO") == "1"
 	_main = load("res://scenes/main.tscn").instantiate()
 	_main.set(&"save_path", SAVE)
 	add_child(_main)
@@ -103,7 +106,7 @@ func _wait() -> void:
 func _shoot(name_of: String) -> void:
 	_busy = true
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(SHOT % name_of)
+	get_viewport().get_texture().get_image().save_png(SHOT % (("demo_" if Demo.forced else "") + name_of))
 	_say("shot %s" % name_of)
 	_step += 1
 	_at = _frames
@@ -119,6 +122,7 @@ func _say(line: String) -> void:
 func _finish() -> void:
 	set_physics_process(false)
 	Lake.force_stages = false
+	Demo.forced = false
 	if FileAccess.file_exists(SAVE):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	get_tree().quit()

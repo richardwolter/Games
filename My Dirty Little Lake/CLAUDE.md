@@ -2150,8 +2150,10 @@ idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19)
   levels bought, DOGS at 15, LUCK at 25 in all (Richard, after his first run: 29 and 51 came
   too late). Counted off the levels owned
   (`buys_to_open`, `track_open`), so nothing is saved; a board already bought from is open
-  whatever the count, so a run saved before the stages keeps what it had. **Full game only**: the demo and every borrowed lake open all four
-  (`Lake.force_stages` for probes and tests).
+  whatever the count, so a run saved before the stages keeps what it had. Every borrowed lake
+  opens all four (`Lake.force_stages` for probes and tests). **The demo stages too since
+  2026-10-30, on its own gates** (`Demo.SHOP_GATES`, `Demo.gate`): NET at 3, DOGS at 7, LUCK at
+  11 of its 31 levels; see The Steam Demo. This said "full game only" until then.
 - **Gates from the sim** (`docs/progression/build_shop.py --gates`, `staged_gates.py`): the
   focused bot opens them at 0.5 / 4.0 / 5.2 min, the buy-anything bot at 0.5 / 3.2 / 6.2
   (first fitted to 3 / 26 / 22 more: 5.9 and 9.8).
@@ -2286,7 +2288,8 @@ idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19)
     deep; a heavy piece on top stops the dig on 1.5 of those tiles a cast. Levers, none
     pulled: `RING_SLOTS`, Width's early price, the depth tiers past the ring.
 - **Out of scope, by decision**: the nonstop caster outrunning the boats, any price or curve,
-  the demo, hiding rows within a board.
+  hiding rows within a board. (The demo was out of scope too; it took the stages on
+  2026-10-30.)
 - **The merge kept main's own `project.godot` name and user dir and `steam_appid.txt`**; the
   branch keeps the test copy's, so the copy stays apart from the real save. The letter's
   Upgrades stills were re-shot on the merge. **The store's shop shot is still owed.**
@@ -8104,6 +8107,17 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   keep their v1.0.0 names; the Oct 20 ones are in `_builds/itch/old_20261020/`. Player-facing
   notes: `docs/steam/demo_patch_20261030.md`, for Richard to post. Steam upload and set-live
   are Richard's (`upload_demo.bat`, which re-exports the same commit).
+  **Rebuilt the same day, before any upload, with the staged shop** (`/grill-me` with Richard,
+  after the "Grill-me demo review" session merged it as full game only): the demo opens its
+  boards one at a time on its own gates (`Demo.SHOP_GATES`: NET at 3 levels bought, DOGS at 7,
+  LUCK at 11; the full game's 3 / 15 / 25 would have opened LUCK only once every other demo
+  level was bought). Sim (`tools/sim_demo/sweep.py`, scratch, the cheapest-first bot on the
+  demo's caps and prices): 0.8 / 1.4 / 2.3 sim minutes of an 8.4-minute buy-out, about triple
+  that for a player. Gates first guesses; Richard's Steam playthrough judges them. Everything
+  else from the four test runs ships with it; what never shows in the demo (the hive's honey,
+  the boats' boost, capybaras, ducks, the end song) is left in, unreachable. One combined
+  update and one set of notes. The probe `tools/shot_staged_shop.tscn` takes `STAGED_DEMO=1`
+  for `tools/last_staged_demo_*.png`.
 - **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
