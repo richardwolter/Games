@@ -796,6 +796,9 @@ var _carried_was: StringName = &""
 var carrying: StringName = &""
 ## The pad has the shelf up: the stick walks its rows rather than the player (RB/LB).
 var _pad_shelf := false
+## The pad's shelf opens with the wash plank picked rather than its first row: set by the lake
+## while the decoration tour's plank card is up.
+var focus_wash := false
 
 ## Which face the carried piece is being held in — an index into its views. Set from the
 ## row it was lifted off so turning a chair, putting it down and picking it up again does
@@ -879,6 +882,31 @@ var _house_clock: float = 0.0
 var _house_playing: Array[String] = []
 var _house_frame_was: int = -1
 var _house_sound_set: String = ""
+## Whether the lake will put the house's card up for this visit's mending (it shows once):
+## set by the lake before the door opens. With it, the mending waits `MEND_WAIT` on its first
+## frame, the old room, so the card is read before anything moves (Richard, after the staged
+## shop's first run: the card came with the animation and stood over it).
+var mend_card := false
+const MEND_WAIT := 1.5
+var _mend_hold: float = 0.0
+## The mending's own sound (2026-10-25, Richard: "a special sound for when the house fixes
+## itself"), laid in time with each stage-up from takes the game already has: the furniture's
+## small thud as hammer taps, its big thud as a board laid, the find's chime as it finishes.
+## `[seconds into the stage-up, what]`; first guesses for Richard's ear.
+const MEND_CUES := [
+	[0.15, &"tap"], [0.32, &"tap"], [0.55, &"board"],
+	[0.80, &"tap"], [0.95, &"tap"], [1.10, &"tap"], [1.35, &"board"],
+	[1.60, &"tap"], [1.75, &"tap"], [1.95, &"board"], [2.35, &"chime"],
+]
+var _mend_set: String = ""
+var _mend_next: int = 0
+## The mending's shine, over everything in the room (2026-10-29, Richard: "so it is more
+## visible"): stars with each tap and board, a burst and a warm wash on the chime.
+var _shine: MendShine
+## Stars a cue lays: a tap one, a board a handful, the chime the burst.
+const SHINE_STARS := {&"tap": 3, &"board": 7, &"chime": 40}
+## The share of stars laid anywhere in the room rather than over the places being mended.
+const SHINE_LOOSE := 0.3
 ## How far the shower has spread through the room, 0..1, a source pixel at a time.
 var _rain_mix: float = 0.0
 var _splash_next: float = 0.0
@@ -2645,6 +2673,13 @@ func room_box() -> Rect2:
 	return _shed_rect()
 
 
+## The back wall, over the floor: where the house's card stands while the floor mends.
+func wall_box() -> Rect2:
+	var shed := _shed_rect()
+	var floor_box := _floor_rect()
+	return Rect2(shed.position, Vector2(shed.size.x, maxf(floor_box.position.y - shed.position.y, 0.0)))
+
+
 func switch_box() -> Rect2:
 	if sheets == null:
 		return Rect2()
@@ -2662,6 +2697,15 @@ func switch_box() -> Rect2:
 ## "nearest wins"). A dog still waiting out its ten seconds is not a candidate, so beside one
 ## E works the switch or does nothing.
 func switch_near() -> bool:
+	# The pad's shelf is up: Interact (the pad's A, which also picks on the shelf) is the
+	# shelf's, never the room's (2026-10-28, Richard: A on the wash plank put him out of the
+	# door he was standing at).
+	if _pad_shelf and Pad.is_pad():
+		return false
+	# A piece in the hands takes every press but the turn (2026-10-29, Richard: the pad's use
+	# button while placing put him out of the door): nothing is used, sat on or left by.
+	if carrying != &"":
+		return false
 	if _you_pet >= 0.0:
 		return true
 	if not _rest_key.is_empty():
@@ -4021,6 +4065,10 @@ func _build_shade_layers() -> void:
 		add_child(over)
 		move_child(over, _light.get_index() + 1 + k)
 		_house_over.append(over)
+	_shine = MendShine.new()
+	_shine.name = &"MendShine"
+	add_child(_shine)
+	move_child(_shine, _house_over[_house_over.size() - 1].get_index() + 1)
 
 
 ## Where the light comes in, in the room's own space: the round window half way down the
@@ -4526,7 +4574,7 @@ func _over_piece(floor_box: Rect2, index: int) -> Vector2:
 ## The interact key's chip over whatever E would use, and which placed piece that is (-1 for
 ## the door, a dog, or nothing).
 func _draw_interact_prompt(floor_box: Rect2) -> int:
-	if _you_pet >= 0.0 or not _rest_key.is_empty():
+	if _you_pet >= 0.0 or not _rest_key.is_empty() or carrying != &"":
 		return -1
 	var record := _record_near()
 	if record >= 0:
@@ -4680,9 +4728,9 @@ func pad_focus() -> Array:
 		)
 		if box.position.y < list.position.y - 0.5 or box.end.y > list.end.y + 0.5:
 			continue
-		out.append({"box": box, "key": store[i], "first": out.is_empty()})
+		out.append({"box": box, "key": store[i], "first": out.is_empty() and not focus_wash})
 	if _wash_plank != null and _wash_plank.visible:
-		out.append({"box": _wash_plank.get_rect(), "key": &"wash", "first": out.is_empty()})
+		out.append({"box": _wash_plank.get_rect(), "key": &"wash", "first": out.is_empty() or focus_wash})
 	if _close != null and _close.visible:
 		out.append({"box": _close.get_rect(), "key": &"close"})
 	return out
@@ -5153,6 +5201,11 @@ func _house_shown() -> void:
 	_house_frame_was = -1
 	_house_playing.clear()
 	_house_rings.clear()
+	_mend_set = ""
+	_mend_next = 0
+	_mend_hold = 0.0
+	if _shine != null:
+		_shine.clear()
 	_rain_mix = _rain_wanted()
 	_bird_next = randf_range(BIRD_GAP.x * 0.3, BIRD_GAP.y * 0.5)
 	if house_seen < house_stage:
@@ -5166,7 +5219,52 @@ func _house_shown() -> void:
 		_house_playing.append("u1h")
 		half_seen = true
 		half_played.emit()
+	if mend_card and not _house_playing.is_empty():
+		_mend_hold = MEND_WAIT
 	house_seen = house_stage
+
+
+## The mending's sound: each `MEND_CUES` step whose time a stage-up has reached, once, and
+## over again from the top for the next stage-up of a jump of two. Nothing while it is held.
+func _mend_sounds(playing: String) -> void:
+	if playing != _mend_set:
+		_mend_set = playing
+		_mend_next = 0
+	if playing.is_empty() or _mend_hold > 0.0:
+		return
+	var sound := Sfx.main()
+	while _mend_next < MEND_CUES.size() and _house_clock >= float(MEND_CUES[_mend_next][0]):
+		if sound != null:
+			sound.room_mend(MEND_CUES[_mend_next][1])
+		_shine_cue(MEND_CUES[_mend_next][1])
+		_mend_next += 1
+
+
+## The shine of one mending cue: stars over the places being mended (the holes, broken boards
+## and puddles of the stage the room is leaving), a few loose over the room, and on the chime
+## a burst over all of it with a warm wash.
+func _shine_cue(what: StringName) -> void:
+	if _shine == null or not HouseInside.ready_to_draw():
+		return
+	var floor_box := _floor_rect()
+	var z := _zoom()
+	# The room itself, wall and floor: the baked region reaches past it, over the lake.
+	var room := _shed_rect()
+	_shine.cell = z
+	_shine.grid_from = floor_box.position
+	var spots := HouseInside.place_blocks(2 if _mend_set == "u23" else 1)
+	var n := int(SHINE_STARS.get(what, 1))
+	for k in n:
+		var at := Vector2.ZERO
+		if spots.is_empty() or randf() < SHINE_LOOSE:
+			at = room.position + Vector2(randf() * room.size.x, randf() * room.size.y)
+		else:
+			var r: Rect2i = spots[randi() % spots.size()]
+			at = floor_box.position + (Vector2(r.position) + Vector2(randf() * r.size.x, randf() * r.size.y)) * z
+		var delay := randf() * (0.5 if what == &"chime" else 0.12)
+		_shine.sprinkle(at, delay, what != &"tap" or k == 0)
+	if what == &"chime":
+		_shine.wash(room)
 
 
 ## How much of the room the shower should have: stage 1 only, the one with the leaks.
@@ -5181,7 +5279,11 @@ func _rain_wanted() -> float:
 func _tick_house(delta: float) -> void:
 	if _house_under.is_empty() or not HouseInside.ready_to_draw():
 		return
-	_house_clock += delta
+	# Held on the stage-up's first frame, the room as it was, while the card is read.
+	if _mend_hold > 0.0:
+		_mend_hold = maxf(_mend_hold - delta, 0.0)
+	else:
+		_house_clock += delta
 	var fps := HouseInside.fps()
 	var main := ""
 	var other := ""
@@ -5195,6 +5297,7 @@ func _tick_house(delta: float) -> void:
 		_house_playing.pop_front()
 		_house_clock = 0.0
 		_house_frame_was = -1
+	_mend_sounds(main)
 	if main.is_empty():
 		_rain_mix = move_toward(_rain_mix, _rain_wanted(), delta / RAIN_SPREAD)
 		main = HouseInside.loop_of(house_stage, false)

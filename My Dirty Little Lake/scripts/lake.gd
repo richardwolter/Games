@@ -789,6 +789,9 @@ var _hive_tick := 0.0
 ## first guesses.
 const HONEY_TIME := 15.0
 const HONEY_BONUS := 0.5
+## A honeyed sweep's coins (2026-10-29): one a piece up to this many, leaving this far apart.
+const HONEY_COINS_MOST := 8
+const HONEY_COIN_GAP := 0.07
 var _honey_left := 0.0
 ## The whole window the seconds left were eaten into: the HUD's drain is left over this.
 var _honey_span := 0.0
@@ -948,11 +951,13 @@ const HINT_TEXT := {
 	&"demo_house": "DEMO_HOUSE",
 	# The first jar of honey held (2026-10-16), at the jar plate: what eating one does.
 	&"honey_jar": "CUE_HONEY",
+	# The boats' boost after a tamed tornado (2026-10-28), at the ferry bar.
+	&"boost": "CUE_BOOST",
 }
 ## The share cleaned at which the meter's hint is owed.
 const METER_HINT_AT := 0.05
 const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter",
-	&"hive_demo", &"demo_goal", &"demo_house", &"honey_jar"]
+	&"hive_demo", &"demo_goal", &"demo_house", &"honey_jar", &"boost"]
 var _cues_seen: Dictionary = {}
 var _hints: Array[StringName] = []
 var _hint_up: StringName = &""
@@ -1093,6 +1098,15 @@ var _steps_done: bool = true
 ## got to is the board's for the session: closed half way, it picks up there next time the
 ## shop opens; quit half way, it starts over.
 var _shop_tour_done: bool = true
+## The staged shop's tour (`SHOP_STAGES`): how many stages have had their cards, in order,
+## saved as `shop_tours`. Each board's cards play the first time the shop is up with it open;
+## "Skip" ends them all. Absent reads as all of them when `shop_tour` was done, none when not.
+var _shop_tours: int = 0
+## Which stage's cards the board is showing, or -1.
+var _touring_stage: int = -1
+## How many stages were open last frame: a rise is a board coming open, which the shop shows
+## then and there (a level is only ever bought with the shop up).
+var _stages_open: int = -1
 
 # The decoration tour (2026-09-22, `/grill-me` with Richard, issue #24; `scripts/tour_card.gd`):
 # the first time a new game opens the shed, five cards walk washing and placing, the new
@@ -1121,6 +1135,12 @@ const DECOR_BACK_AFTER := 1.6
 const DECOR_SPRAYED := 0.04
 ## How many pieces stood in the room when the shelf's card came up; -1 before it has.
 var _decor_tour_placed := -1
+## Where the player stood (house cells) when the room's card came up in this visit, or INF;
+## and how far a walk from there ends the card.
+var _decor_room_from := Vector2.INF
+const DECOR_ROOM_MOVED := 0.35
+## Whether the plank's card has opened the pad's shelf this visit.
+var _decor_shelf_opened := false
 ## How clean the find was when the stand's card came up; -1 before it has.
 var _decor_stand_from := -1.0
 ## The decoration tour's sentences are `Text.TOUR_DECOR_*`, read as each card goes up.
@@ -1602,6 +1622,8 @@ func _ready() -> void:
 	# catalogue, or the shelf shows a picture with no word under it (Richard, 2026-09-13).
 	if _sheets != null and not _pretty(STARTER_BED).is_empty():
 		_room.titles[STARTER_BED] = _pretty(STARTER_BED)
+	# Those names are words: a language picked on the menu after the lake loaded renames them.
+	Prefs.language_changed.connect(_rename_finds)
 	_shop_skin.bought.connect(_buy)
 	# The picture at the head of the net and ferry boards: the ferry's own baked hull and
 	# the net laid out. The dog's board draws the dog itself.
@@ -1654,6 +1676,9 @@ func _ready() -> void:
 	Pad.pad_lost.connect(_on_pad_lost)
 	Pad.pad_found.connect(_on_pad_found)
 	_open_settings.pressed.connect(_set_settings.bind(true))
+	# Their pad buttons, drawn on their corners in pad mode (2026-10-28, Richard).
+	_open_settings.pad_action = &"open_settings"
+	_free_camera.pad_action = &"camera_lock"
 	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
 	# fills the screen now, and a settings panel drawn beneath that is a settings panel
 	# nobody can see or press.
@@ -2430,6 +2455,24 @@ func found() -> Array[String]:
 ## shows a find checks for the empty string and draws the picture on its own instead.
 func _pretty(name: String) -> String:
 	return "" if _sheets == null else _sheets.title_of(StringName(name))
+
+
+## Every find's name asked again, in the language now in play: the defs and the house's list
+## keep the words they were given at load.
+func _rename_finds() -> void:
+	if _sheets == null or _grid == null:
+		return
+	for def: TrashDef in _grid.defs:
+		if not def.keepsake or def.piece == &"":
+			continue
+		var said := _pretty(String(def.piece))
+		if said.is_empty():
+			continue
+		def.display_name = said
+		if _room != null:
+			_room.titles[String(def.piece)] = said
+	if _room != null and not _pretty(STARTER_BED).is_empty():
+		_room.titles[STARTER_BED] = _pretty(STARTER_BED)
 
 
 ## Point every def at its picture, and take its drawn size from the art rather than from
@@ -3460,9 +3503,15 @@ func _honey_pay(defs: PackedInt32Array, from: Vector2) -> float:
 	if pieces == 0:
 		return 0.0
 	sludge += paid
-	# Not while the shed is up: its room covers the plate the coin is aimed at.
+	# Not while the shed is up: its room covers the plate the coin is aimed at. A coin a piece
+	# up to `HONEY_COINS_MOST`, leaving one after another, and the sweep's pay written over
+	# the catch (2026-10-29, Richard: one coin a sweep was too little to feel).
 	if _coins != null and not _shed_open:
-		_coins.fly(from, true, pieces)
+		var coins := mini(pieces, HONEY_COINS_MOST)
+		for k in coins:
+			var carry := pieces / coins + (1 if k < pieces % coins else 0)
+			_coins.fly(from, true, carry, HONEY_COIN_GAP * float(k))
+		_coins.rise(from, paid)
 	return paid
 
 
@@ -3668,7 +3717,10 @@ func _set_menu(open: bool) -> void:
 		_skin.purse_over = Rect2()
 	if open:
 		_skin.hush_pulse(&"upgrades")
-		if not _shop_tour_done and _shop_skin.tour < 0:
+		if _stages_on():
+			_start_stage_tour()
+		elif not _shop_tour_done and _shop_skin.tour < 0:
+			_shop_skin.tour_cards = ShopSkin.TOUR
 			_shop_skin.tour = 0
 	_push_rooms()
 	if open:
@@ -3685,6 +3737,10 @@ func _set_shed(open: bool) -> void:
 	if open and not _shed_open and _sfx != null and not _room_swap:
 		_sfx.play_door(true)
 	_shed_open = open
+	# The house's card goes up before the mending plays, the first time only (see
+	# `ShedRoom.mend_card`): told before the door opens, which is when the room decides.
+	if _room != null:
+		_room.mend_card = not _cues_seen.has(&"demo_house")
 	_shed.visible = open
 	if open:
 		_skin.hush_pulse(&"shed")
@@ -4058,6 +4114,8 @@ func _show_farewell() -> void:
 	else:
 		# The ending filmed (2026-10-12): the full game's only.
 		_farewell.reel_of = self
+		# And a way back to the lake beside the way to the menu (2026-10-28, Richard).
+		_farewell.stay_door = true
 		# The Donation Bank's door beside the menu's (2026-10-22), hidden while
 		# `DonationBank.OPEN` is off.
 		if DonationBank.OPEN:
@@ -4124,6 +4182,7 @@ func _start_arrival() -> void:
 		return
 	_steps_done = false
 	_shop_tour_done = false
+	_shop_tours = 0
 	_first_buy_done = false
 	_decor_tour_done = false
 	_house_walk_done = false
@@ -4340,6 +4399,14 @@ func _decor_tour_step(delta: float) -> void:
 			_set_shed(true)
 		return
 	var room := _room_box_of
+	# The wash plank's card on the pad (2026-10-28, Richard: R1 had to open the shelf before
+	# the plank could be reached): the shelf opens itself, once a visit, with the plank picked.
+	_room.focus_wash = _decor_tour == DecorTour.PLANK and _shed_open and Pad.is_pad()
+	if not _shed_open:
+		_decor_shelf_opened = false
+	elif _room.focus_wash and not _decor_shelf_opened:
+		_decor_shelf_opened = true
+		_room.set(&"_pad_shelf", true)
 	match _decor_tour:
 		DecorTour.HINT:
 			if _panelled() or _fronted():
@@ -4396,6 +4463,18 @@ func _decor_tour_step(delta: float) -> void:
 			else:
 				_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 3, DECOR_TOUR_CARDS, true)
 		DecorTour.ROOM:
+			# A walk ends the card for good (Richard, after his first run of the staged shop):
+			# the player has stopped reading and the dimming is in the way. Measured from where
+			# they stood when it came up in this room.
+			var you: Vector2 = _room.get(&"_you_at")
+			if not _shed_open:
+				_decor_room_from = Vector2.INF
+			elif _decor_room_from == Vector2.INF:
+				_decor_room_from = you
+			elif you.distance_to(_decor_room_from) > DECOR_ROOM_MOVED:
+				_decor_room_from = Vector2.INF
+				_end_decor_tour()
+				return
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
 				lit = _room.room_box()
@@ -4443,9 +4522,99 @@ func _end_decor_tour() -> void:
 
 
 ## The shop's tour is over, read through or skipped: it is not shown again.
-func _on_shop_tour_ended(_skipped: bool) -> void:
+func _on_shop_tour_ended(skipped: bool) -> void:
+	if _touring_stage >= 0:
+		_shop_tours = SHOP_STAGES.size() if skipped else maxi(_shop_tours, _touring_stage + 1)
+		_touring_stage = -1
+		_shop_tour_done = _shop_tours >= SHOP_STAGES.size()
+		# Two boards come open together only on a load, but then both get their cards.
+		if not skipped:
+			_start_stage_tour()
+		save_game()
+		return
 	_shop_tour_done = true
 	save_game()
+
+
+## Whether the boards open one at a time on this lake (see `SHOP_STAGES`).
+func _stages_on() -> bool:
+	return not Demo.on() and (force_stages or get_parent() == get_tree().root)
+
+
+## Every level bought on every track, which is what the stages count.
+func _levels_bought() -> int:
+	var n := 0
+	for key: StringName in TRACKS:
+		n += _level_of(key)
+	return n
+
+
+## How many more levels a board waits for, 0 when it is open.
+func buys_to_open(board: StringName) -> int:
+	if not _stages_on():
+		return 0
+	# A board already bought from is open, whatever the count says: a run saved before the
+	# stages may own a dog level with fewer than DOGS' levels bought in all.
+	for key: StringName in TRACKS:
+		if _level_of(key) > 0 and ShopSkin.board_for(key) == board:
+			return 0
+	var need := 0
+	for stage: Array in SHOP_STAGES:
+		need += int(stage[1])
+		if stage[0] == board:
+			return maxi(need - _levels_bought(), 0)
+	return 0
+
+
+## Whether a track's board is open, so its rows can be bought.
+func track_open(key: StringName) -> bool:
+	return buys_to_open(ShopSkin.board_for(key)) <= 0
+
+
+## How many stages are open, counted in order.
+func _open_stages() -> int:
+	var n := 0
+	for stage: Array in SHOP_STAGES:
+		if buys_to_open(stage[0]) > 0:
+			break
+		n += 1
+	return n
+
+
+## Every board still shut, with the levels it waits for: what the shop boards over.
+func _shut_boards() -> Dictionary:
+	var out := {}
+	for stage: Array in SHOP_STAGES:
+		var left := buys_to_open(stage[0])
+		if left > 0:
+			out[stage[0]] = left
+	return out
+
+
+## The cards of the first open stage that has not had them, unless the shop is already
+## showing a tour.
+func _start_stage_tour(wait := 0.0) -> void:
+	if not _menu_open or _shop_skin.tour >= 0 or _shop_tours >= SHOP_STAGES.size():
+		return
+	if _shop_tours >= _open_stages():
+		return
+	_touring_stage = _shop_tours
+	_shop_skin.tour_cards = ShopSkin.TOUR_STAGES[SHOP_STAGES[_touring_stage][0]]
+	_shop_skin.tour_wait = wait
+	_shop_skin.tour = 0
+
+
+## A board came open (a rise in `_open_stages`): the planks come off it on the spot, the shop
+## being up whenever a level is bought, and its cards follow.
+func _watch_stages() -> void:
+	var open := _open_stages() if _stages_on() else SHOP_STAGES.size()
+	if _stages_open >= 0 and open > _stages_open:
+		for k in range(_stages_open, open):
+			_shop_skin.unseal(SHOP_STAGES[k][0])
+		# Once its planks are down: until then the card would stand over them.
+		if _menu_open:
+			_start_stage_tour(ShopSkin.UNSEAL_TIME)
+	_stages_open = open
 
 
 ## The last step is over: the flag, and a save so a Continue does not teach it again.
@@ -4744,6 +4913,7 @@ func _raise_front(loaded: bool) -> void:
 			_intro_done = true
 			_steps_done = true
 			_shop_tour_done = true
+			_shop_tours = SHOP_STAGES.size()
 			_decor_tour_done = true
 			_camera_tip_seen = true
 			for kind in CUE_KINDS:
@@ -5341,6 +5511,22 @@ const TRACKS := [
 	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
 
+# The staged shop (2026-10-25, `/grill-me` with Richard; the mdll-staged-shop test branch): the
+# boards open one at a time, BOATS first, then NET, DOGS and LUCK, each once enough levels have
+# been bought since the board before it opened, so a new player meets one board at a time and
+# learns first that the boats carry the money. Each stage is a board and the levels it waits
+# for after the one before: NET at 3 levels bought, DOGS at 15, LUCK at 25 in all (Richard,
+# after his first run: DOGS and LUCK came too late at 29 and 51). The sim
+# (`docs/progression/staged_gates.py`) opens them at about 0.5, 4.0 and 5.2 minutes in a
+# focused run. NET waits only three buys because past the third boat level a level-0 net
+# cannot fill even one hull, and every further boat level earns nothing.
+#
+# Worked out from the levels owned, so nothing is saved; a board already bought from is open
+# whatever the count. Full game only: the demo, and every borrowed lake but one that
+# asks (`force_stages`), open everything at once.
+const SHOP_STAGES := [[&"boat", 0], [&"net", 3], [&"dog", 12], [&"luck", 10]]
+static var force_stages: bool = false
+
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
 ## wording for now (2026-09-13): Richard writes the real lines once the rows read right.
 ## What stands between a row's figure now and its figure one level on. A mark rather than
@@ -5374,7 +5560,7 @@ const BLURBS := {
 func _affordable() -> int:
 	var count := 0
 	for key: StringName in TRACKS:
-		if not is_maxed(key) and sludge >= cost_of(key):
+		if not is_maxed(key) and sludge >= cost_of(key) and track_open(key):
 			count += 1
 	return count
 
@@ -5478,7 +5664,7 @@ func _shop_rows() -> Array:
 			# A track with nothing left to sell says so in a word: a dash reads as a price
 			# that failed to print.
 			"cost": Text.SHOP_MAX if full else "$%d" % roundi(price),
-			"afford": not full and sludge >= price,
+			"afford": not full and sludge >= price and track_open(key),
 			"maxed": full,
 		})
 	return out
@@ -5678,7 +5864,7 @@ func _saved_level(levels: Dictionary, what: StringName) -> int:
 
 
 func _buy(what: StringName) -> void:
-	if is_maxed(what):
+	if is_maxed(what) or not track_open(what):
 		return
 	var price := cost_of(what)
 	if sludge < price:
@@ -5910,10 +6096,35 @@ func _add_dog() -> void:
 
 
 func _push_boat_numbers() -> void:
+	var boosted := _boost_left > 0.0
 	for boat in _boats:
-		boat.speed = boat_speed()
+		boat.speed = boat_speed() * (BOOST_SAIL if boosted else 1.0)
 		boat.capacity = boat_cargo()
-		boat.volley_gap = boat_volley_gap()
+		# Loading quickens too, never under the volley's own floor (`Haul`, the track's top).
+		boat.volley_gap = maxf(boat_volley_gap() / BOOST_LOAD, 0.4) if boosted else boat_volley_gap()
+		boat.boost_left = _boost_left
+
+
+# The boats' boost (2026-10-28, `/grill-me` with Richard): a tamed tornado sends the fleet off
+# 2.5 times as fast, loading twice as fast, for a minute. The boats sit moored while it is
+# down, often 30 to 60 seconds; this gives back about 90 seconds of sailing, more than they
+# lost. A spinning tornado rides over every hull while it runs (`Boat.boost_left`), and the
+# first time a card says so (`CUE_BOOST`). Untamed, or settled by a save or the menu: nothing.
+# Not saved: a save during it drops it.
+const BOOST_TIME := 60.0
+const BOOST_SAIL := 2.5
+const BOOST_LOAD := 2.0
+const BOOST_BLINK := 5.0
+var _boost_left: float = 0.0
+
+
+## A frame of the boost: it runs while the boats do, so not in the settings' pause or behind
+## the menu, and the speeds go back the frame it ends.
+func _boost_step(delta: float) -> void:
+	if _boost_left <= 0.0 or _world_paused or _in_menu:
+		return
+	_boost_left = maxf(_boost_left - delta, 0.0)
+	_push_boat_numbers()
 
 
 ## Whether a docked hull sets off on its own, for the whole fleet. Called by the harness and
@@ -6332,7 +6543,10 @@ func _first_buy_step() -> void:
 		_first_buy_card.show_card(Rect2())
 		return
 	var box: Rect2 = _skin.get(&"_upgrades_box")
-	_first_buy_card.show_card(Rect2(_skin.global_position + box.position, box.size), Text.FIRST_BUY)
+	# On the pad the card names the button (2026-10-28, Richard: it said "Open Upgrades" and
+	# nothing about how).
+	var words := Text.FIRST_BUY_PAD % Binds.shown(&"open_upgrades", true) if Pad.is_pad() else Text.FIRST_BUY
+	_first_buy_card.show_card(Rect2(_skin.global_position + box.position, box.size), words)
 	_first_buy_forced = true
 
 
@@ -6345,7 +6559,7 @@ func _first_buy_up() -> bool:
 func _cheapest_affordable() -> StringName:
 	var best: StringName = &""
 	for key: StringName in TRACKS:
-		if is_maxed(key) or sludge < cost_of(key):
+		if is_maxed(key) or sludge < cost_of(key) or not track_open(key):
 			continue
 		if best == &"" or cost_of(key) < cost_of(best):
 			best = key
@@ -6356,7 +6570,24 @@ func _cheapest_affordable() -> StringName:
 func _owe_hint(kind: StringName) -> void:
 	if _cues_seen.has(kind) or kind in _hints or _hint_up == kind:
 		return
+	# A luck hint names the cast in the air (2026-10-29, Richard: the lucky card came in late,
+	# queued behind the meter's or the ferries'): it goes to the front, and a card already up
+	# that is not about luck steps aside and comes back after it.
+	if LUCK_HINTS.has(kind):
+		var at := 0
+		while at < _hints.size() and LUCK_HINTS.has(_hints[at]):
+			at += 1
+		_hints.insert(at, kind)
+		if _hint_up != &"" and not LUCK_HINTS.has(_hint_up):
+			_hints.insert(at + 1, _hint_up)
+			_end_hint(false)
+		return
 	_hints.append(kind)
+
+
+## Whether either net of the angler's cast is out: a luck hint is only worth showing then.
+func _cast_in_air() -> bool:
+	return _net.state != CastNet.State.IDLE or (_net2 != null and _net2.state != CastNet.State.IDLE)
 
 
 ## What holds a hint back: anything that is already talking to the player, or covering the
@@ -6406,6 +6637,11 @@ func _hint_step(delta: float) -> void:
 		_settings.get_parent().add_child(_hint_card)
 		_hint_card.closed.connect(_end_hint.bind(true))
 	_settings.get_parent().move_child(_hint_card, _settings.get_parent().get_child_count() - 1)
+	# A luck hint that could not come up while its cast was out waits for the next lucky cast
+	# rather than pointing at an empty spot over the angler; it was not seen.
+	if _hint_up == &"" and LUCK_HINTS.has(next) and not _cast_in_air():
+		_hints.pop_front()
+		return
 	var held := _hint_held_for(next)
 	if _hint_up == &"":
 		# The last one's fade is let finish before the next comes in.
@@ -6424,6 +6660,7 @@ func _hint_step(delta: float) -> void:
 	if held or target.size.x <= 0.0:
 		_hint_card.hide_hint(true)
 		return
+	_hint_card.inside = _hint_up == &"demo_house"
 	if not _hint_card.showing():
 		_hint_card.show_hint(_hint_up, Text.of(String(HINT_TEXT[_hint_up])), target)
 	_hint_card.target = target
@@ -6457,11 +6694,14 @@ func _hint_target(kind: StringName) -> Rect2:
 			return _skin.get_global_transform() * _skin.upgrades_box()
 		&"honey_jar":
 			return _skin.get_global_transform() * _skin.honey_box()
+		&"boost":
+			return _skin.get_global_transform() * _skin.ferry_bar_box()
 		&"demo_house":
+			# Over the back wall, off the floor the mending plays on (2026-10-25, Richard: the
+			# card stood over the animation). The card stands inside it, with no arrow.
 			if _room == null:
 				return Rect2()
-			var room := _room.get_global_transform() * _room.room_box()
-			return Rect2(room.get_center() - Vector2(20.0, room.size.y * 0.3), Vector2(40.0, 40.0))
+			return _room.get_global_transform() * _room.wall_box()
 		&"hive_demo":
 			if _hive == null:
 				return Rect2()
@@ -6651,6 +6891,7 @@ func _process(delta: float) -> void:
 		_hide_lake_cards()
 	# Every frame, so the menu's pose reaches the nets; its clock decides for itself.
 	_honey_step(delta)
+	_boost_step(delta)
 	_haul_count_step()
 	_achievements_step(delta)
 	if _tornado != null:
@@ -7441,6 +7682,10 @@ func _on_tornado_began() -> void:
 func _on_tornado_ended(tamed: bool) -> void:
 	_held_for_tornado = false
 	_note_tornado_end(tamed)
+	if tamed and not _tornado.settled and not _in_menu and not _demo_finale:
+		_boost_left = BOOST_TIME
+		_push_boat_numbers()
+		_owe_hint(&"boost")
 	if _demo_finale:
 		if _tornado.settled:
 			# A save or the menu's pose: the finale is owed again, as the run's first.
@@ -7795,6 +8040,7 @@ func _push_water_colours() -> void:
 
 
 func _update_hud() -> void:
+	_watch_stages()
 	_skin.pollution = pollution
 	_push_pad_light()
 	_skin.money = sludge
@@ -7820,6 +8066,7 @@ func _update_hud() -> void:
 		_skin.purse_over = Rect2()
 		return
 	_shop_skin.rows = _shop_rows()
+	_shop_skin.shut = _shut_boards()
 	# Read every frame the board is up, like the rows, so a language change reaches them.
 	_shop_skin.titles = ShopSkin.spoken(ShopSkin.TITLE_KEYS)
 	_shop_skin.headings = ShopSkin.spoken(ShopSkin.HEADING_KEYS)
@@ -7924,6 +8171,7 @@ func save_game() -> bool:
 		"intro_done": _intro_done,
 		"first_steps": _steps_done,
 		"shop_tour": _shop_tour_done,
+		"shop_tours": _shop_tours,
 		"decor_tour": _decor_tour_done,
 		"house_walk": _house_walk_done,
 		"wildlife_seen": _wildlife_seen,
@@ -8142,6 +8390,7 @@ func load_game() -> bool:
 	# Absent means done, as above. Not done means the steps start over from the walk.
 	_steps_done = bool(save.get("first_steps", true))
 	_shop_tour_done = bool(save.get("shop_tour", true))
+	_shop_tours = int(save.get("shop_tours", SHOP_STAGES.size() if _shop_tour_done else 0))
 	_decor_tour_done = bool(save.get("decor_tour", true))
 	_house_walk_done = bool(save.get("house_walk", true))
 	# Absent means seen, the tours' rule: an older save is past its first animal, or near

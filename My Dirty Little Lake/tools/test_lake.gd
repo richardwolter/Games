@@ -3011,9 +3011,9 @@ func _stage_market() -> void:
 			and ShopSkin.LEGEND_REACH < ShopSkin.BOARD_GAP * 0.5,
 			"and stands under the middle two boards, inside the table",
 			"legend %s left %s right %s table %s" % [legend_box, boat_box, dog_box, table])
-		_check(ShopSkin.BOARDS == [&"net", &"luck", &"boat", &"dog"]
+		_check(ShopSkin.BOARDS == [&"boat", &"net", &"dog", &"luck"]
 			and (ShopSkin.GROUPS[&"net"][0][1] as Array).slice(0, 2) == [&"net_strength", &"net_hold"],
-			"the boards stand net, luck, boats, dogs, and Catch is under Strength",
+			"the boards stand boats, net, dogs, luck (the order they open), and Catch is under Strength",
 			str(ShopSkin.BOARDS))
 	# The rail (2026-09-17): a column down the left of a row, the "?" answering in its top
 	# half and the level's figure standing in its bottom. Both inside the plate, where the
@@ -5583,6 +5583,34 @@ func _check_house(room: ShedRoom) -> void:
 	_check(queued == ["u12", "u23"] and room.house_seen == 3, "a jump of two stages plays both stage-ups, once", str(queued))
 	room.call(&"_house_shown")
 	_check((room.get(&"_house_playing") as Array).is_empty(), "and not on the next visit", "")
+	# The saw and boards by the low corner (st1) are there from stage 1 and take no piece in
+	# stages 1 and 2, so the mending lands nothing under a piece (2026-10-25, Richard).
+	var saw := Rect2i(204, 190, 34, 4)
+	_check(HouseInside.base_blocked(1, saw) and HouseInside.base_blocked(2, saw)
+		and not HouseInside.base_blocked(3, saw),
+		"the saw and boards take no piece in stages 1 and 2, and are gone in 3", "")
+	# The house's card first: with it owed, the mending holds on its first frame, the old room,
+	# then plays with its own sound; without it, it plays at once.
+	room.mend_card = true
+	room.house_seen = 1
+	room.call(&"_house_shown")
+	_check(is_equal_approx(float(room.get(&"_mend_hold")), ShedRoom.MEND_WAIT),
+		"with the house's card owed, the mending waits for it", str(room.get(&"_mend_hold")))
+	if not (room.get(&"_house_under") as Array).is_empty() and HouseInside.ready_to_draw():
+		room.call(&"_tick_house", 0.5)
+		_check(is_zero_approx(float(room.get(&"_house_clock"))), "and does not move while it waits", "")
+		room.set(&"_mend_hold", 0.0)
+		room.call(&"_tick_house", 1.0)
+		_check(int(room.get(&"_mend_next")) > 0, "then plays the mending's own sound",
+			str(room.get(&"_mend_next")))
+	room.mend_card = false
+	room.house_seen = 1
+	room.call(&"_house_shown")
+	_check(is_zero_approx(float(room.get(&"_mend_hold"))), "with no card owed the mending plays at once", "")
+	var lake_wall: Rect2 = _main.call(&"_hint_target", &"demo_house")
+	var floor_at: Rect2 = room.get_global_transform() * (room.call(&"_floor_rect") as Rect2)
+	_check(lake_wall.size.y > 0.0 and lake_wall.end.y <= floor_at.position.y + 0.5,
+		"the house's card stands over the back wall, off the floor", "%s %s" % [lake_wall, floor_at])
 	# A foot in a puddle splashes.
 	room.house_stage = 1
 	room.set(&"_house_rings", [])
@@ -6948,9 +6976,18 @@ func _stage_music() -> void:
 	music.set_ending(false)
 	_run_music(music, fade + 0.2)
 	g = music.gains()
+	_check(is_equal_approx(float(g["end"]), 1.0) and music.is_playing(&"habibs") and music.rolling(),
+		"closing the words lets the end song roll on (2026-10-29, Richard)", "%s" % g)
+	var end_len: float = (music.get(&"_ending") as AudioStreamPlayer).stream.get_length()
+	music.set(&"_end_clock", end_len - fade - 0.1)
+	_run_music(music, 0.2)
+	_check(not music.rolling() and float(music.gains()["end"]) < 1.0,
+		"and goes out over its own last seconds", "%s" % music.gains())
+	_run_music(music, fade + 0.2)
+	g = music.gains()
 	_check(is_zero_approx(float(g["end"])) and not music.is_playing(&"habibs")
 		and is_equal_approx(float(g["beatgucci"]), 1.0) and music.song_time() > at,
-		"closing it fades back to the playlist where it has got to", "%s" % g)
+		"then fades back to the playlist where it has got to", "%s" % g)
 	_check_record_lists(music)
 	_check_loobas(music)
 	music.queue_free()
@@ -7832,6 +7869,32 @@ func _check_cues() -> void:
 	# The hints: owed, one at a time, each with its words and its target; read once.
 	for kind: StringName in [&"lucky", &"double", &"pigeon", &"ferry"]:
 		seen.erase(kind)
+	# A luck hint is only shown while its cast is out (2026-10-29): with the net home it is
+	# dropped unseen, for the next lucky cast to owe again.
+	var luck_net: CastNet = _main.get(&"_net")
+	var luck_net_was := luck_net.state
+	_main.call(&"_owe_hint", &"lucky")
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	_check((_main.get(&"_hints") as Array).is_empty() and StringName(_main.get(&"_hint_up")) == &""
+		and not seen.has(&"lucky"),
+		"a lucky hint owed with the cast already home is dropped unseen", "")
+	# And it goes to the front: a card already up that is not about luck steps aside for it and
+	# comes back after (Richard: the lucky card came in late, behind the others).
+	luck_net.state = CastNet.State.FLYING
+	_main.call(&"_owe_hint", &"pigeon")
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	_main.call(&"_owe_hint", &"lucky")
+	_check(StringName(_main.get(&"_hint_up")) == &"" and str(_main.get(&"_hints")) == str([&"lucky", &"pigeon"]),
+		"a lucky cast puts its card in front of one already up, which waits behind it",
+		str(_main.get(&"_hints")))
+	(_main.get(&"_hints") as Array).clear()
+	seen.erase(&"pigeon")
+	_main.call(&"_owe_hint", &"ferry")
+	_main.call(&"_owe_hint", &"lucky")
+	_main.call(&"_owe_hint", &"double")
+	_check(str(_main.get(&"_hints")) == str([&"lucky", &"double", &"ferry"]),
+		"luck hints go in front of the queue, in the order they came", str(_main.get(&"_hints")))
+	(_main.get(&"_hints") as Array).clear()
 	_main.call(&"_owe_hint", &"lucky")
 	_main.call(&"_owe_hint", &"double")
 	_main.call(&"_owe_hint", &"lucky")
@@ -7858,6 +7921,7 @@ func _check_cues() -> void:
 	_main.call(&"_hint_step", 1.0 / 60.0)
 	_check(hint.showing() and hint.kind == &"double" and hint.text == Text.CUE_DOUBLE,
 		"then the double cast's", String(hint.kind))
+	luck_net.state = luck_net_was
 	hint.closed.emit()
 	_check(StringName(_main.get(&"_hint_up")) == &"" and seen.has(&"double"), "a click on its paper takes it down", "")
 	hint._process(CueCard.FADE + 0.05)
@@ -10189,8 +10253,276 @@ func _stage_foam() -> void:
 ## The shop's shape (2026-09-17): four boards named without an article, every row's name
 ## unique across all of them, every row claimed by exactly one group, one value grammar, and
 ## the pricing plate standing under the middle two even though the boards are now level.
+## The staged shop (2026-10-25, the mdll-staged-shop test branch): the boards open one at a
+## time, BOATS first, then NET, DOGS and LUCK, each once enough levels are bought since the one
+## before; a shut board cannot be bought from and counts nothing affordable; a board coming
+## open has its planks come off; each stage's tour cards follow; the demo and a borrowed lake
+## open everything.
+func _check_staged_shop() -> void:
+	var shop: ShopSkin = _main.get(&"_shop_skin")
+	var levels := {}
+	for key: StringName in Lake.TRACKS:
+		levels[key] = int(_main.call(&"_level_of", key))
+	var money: float = _main.get(&"sludge")
+	var tours: int = _main.get(&"_shop_tours")
+	var tour_done: bool = _main.get(&"_shop_tour_done")
+	var first_buy: bool = _main.get(&"_first_buy_done")
+	_check(int(_main.call(&"buys_to_open", &"luck")) == 0,
+		"a borrowed lake opens every board at once", str(_main.call(&"buys_to_open", &"luck")))
+	_check(ShopSkin.board_for(&"cargo") == &"boat" and ShopSkin.board_for(&"double_cast") == &"luck",
+		"every track knows its board", "")
+	Lake.force_stages = true
+	for key: StringName in Lake.TRACKS:
+		_main.set(StringName(String(key) + "_level"), 0)
+	_main.set(&"sludge", 1.0e7)
+	_main.set(&"_first_buy_done", true)
+	_main.set(&"_stages_open", -1)
+	_main.call(&"_watch_stages")
+	_check(int(_main.call(&"buys_to_open", &"boat")) == 0
+		and int(_main.call(&"buys_to_open", &"net")) == 3
+		and int(_main.call(&"buys_to_open", &"dog")) == 15
+		and int(_main.call(&"buys_to_open", &"luck")) == 25,
+		"a new game opens the boats and the rest at 3, 15 and 25 levels bought",
+		"%d %d %d" % [_main.call(&"buys_to_open", &"net"), _main.call(&"buys_to_open", &"dog"),
+			_main.call(&"buys_to_open", &"luck")])
+	var shut: Dictionary = _main.call(&"_shut_boards")
+	_check(not shut.has(&"boat") and shut.has(&"net") and shut.has(&"dog") and shut.has(&"luck"),
+		"the shut boards are the three after the boats", str(shut))
+	_check(int(_main.call(&"_affordable")) == 4,
+		"only the boats' four rows count as affordable", str(_main.call(&"_affordable")))
+	_check(_main.call(&"_cheapest_affordable") == &"cargo",
+		"the first upgrade points at a boat row", str(_main.call(&"_cheapest_affordable")))
+	var shut_rows := (_main.call(&"_shop_rows") as Array).filter(func(r: Dictionary) -> bool:
+		return StringName(r["board"]) != &"boat" and bool(r["afford"]))
+	_check(shut_rows.is_empty(), "no row on a shut board can be bought", str(shut_rows.size()))
+	_main.call(&"_buy", &"net_width")
+	_check(int(_main.call(&"_level_of", &"net_width")) == 0, "a buy on a shut board does nothing", "")
+	_main.set(&"dog_count_level", 1)
+	_check(int(_main.call(&"buys_to_open", &"dog")) == 0,
+		"a board already bought from is open, whatever the count (a run saved before the stages)", "")
+	_main.set(&"dog_count_level", 0)
+	# The first visit: the boats' cards, then the shut boards', then the plate's.
+	_main.set(&"_shop_tours", 0)
+	shop.tour = -1
+	_main.call(&"_set_menu", true)
+	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"boat"],
+		"the first visit walks the boats' cards", "%d %s" % [shop.tour, str(shop.tour_cards)])
+	shop.shut = _main.call(&"_shut_boards")
+	shop.call(&"_lay_out")
+	shop.tour = 1
+	var locked: Rect2 = shop.tour_target()
+	var boards: Dictionary = shop.get(&"_boards")
+	_check(locked.encloses(boards[&"net"]) and locked.encloses(boards[&"luck"])
+		and not locked.encloses(boards[&"boat"]),
+		"the second card points at the boards still shut", str(locked))
+	shop.tour = 0
+	for i in 3:
+		shop.tour_next()
+	_check(shop.tour == -1 and int(_main.get(&"_shop_tours")) == 1,
+		"the boats' cards end and their stage is counted", "%d %d" % [shop.tour, _main.get(&"_shop_tours")])
+	# Three buys open the net: its planks come off and its card follows, the shop being up.
+	for key: StringName in [&"cargo", &"boat_speed", &"boat_speed"]:
+		_main.call(&"_buy", key)
+	_main.call(&"_watch_stages")
+	_check(int(_main.call(&"buys_to_open", &"net")) == 0 and (shop.get(&"_unsealing") as Dictionary).has(&"net"),
+		"three boat levels open the net, its planks coming off", str(shop.get(&"_unsealing")))
+	shop.call(&"_lay_out")
+	var net_box: Rect2 = (shop.get(&"_boards") as Dictionary)[&"net"]
+	var net_face: Rect2 = Style.board_face(net_box, ShopSkin.FRAME)
+	shop.call(&"_cover_of", &"net", net_box, net_face)
+	var covers: Dictionary = shop.get(&"_covers")
+	var cover: Control = covers.get(&"net")
+	_check(cover != null and cover.clip_contents and absf(cover.get_rect().end.y - net_face.end.y) < 0.5,
+		"the falling planks are clipped to the board's face, over nothing else",
+		"%s face %s" % [cover.get_rect() if cover != null else Rect2(), net_face])
+	_check(shop.tour == 0 and shop.tour_cards == ShopSkin.TOUR_STAGES[&"net"]
+		and not shop.tour_up() and is_equal_approx(shop.tour_wait, ShopSkin.UNSEAL_TIME),
+		"and the net's card waits for its planks to fall", "%d %s %.2f" % [shop.tour, str(shop.tour_cards), shop.tour_wait])
+	shop.tour_wait = 0.0
+	# A click in the card's first moments is not a click on it (2026-10-28, Richard: the next
+	# buy click dismissed the card unread); after it, the card takes it.
+	var early := InputEventMouseButton.new()
+	early.button_index = MOUSE_BUTTON_LEFT
+	early.pressed = true
+	early.position = Vector2(400.0, 400.0)
+	shop.set(&"_tour_age", 0.0)
+	shop.call(&"_gui_input", early)
+	_check(shop.tour == 0, "a click at once does not dismiss the board's card", str(shop.tour))
+	shop.set(&"_tour_skip", Rect2(0.0, 0.0, 10.0, 10.0))
+	var skip := InputEventMouseButton.new()
+	skip.button_index = MOUSE_BUTTON_LEFT
+	skip.pressed = true
+	skip.position = Vector2(5.0, 5.0)
+	shop.call(&"_tour_input", skip)
+	_check(shop.tour == -1 and int(_main.get(&"_shop_tours")) == Lake.SHOP_STAGES.size()
+		and bool(_main.get(&"_shop_tour_done")),
+		"Skip ends every stage's cards for good", str(_main.get(&"_shop_tours")))
+	_main.call(&"_set_menu", false)
+	Demo.forced = true
+	_check(int(_main.call(&"buys_to_open", &"luck")) == 0, "the demo opens every board at once", "")
+	Demo.forced = false
+	var src := (load("res://scripts/lake.gd") as GDScript).source_code
+	_check(src.find('"shop_tours": _shop_tours') >= 0
+		and src.find('save.get("shop_tours", SHOP_STAGES.size() if _shop_tour_done else 0)') >= 0,
+		"the stages' tours are saved, an older save reading as all seen", "")
+	for word: String in [Text.SHOP_LOCKED_BUYS % 26, Text.SHOP_LOCKED_BUY_ONE, Text.TOUR_SHOP_LOCKED]:
+		_check(not word.is_empty() and word.find("SHOP_") < 0, "the shut boards' words are in the table", word)
+	Lake.force_stages = false
+	for key: StringName in Lake.TRACKS:
+		_main.set(StringName(String(key) + "_level"), int(levels[key]))
+	_main.set(&"sludge", money)
+	_main.set(&"_shop_tours", tours)
+	_main.set(&"_shop_tour_done", tour_done)
+	_main.set(&"_first_buy_done", first_buy)
+	_main.set(&"_stages_open", -1)
+	shop.tour = -1
+	shop.tour_cards = ShopSkin.TOUR
+	(shop.get(&"_unsealing") as Dictionary).clear()
+	for layer: Control in (shop.get(&"_covers") as Dictionary).values():
+		layer.queue_free()
+	(shop.get(&"_covers") as Dictionary).clear()
+	# The house tour's last card: a walk takes it down for good (2026-10-25, Richard).
+	var room: ShedRoom = _main.get(&"_room")
+	var kept_tour: int = _main.get(&"_decor_tour")
+	var kept_tour_done: bool = _main.get(&"_decor_tour_done")
+	var kept_you: Vector2 = room.get(&"_you_at")
+	_main.call(&"_set_shed", true)
+	_main.set(&"_decor_tour", Lake.DecorTour.ROOM)
+	_main.set(&"_decor_tour_done", false)
+	_main.set(&"_decor_room_from", Vector2.INF)
+	_main.call(&"_decor_tour_step", 0.016)
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.ROOM, "the house tour's last card stands while the player is still", "")
+	room.set(&"_you_at", (room.get(&"_you_at") as Vector2) + Vector2(1.0, 0.0))
+	_main.call(&"_decor_tour_step", 0.016)
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.OFF and bool(_main.get(&"_decor_tour_done")),
+		"and a walk ends it for good", str(_main.get(&"_decor_tour")))
+	_main.call(&"_set_shed", false)
+	room.set(&"_you_at", kept_you)
+	_main.set(&"_decor_tour", kept_tour)
+	_main.set(&"_decor_tour_done", kept_tour_done)
+	# A find's name follows a language picked after the lake loaded (2026-10-25, Richard: the
+	# record player's card said "Record Player" in PT-BR).
+	var record: TrashDef = null
+	for def: TrashDef in (_main.get(&"_grid") as LakeGrid).defs:
+		if def.keepsake and String(def.piece) == "decor_vynil_player":
+			record = def
+	if record != null:
+		var was := TranslationServer.get_locale()
+		TranslationServer.set_locale("pt_BR")
+		_main.call(&"_rename_finds")
+		_check(record.display_name == Text.of("DECOR_VYNIL_PLAYER") and record.display_name != "Record Player",
+			"a find's name follows the language picked after load", record.display_name)
+		TranslationServer.set_locale(was)
+		_main.call(&"_rename_finds")
+
+
+## Round 3 off Richard's second run (2026-10-28): the house on the pad, the upgrades card's
+## pad wording, the HUD's pad glyphs, the hive's pad cursor and its felt tools, the boats'
+## boost after a tamed tornado, and the ending's lake door and quiet bubble.
+## Round 4 of the staged shop's test branch (2026-10-29, Richard's notes after another run).
+func _check_round4() -> void:
+	var room: ShedRoom = _main.get(&"_room")
+	# A piece in the hands takes every press: nothing is used, sat on or left by.
+	var carried_was := room.carrying
+	room.carrying = &"decor_bookcase_tall"
+	_check(not room.switch_near(), "with a piece in the hands, Interact does nothing in the room", "")
+	room.carrying = carried_was
+	# The mending shines: stars with the taps and a burst with a wash on the chime.
+	var shine: MendShine = room.get(&"_shine")
+	_check(shine != null and shine.get_index() > (room.get(&"_house_over") as Array)[1].get_index(),
+		"the house's mending shine is drawn over the room", "")
+	if shine != null:
+		shine.clear()
+		room.call(&"_shine_cue", &"tap")
+		var taps := shine.stars()
+		room.call(&"_shine_cue", &"chime")
+		_check(taps >= 1 and shine.stars() >= taps + 20 and float(shine.get(&"_wash")) > 0.0,
+			"a tap lays a star or two, the chime a burst and a warm wash", "%d %d" % [taps, shine.stars()])
+		shine.clear()
+	# The smoke's crowd, sent in on the last band and waiting its stagger, is off the beard.
+	var smoke_src := (load("res://scripts/hive_step_smoke.gd") as GDScript).source_code
+	_check(smoke_src.find("_walk[i] != Walk.BEARD and (_is_walking(i) or _left_home(i))") >= 0,
+		"a bee off its spot on the beard is counted gone from it, so the swarm does not come back", "")
+	# The gutter's honey runs quicker, and the step waits less for the last of it.
+	_check(HiveStepUncap.RUN_BASE >= 80.0 and HiveStepUncap.DRAIN_WAIT <= 4.5,
+		"the gutter's honey runs quicker and the uncap step waits less for it", "")
+	# The duck's feet sweep back, away from the way it swims, and snap forward.
+	_check(Wildlife.stroke_at(0.0) == -1 and Wildlife.stroke_at(0.4) == 0 and Wildlife.stroke_at(0.7) == 1
+		and Wildlife.stroke_at(0.9) == -1,
+		"a duck's foot sweeps back over the stroke and snaps forward", "")
+
+
+func _check_round3() -> void:
+	var room: ShedRoom = _main.get(&"_room")
+	var was_shelf: bool = room.get(&"_pad_shelf")
+	Pad.set_mode(Pad.Mode.PAD)
+	room.set(&"_pad_shelf", true)
+	_check(not room.switch_near(), "with the pad's shelf up, Interact does nothing in the room", "")
+	room.set(&"_pad_shelf", was_shelf)
+	Pad.set_mode(Pad.Mode.MOUSE)
+	var src := (load("res://scripts/shed_room.gd") as GDScript).source_code
+	_check(src.find('"first": out.is_empty() or focus_wash') >= 0,
+		"the plank's card opens the pad's shelf on the wash plank", "")
+	var words := Text.FIRST_BUY_PAD % Binds.shown(&"open_upgrades", true)
+	_check(Glyphs.has_tokens(words) and words.find("%s") < 0,
+		"the upgrades card names the pad's button", words)
+	var gear: PlankButton = _main.get(&"_open_settings")
+	var camera: PlankButton = _main.get(&"_free_camera")
+	_check(gear.pad_action == &"open_settings" and camera.pad_action == &"camera_lock",
+		"the gear and the camera wear their pad buttons", "")
+	var hud_src := (load("res://scripts/hud_skin.gd") as GDScript).source_code
+	_check(hud_src.find("[[shed, &\"open_shed\"], [upgrades, &\"open_upgrades\"]]") >= 0,
+		"the decorate and upgrades buttons wear theirs", "")
+	_check(HiveStepCatch.new().has_method(&"_draw_pad_pointer"), "the hive's catch draws the pad's pointer", "")
+	_check(HiveStep.press_strength() == 0.0, "nothing pressed is no pressure", "")
+	var uncap_src := (load("res://scripts/hive_step_uncap.gd") as GDScript).source_code
+	var pour_src := (load("res://scripts/hive_step_pour.gd") as GDScript).source_code
+	_check(uncap_src.find("GLIDE_PACE * press_strength()") >= 0 and uncap_src.find("feel(") >= 0
+		and pour_src.find("press_strength() if Pad.is_pad()") >= 0 and pour_src.find("feel(") >= 0,
+		"the knife and the lever follow RT's travel and are felt", "")
+	# The boost: a tamed tornado speeds the fleet for a minute; untamed, nothing.
+	var tornado: Node = _main.get(&"_tornado")
+	if tornado != null and not (_main.get(&"_boats") as Array).is_empty():
+		var hull: Boat = (_main.get(&"_boats") as Array)[0]
+		var base: float = _main.call(&"boat_speed")
+		var was_settled: bool = tornado.get(&"settled")
+		tornado.set(&"settled", false)
+		_main.set(&"_boost_left", 0.0)
+		_main.call(&"_push_boat_numbers")
+		_main.call(&"_on_tornado_ended", false)
+		_check(is_zero_approx(float(_main.get(&"_boost_left"))), "an untamed tornado gives no boost", "")
+		_main.call(&"_on_tornado_ended", true)
+		_check(is_equal_approx(float(_main.get(&"_boost_left")), Lake.BOOST_TIME)
+			and is_equal_approx(hull.speed, base * Lake.BOOST_SAIL) and hull.boost_left > 0.0,
+			"a tamed tornado sends the boats off 2.5 times as fast, wearing the icon",
+			"%.1f %.2f %.2f" % [_main.get(&"_boost_left"), hull.speed, base])
+		_main.call(&"_boost_step", Lake.BOOST_TIME + 1.0)
+		_check(is_zero_approx(float(_main.get(&"_boost_left"))) and is_equal_approx(hull.speed, base)
+			and is_zero_approx(hull.boost_left),
+			"and back to their own pace after the minute", "%.2f" % hull.speed)
+		tornado.set(&"settled", was_settled)
+		var bar: Rect2 = _main.call(&"_hint_target", &"boost")
+		_check(bar.size.x > 0.0, "the boost's card points at the ferry bar", str(bar))
+	_check(Text.CUE_BOOST.find("*") >= 0 and CueCard.THEMES.has(&"boost"),
+		"the boost's card has its words and its theme", Text.CUE_BOOST)
+	# The ending: a way back to the lake beside the menu's, and the bubble shut from the start.
+	var farewell := Farewell.new()
+	farewell.stay_door = true
+	_check(String(farewell.call(&"_side_label")) == Text.DEMO_BACK_LAKE,
+		"the full game's ending offers a way back to the lake", "")
+	farewell.free()
+	var lake_src := (load("res://scripts/lake.gd") as GDScript).source_code
+	var reel_src := (load("res://scripts/ending_reel.gd") as GDScript).source_code
+	_check(lake_src.find("_farewell.stay_door = true") >= 0
+		and reel_src.find('_mat.set_shader_parameter(&"alpha", 0.0)') >= 0,
+		"the ending's lake door is set and its bubble starts unseen", "")
+
+
 func _stage_shop_shape() -> void:
 	var skin := _main.get_node(^"HUD/ShopSkin")
+	_check_staged_shop()
+	_check_round3()
+	_check_round4()
 	_check_shop_purse(skin)
 	_check_ten_fixes(skin)
 	_check_bonus_panel()
@@ -12168,9 +12500,9 @@ func _stage_first_steps() -> void:
 	_main.call(&"_set_menu", true)
 	_check(shop.tour == 2, "a tour closed half way picks up where it was", str(shop.tour))
 	var shop_src := (load("res://scripts/shop_skin.gd") as GDScript).source_code
-	_check(shop_src.find("if tour >= 0:
-		_tour_input(event)
-		return") >= 0,
+	_check(shop_src.find("if tour_up():
+		if _tour_age >= TOUR_GRACE:
+			_tour_input(event)") >= 0,
 		"nothing is bought while the tour is up", "")
 	for i in ShopSkin.TOUR.size():
 		shop.tour_next()
@@ -13380,9 +13712,21 @@ func _check_honey() -> void:
 	_net.catch = PackedInt32Array([rubbish, rubbish])
 	_main.call(&"_on_net_swept", at, 2, 10, 30.0, _net)
 	var paid := float(_main.get(&"sludge")) - before
-	_check(is_equal_approx(paid, half * 2.0) and coins.honey_flying() == 1,
-		"a sweep under honey pays half each piece's base price at once, and a honey coin flies",
-		"%.2f against %.2f, %d honey coins" % [paid, half * 2.0, coins.honey_flying()])
+	_check(is_equal_approx(paid, half * 2.0) and coins.honey_flying() == 2 and coins.rising() == 1,
+		"a sweep under honey pays half each piece's base price at once, a honey coin a piece flies and the pay rises over the catch (2026-10-29)",
+		"%.2f against %.2f, %d honey coins, %d rising" % [paid, half * 2.0, coins.honey_flying(), coins.rising()])
+	coins.clear()
+	_net.catch = PackedInt32Array()
+	for k in 20:
+		_net.catch.append(rubbish)
+	_main.call(&"_on_net_swept", at, 20, 30, 30.0, _net)
+	var carried := 0
+	for coin: Dictionary in coins.get(&"_flying"):
+		carried += int(coin["carry"])
+	_check(coins.honey_flying() == Lake.HONEY_COINS_MOST and carried == 20,
+		"a big honeyed sweep sends at most %d coins, carrying every piece between them" % Lake.HONEY_COINS_MOST,
+		"%d coins carrying %d" % [coins.honey_flying(), carried])
+	coins.clear()
 	_check(boosted, "with the Recycle Bonus on that piece's yard, and the honey not boosted by it", "")
 	_main.set(&"recycle_bonus_level", bonus_level_was)
 	_main.set(&"_bonus_kind", bonus_kind_was)

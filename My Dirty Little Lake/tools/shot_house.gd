@@ -72,6 +72,21 @@ func _run() -> void:
 	if OS.get_environment("HOUSE_FILM") != "":
 		await _store_film()
 		return
+	# The mending's shine (2026-10-29): tools/last_house_shine_{taps,burst}.png, a second into
+	# the stage-up and just after its chime.
+	if OS.get_environment("HOUSE_SHINE") != "":
+		var seen: Dictionary = _main.get(&"_cues_seen")
+		seen[&"demo_house"] = true
+		await _stage(1, 1)
+		_furnish(LAYERS.STAGE_1)
+		await _stage(2, 1)
+		_room.mend_card = false
+		await _wait(60)
+		await _shot("last_house_shine_taps.png")
+		await _wait(90)
+		await _shot("last_house_shine_burst.png")
+		_finish("shine")
+		return
 	var placed: Array = []
 	for stage in [1, 2, 3]:
 		placed.append_array([LAYERS.STAGE_1, LAYERS.STAGE_2, LAYERS.STAGE_3][stage - 1])

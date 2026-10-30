@@ -18,6 +18,7 @@ extends Control
 
 ## Preloaded, as every user of it does: hud_buttons.gd has no class_name.
 const HudButtons := preload("res://scripts/hud_buttons.gd")
+const Style := preload("res://scripts/style.gd")
 
 ## How long a coin is in the air, and how high it arcs above the straight line, in screen
 ## px. About the plate's shine time, so the plate stays lit from the first coin's landing
@@ -54,6 +55,15 @@ const HONEY_TRAIL_GAP := 0.06
 ## The last stretch of the flight is drawn face on, so it lands face on.
 const HONEY_LAND_FACE := 0.9
 
+## What the honey paid, written over the catch and rising (2026-10-29, Richard: "money from
+## honey pot bonus should be more clearly visible ... right now, there's like 1 coin flying"):
+## "+$N" in the honey's own ink, climbing `RISE_UP` canvas px over `RISE_TIME`, in whole
+## pixels, the last third fading.
+const RISE_TIME := 1.3
+const RISE_UP := 30.0
+const RISE_INK := Color(1.0, 0.78, 0.32)
+const RISE_SIZE := 16
+
 static var _honey_tex: Texture2D
 static var _honey_frame := Vector2.ZERO
 static var _honey_middle := Vector2.ZERO
@@ -70,8 +80,11 @@ signal landed(carry: int)
 ## look for.
 var target: Callable
 
-## Coins in the air, as `{from, to, age, carry, spin, honey}`.
+## Coins in the air, as `{from, to, age, carry, spin, honey}`. A coin with a negative age is
+## waiting to set off (a honeyed sweep's coins leave one after another).
 var _flying: Array = []
+## The rising "+$N"s, as `{at, age, text}`.
+var _rises: Array = []
 var _rng := RandomNumberGenerator.new()
 
 
@@ -99,14 +112,29 @@ func honey_flying() -> int:
 ## it is turned into screen px here and now, so a camera that pans during the flight does
 ## not drag the coin's start about with it. `honey` sends a honey coin, and `carry` is how
 ## many pieces' worth it stands for (a honeyed sweep sends one coin for its whole catch).
-func fly(from_world: Vector2, honey := false, carry := 1) -> void:
-	fly_from(get_viewport().get_canvas_transform() * from_world, honey, carry)
+func fly(from_world: Vector2, honey := false, carry := 1, delay := 0.0) -> void:
+	fly_from(get_viewport().get_canvas_transform() * from_world, honey, carry, delay)
+
+
+## "+$N" rising over a world point: the honey's pay for one sweep.
+func rise(from_world: Vector2, amount: float) -> void:
+	_rises.append({
+		"at": get_viewport().get_canvas_transform() * from_world, "age": 0.0,
+		"text": "+" + Style.MONEY_MARK + str(maxi(roundi(amount), 1)),
+	})
+	set_process(true)
+	queue_redraw()
+
+
+## How many "+$N"s are up. The harness asks.
+func rising() -> int:
+	return _rises.size()
 
 
 ## The same, from a point already in screen pixels. Used by the pigeon that pops into the
 ## side of the screen: it is drawn on a CanvasLayer and has no place on the lake at all, so
 ## there is no world point to put through the transform.
-func fly_from(from: Vector2, honey := false, carry := 1) -> void:
+func fly_from(from: Vector2, honey := false, carry := 1, delay := 0.0) -> void:
 	if _flying.size() >= MOST:
 		# Joined to the last coin of its own kind in the air, so a honey payment is never
 		# swallowed by a sale's coin, nor a sale by honey; to the last of any kind if none is.
@@ -125,7 +153,7 @@ func fly_from(from: Vector2, honey := false, carry := 1) -> void:
 	_flying.append({
 		"from": from,
 		"to": _target(),
-		"age": 0.0,
+		"age": -delay,
 		"carry": carry,
 		"spin": _rng.randf_range(0.6, 1.4),
 		"honey": honey,
@@ -139,6 +167,7 @@ func fly_from(from: Vector2, honey := false, carry := 1) -> void:
 ## a plate that is not drawn, is a receipt for something the player cannot see.
 func clear() -> void:
 	_flying.clear()
+	_rises.clear()
 	queue_redraw()
 
 
@@ -157,13 +186,28 @@ func _process(delta: float) -> void:
 		if float(coin["age"]) >= FLIGHT:
 			landed.emit(int(coin["carry"]))
 			_flying.remove_at(i)
-	if _flying.is_empty():
+	for i in range(_rises.size() - 1, -1, -1):
+		var up: Dictionary = _rises[i]
+		up["age"] = float(up["age"]) + delta
+		if float(up["age"]) >= RISE_TIME:
+			_rises.remove_at(i)
+	if _flying.is_empty() and _rises.is_empty():
 		set_process(false)
 	queue_redraw()
 
 
 func _draw() -> void:
+	for up: Dictionary in _rises:
+		var u := clampf(float(up["age"]) / RISE_TIME, 0.0, 1.0)
+		var text := String(up["text"])
+		var wide: float = Style.measure(text, RISE_SIZE).x
+		var lift := roundf(RISE_UP * (1.0 - (1.0 - u) * (1.0 - u)))
+		var at: Vector2 = (up["at"] as Vector2) + Vector2(-wide * 0.5, -lift)
+		var alpha := clampf((1.0 - u) * 3.0, 0.0, 1.0)
+		Style.write(self, text, RISE_SIZE, at.round(), RISE_INK, HORIZONTAL_ALIGNMENT_LEFT, Rect2(), alpha)
 	for coin: Dictionary in _flying:
+		if float(coin["age"]) < 0.0:
+			continue
 		var t := clampf(float(coin["age"]) / FLIGHT, 0.0, 1.0)
 		var from: Vector2 = coin["from"]
 		var to: Vector2 = coin["to"]

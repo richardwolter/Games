@@ -23,8 +23,30 @@ import glob
 import json
 import math
 import re
+import sys
 
 ROOT = "."
+
+# The staged shop (2026-10-25, the mdll-staged-shop test branch): the boards open one at a time,
+# in OPEN_ORDER, each once the levels bought on the boards already open reach its gate. GATES
+# holds the purchases each board after the first waits for, counted since the board before it
+# opened, so the thresholds are their running sums. Passed as --gates 4,6,8; without it the
+# model is the shop as it ships, every board open from the start.
+#   python docs/progression/build_shop.py --gates 4,6,8 --out docs/progression/shop_staged.json
+OPEN_ORDER = ["ferry", "net", "dog", "luck"]
+GATES = None
+OUT = f"{ROOT}/docs/progression/shop.json"
+_args = sys.argv[1:]
+while _args:
+    flag = _args.pop(0)
+    if flag == "--gates":
+        GATES = [int(x) for x in _args.pop(0).split(",")]
+        assert len(GATES) == len(OPEN_ORDER) - 1, "one gate per board after the first"
+    elif flag == "--out":
+        OUT = _args.pop(0)
+OPENS_AT = {OPEN_ORDER[0]: 0}
+for board, gate in zip(OPEN_ORDER[1:], GATES or []):
+    OPENS_AT[board] = OPENS_AT[OPEN_ORDER[OPEN_ORDER.index(board) - 1]] + gate
 
 
 def tres(path):
@@ -104,6 +126,8 @@ stats = {
     "k_ferry_per_piece": cal.get("k_ferry_per_piece", 0.0),
     "k_dog_trip": 8, "k_dog_carry": 2.2, "k_dog_carry_share": 0.5,
     "k_strand": STRAND, "k_strand_band": 2.5,
+    # Levels bought so far, every track counting one a level: what the staged boards gate on.
+    "buys": 0,
 }
 
 pools, catch_from, access_terms = {}, [], []
@@ -234,13 +258,17 @@ for key, tree, name, stat, tags in SPEC:
     cap = int(d["level_cap"])
     if stat not in ("boats", "dog"):
         stats[stat] = curve(d, 0)
-    nodes.append({
+    node = {
         "id": key, "tree": tree, "group": key, "name": name, "ranks": cap,
         "cost": [round(d["price_base"] * d["price_mult"] ** level, 1) for level in range(cap)],
-        "effects": [{"stat": stat, "add": [round(curve(d, level + 1) - curve(d, level), 5) for level in range(cap)]}],
+        "effects": [{"stat": stat, "add": [round(curve(d, level + 1) - curve(d, level), 5) for level in range(cap)]},
+                    {"stat": "buys", "add": [1] * cap}],
         "tags": tags,
         "schedule": SCHEDULE[key],
-    })
+    }
+    if GATES and OPENS_AT[tree] > 0:
+        node["gate"] = f"buys >= {OPENS_AT[tree]}"
+    nodes.append(node)
     assert len(SCHEDULE[key]) == cap, key
 
 config = {
@@ -250,7 +278,7 @@ config = {
     # The boats slightly ahead (Richard, 2026-09-18): the fleet's capacity at or over what the net
     # lands, never under it. The dogs feed the box too, which is why the band starts at par.
     "links": [{"up": "catch", "down": "ferry", "band": [1.0, 2.5], "buffer": "box"}],
-    "trees": ["net", "ferry", "dog", "luck"], "nodes": nodes,
+    "trees": OPEN_ORDER if GATES else ["net", "ferry", "dog", "luck"], "nodes": nodes,
     "bots": [
         {"id": "focused", "policy": "value", "thinkEvery": 5},
         {"id": "casual", "policy": "mixed", "noise": 0.15, "attention": 0.9,
@@ -268,6 +296,7 @@ config = {
     "gapCurve": [[0, 7], [10, 14], [30, 26], [60, 42], [90, 60]],
 }
 
-with open(f"{ROOT}/docs/progression/shop.json", "w", encoding="utf8") as out:
+with open(OUT, "w", encoding="utf8") as out:
     json.dump(config, out, indent=1)
-print(f"shop.json: {len(pools)} pools, {len(nodes)} tracks, {sum(n['ranks'] for n in nodes)} levels")
+print(f"{OUT}: {len(pools)} pools, {len(nodes)} tracks, {sum(n['ranks'] for n in nodes)} levels"
+      + (f", boards open at {OPENS_AT} buys" if GATES else ""))

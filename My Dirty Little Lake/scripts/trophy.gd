@@ -339,7 +339,12 @@ func _draw() -> void:
 	# The piece's own name in gold, so the line that changes is the one the eye goes to.
 	# Nothing at all for a piece that has not been named: the card is the picture, and a
 	# card that says "Find 07" under it is worse than a card that says nothing.
+	# Asked of the catalogue as it is drawn, in the language in play (Richard, after the staged
+	# shop's first run: the record player's card said "Record Player" in PT-BR, the name the
+	# lake had cached before the language was switched on the menu).
 	var named_title := String(_queue[0]["title"])
+	if sheets != null and not sheets.title_of(piece).is_empty():
+		named_title = sheets.title_of(piece)
 	if not named_title.is_empty():
 		var named_ink := Style.GOLD.lerp(Style.INK, 0.4)
 		_line(

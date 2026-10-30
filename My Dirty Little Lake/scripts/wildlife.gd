@@ -551,7 +551,16 @@ func _process(delta: float) -> void:
 		_fly_step(d, delta, seen)
 	_building_boxes = buildings.call() if buildings.is_valid() else []
 	for c: Dictionary in _critters_on_land:
+		var was: Vector2 = c["at"]
 		_land_step(c, delta, seen)
+		if c["kind"] == &"capy":
+			var still := (c["at"] as Vector2).distance_to(was) < 0.08
+			c["still_t"] = float(c.get("still_t", 0.0)) + delta if still else 0.0
+			c["move_t"] = 0.0 if still else float(c.get("move_t", 0.0)) + delta
+			if float(c["still_t"]) >= CAPY_STILL_SHOW:
+				c["stood"] = true
+			elif float(c["move_t"]) >= CAPY_MOVE_SHOW:
+				c["stood"] = false
 	_lay_streaks(delta)
 	# What the dogs walk round: the capybaras, which never run (Dog.calm). Not the peacock
 	# (2026-10-06, Richard: "no collision with peacock, its buggy").
@@ -1652,10 +1661,18 @@ const SNAKE_AWAY := Vector2(1.4, 2.4)
 ## and only changes once it is `CAPY_SIDE_SWAP` plane px over the lead's line, so a lead
 ## turning round puts its place from behind to beside-and-ahead on the same side, never
 ## through the lead.
-const CAPY_GAP := 36.0
+## **Further apart** (2026-10-29, Richard: "still bugging in place ... we can set them apart
+## more"): 36 to 42, with `CAPY_KEEP`, `CAPY_MATE_KEEP`, `CAPY_KEEP_OFF`, `CAPY_SIDE_SWAP` and
+## `CAPY_CATCH_UP` grown with it. 46 was tried: on the island's small lawn the follower's
+## place was blocked more often and it stepped back and forth more (the probe, isle).
+const CAPY_GAP := 42.0
 const CAPY_ASIDE := 1.1
-const CAPY_SIDE_SWAP := 14.0
-const CAPY_CATCH_UP := 40.0
+const CAPY_SIDE_SWAP := 16.0
+const CAPY_CATCH_UP := 46.0
+## How long the follower's straight place must stay clear before it leaves a turned one.
+const CAPY_TURN_BACK := 1.5
+## How long a follower stands before it may step back the way it came.
+const CAPY_REVERSE_AFTER := 0.3
 const CAPY_GO := 10.0
 const CAPY_STOP := 2.0
 const CAPY_KEEP_UP := 1.15
@@ -1674,13 +1691,21 @@ const CAPY_SETTLE := 0.6
 ## rather than through when the lead turns back on it. They walked through both before: a
 ## lead turning round walked into its follower, and two pairs met and stood in each other.
 ## Under `CAPY_GAP`, so a follower's place beside its lead stays outside the lead's room.
-const CAPY_KEEP := 30.0
-const CAPY_MATE_KEEP := 26.0
+const CAPY_KEEP := 36.0
+const CAPY_MATE_KEEP := 30.0
 ## A capybara resting with another land animal or a turtle inside `CAPY_KEEP` walks off
 ## calmly to `CAPY_KEEP_OFF` from it. After a walk out of the way that gave up (blocked, or
 ## no ground made), it waits `ROOM_AGAIN` seconds before trying again: tried every frame it
 ## walked a quarter second, rested, and walked again on the spot.
-const CAPY_KEEP_OFF := 56.0
+const CAPY_KEEP_OFF := 68.0
+## A capybara held where it is while walking (its place behind another's room, a step that
+## came back nothing) stands in its idle picture once it has not moved for this long, instead
+## of frozen mid-stride (2026-10-29, Richard: "bugging in place"; the probe counted two
+## seconds of frozen walking in three minutes).
+const CAPY_STILL_SHOW := 0.1
+## And once standing, it walks in its walk picture again only after `CAPY_MOVE_SHOW` of moving:
+## a follower stopping and going every few frames swapped its two pictures with it.
+const CAPY_MOVE_SHOW := 0.15
 const ROOM_AGAIN := 2.0
 ## The capybara swims the dogs' way: cut at the waterline (`CAPY_SINK` of its picture under
 ## it), bobbing, a foam collar on the cut, the ferry's foam streak behind it and one ring
@@ -2564,12 +2589,33 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 		c["side"] = 1.0 if lean >= 0.0 else -1.0
 	var place := (-ahead * cos(CAPY_ASIDE) + across * float(c["side"]) * sin(CAPY_ASIDE)) * CAPY_GAP
 	var goal := lat
-	for turn: float in [0.0, 0.6, -0.6, 1.2, -1.2, PI]:
-		var off := place.rotated(turn * float(c["side"])) / squash
-		if lead.get("trip", false) or (_walkable(c, lat + off) and not _blocked(c, lat + off)
-				and not _capy_crowded(c, lat + off)):
-			goal = lat + off
+	# The turn it took last is kept while it stays clear, and the straight place taken back
+	# only once it has been clear `CAPY_TURN_BACK` (2026-10-29): tried in a fixed order every
+	# frame, a place on the edge of another's room was clear one frame and not the next, and
+	# the follower's goal swung between two turns, stepping back and forth and turning round.
+	var turns: Array[float] = [0.0, 0.6, -0.6, 1.2, -1.2, PI]
+	var kept := float(c.get("turn", 0.0))
+	var free := func(t: float) -> bool:
+		var o := place.rotated(t * float(c["side"])) / squash
+		return lead.get("trip", false) or (_walkable(c, lat + o) and not _blocked(c, lat + o)
+			and not _capy_crowded(c, lat + o))
+	if kept != 0.0:
+		if free.call(0.0):
+			c["straight_t"] = float(c.get("straight_t", 0.0)) + delta
+		else:
+			c["straight_t"] = 0.0
+		if float(c["straight_t"]) < CAPY_TURN_BACK:
+			turns.erase(kept)
+			turns.push_front(kept)
+	var chose := PI
+	for turn: float in turns:
+		if free.call(turn):
+			chose = turn
+			goal = lat + place.rotated(turn * float(c["side"])) / squash
 			break
+	if chose != kept:
+		c["turn"] = chose
+		c["straight_t"] = 0.0
 	var gap := at.distance_to(goal)
 	# Sets off once its place is `CAPY_GO` away and walks until it is within `CAPY_STOP`: one
 	# threshold had it starting and stopping every few frames behind a walking lead, swapping
@@ -2616,6 +2662,18 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 		speed *= 1.25 if lead.get("trip", false) else 1.0
 		var go := speed * delta
 		var next := _step_to(c, goal, go, bool(lead.get("trip", false)))
+		# Never straight back on its last step (2026-10-29, Richard: "still bugging in place"):
+		# steered round a fox or its lead, or after a place on the edge of a room, the step
+		# came back reversed every few frames and the follower vibrated on the spot, turning
+		# round with it. It stands instead, and only steps the other way once it has stood
+		# `CAPY_REVERSE_AFTER`; held long enough it sits and waits like any held follower.
+		var last: Vector2 = c.get("last_step", Vector2.ZERO)
+		var step := next - at
+		if (step.length() > 0.001 and last.length() > 0.001 and step.dot(last) < 0.0
+				and float(c.get("still_t", 0.0)) < CAPY_REVERSE_AFTER):
+			next = at
+		elif step.length() > 0.001:
+			c["last_step"] = step
 		# Held where it is, its place behind its lead's room or another animal's: the step
 		# comes back a sliver of what was asked. `PROGRESS_TIME` of that and it stands and
 		# waits `ROOM_AGAIN` rather than walking on the spot with its legs going. (A step
@@ -2862,6 +2920,8 @@ func _land_frame(c: Dictionary) -> String:
 		&"snake":
 			return "snake_%s_%d" % [c["coat"], int(stepped / SNAKE_STEP_PX) % 7 if moving else 0]
 		&"capy":
+			if moving and bool(c.get("stood", false)):
+				return "capy_idle%d" % (int(clock * 4.0) % 5)
 			if moving:
 				var view: String = c["view"]
 				var anim := "walk" if view == "side" else ("fwalk" if view == "front" else "bwalk")
@@ -3704,9 +3764,10 @@ func _paint_under(on: CanvasItem) -> void:
 		var kind := String(b["kind"])
 		for kid: Dictionary in b["kids"]:
 			_shadow_of(on, "duckling_swim0", kid["at"], float(kid.get("facing", b["facing"])), 1.0)
-			_duck_legs(on, kid["at"], float(b["clock"]) + float(kid["wobble"]), true)
+			_duck_legs(on, kid["at"], float(b["clock"]) + float(kid["wobble"]), true,
+				float(kid.get("facing", b["facing"])), int(b["state"]) == Brood.SWIM)
 		_shadow_of(on, "%s_swim0" % kind, b["at"], float(b["facing"]), 1.0)
-		_duck_legs(on, b["at"], float(b["clock"]), false)
+		_duck_legs(on, b["at"], float(b["clock"]), false, float(b["facing"]), int(b["state"]) == Brood.SWIM)
 
 
 ## Something's own picture laid on the bed under it as a shadow, where the bed shows: thrown
@@ -3721,21 +3782,45 @@ func _shadow_of(on: CanvasItem, name: String, at: Vector2, facing: float, fade: 
 ## are a pixel shorter. Mixed towards the water over them.
 const DUCK_FOOT := Color(0.86, 0.52, 0.2)
 const LEGS_WATER := [0.3, 0.46, 0.6]
-func _duck_legs(on: CanvasItem, at: Vector2, clock: float, small: bool) -> void:
+## The paddle stroke (2026-10-29, Richard: the legs "should move to the opposite direction to
+## where the duck is moving, right now it feels random"): each foot sweeps back, away from the
+## way the duck is going, one whole art pixel at a time over `STROKE_PUSH` of the cycle, and
+## snaps forward again; the two feet half a cycle apart. `DUCK_STROKE` cycles a second while
+## swimming, `DUCK_STROKE_IDLE` while it sits or dabbles. It used to toggle both feet left and
+## right on a beat, the same whichever way the duck swam.
+const DUCK_STROKE := 1.6
+const DUCK_STROKE_IDLE := 0.5
+const STROKE_PUSH := 0.85
+
+
+## Where one foot is in its stroke, in art pixels behind the leg: -1 (forward), 0, 1 (back).
+static func stroke_at(phase: float) -> int:
+	var p := fposmod(phase, 1.0)
+	if p >= STROKE_PUSH:
+		return -1
+	return clampi(int(p / STROKE_PUSH * 3.0) - 1, -1, 1)
+
+
+func _duck_legs(on: CanvasItem, at: Vector2, clock: float, small: bool, facing: float, swimming: bool) -> void:
 	if not Fish.bed_shows(grid, at):
 		return
 	var ink := Fish.under_water(at, DUCK_FOOT, LEGS_WATER[0], LEGS_WATER[1], LEGS_WATER[2])
 	var dark := Fish.under_water(at, DUCK_FOOT.darkened(0.35), LEGS_WATER[0], LEGS_WATER[1], LEGS_WATER[2])
-	var beat := int(clock * 3.0) % 2
+	# The pictures face left, so `facing` +1 is a duck going left and its back is to the right.
+	var back := 1.0 if facing > 0.0 else -1.0
+	var rate := DUCK_STROKE if swimming else DUCK_STROKE_IDLE
 	var reach := 1 if small else 2
+	var foot_wide := ART * (1.0 if small else 2.0)
 	var base := (at / ART).floor() * ART + Vector2(0.0, ART)
 	for s in [-1, 1]:
-		var forward := (1 if (s > 0) == (beat == 0) else 0)
 		var x := base.x + float(s) * ART * (1.0 if small else 2.0)
 		for k in reach:
 			on.draw_rect(Rect2(Vector2(x, base.y + float(k) * ART), Vector2(ART, ART)), dark)
-		var foot := Vector2(x + float(forward * 2 - 1) * ART, base.y + float(reach) * ART)
-		on.draw_rect(Rect2(foot, Vector2(ART * (1.0 if small else 2.0), ART)), ink)
+		var behind := float(stroke_at(clock * rate + (0.5 if s > 0 else 0.0)))
+		# The heel under the leg, pushed back or forward; the web spreads behind it.
+		var heel := x + behind * back * ART
+		var left := heel if back > 0.0 else heel - (foot_wide - ART)
+		on.draw_rect(Rect2(Vector2(left, base.y + float(reach) * ART), Vector2(foot_wide, ART)), ink)
 
 
 ## What is under the water, drawn through it: a swimming frog in its own colours, kicking,

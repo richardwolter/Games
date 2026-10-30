@@ -93,6 +93,10 @@ const THEMES := {
 		"ink": Color(0.33, 0.19, 0.0), "icon": &"coin", "entrance": &"pop"},
 	&"ferry": {"band": Color(0.22, 0.48, 0.62), "mark": Color(0.60, 0.82, 0.94),
 		"ink": Color(0.02, 0.21, 0.34), "icon": &"boat", "entrance": &"sail"},
+	# The boats' boost after a tamed tornado (2026-10-28): the tornado's funnel on the ferry's
+	# blue, swirling in.
+	&"boost": {"band": Color(0.30, 0.44, 0.66), "mark": Color(0.68, 0.76, 0.92),
+		"ink": Color(0.02, 0.21, 0.34), "icon": &"funnel", "entrance": &"swirl"},
 }
 ## The icons that are drawn from rows of letters, one letter a pixel. `k` is the outline,
 ## `w` white, `p` the paper, `y` gold, `o` deep gold, `g` green, `G` deep green, `b` the
@@ -173,6 +177,9 @@ var text := ""
 var kind: StringName = &"tornado"
 ## A hint's target, in this control's pixels; empty for a moment.
 var target := Rect2()
+## A hint that stands inside its target, in its middle, with no arrow: about a whole place
+## rather than a thing in it (the house's card over the back wall, 2026-10-25).
+var inside := false
 
 var _hint := false
 var _clock := -1.0
@@ -347,7 +354,7 @@ func _draw() -> void:
 		_draw_card(card, look, rows, px, line_tall, pad, tab, t, 1.0)
 		draw_set_transform(Vector2.ZERO)
 		_draw_fx(look, t, card)
-	if _hint and target.size.x > 0.0 and t > ENTER * 0.5:
+	if _hint and target.size.x > 0.0 and t > ENTER * 0.5 and not inside:
 		_draw_arrow(card, t)
 
 
@@ -465,6 +472,11 @@ func _card_at(card: Vector2) -> Vector2:
 		return Vector2(size.x * 0.5 - card.x * 0.5, size.y * DOWN - card.y * 0.5)
 	var reach := (_arrow.get_size().y * 2.0 if _arrow != null else 16.0) + ARROW_GAP + GAP * 0.5
 	var at: Vector2
+	if inside:
+		at = target.get_center() - card * 0.5
+		at.x = clampf(at.x, 8.0, size.x - card.x - 8.0)
+		at.y = clampf(at.y, 8.0, size.y - card.y - 8.0)
+		return at
 	match _side():
 		&"right":
 			at = Vector2(target.end.x + reach, target.get_center().y - card.y * 0.5)

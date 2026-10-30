@@ -201,6 +201,11 @@ def blocks():
                 continue
             if f["kind"] in ("hole", "broken"):
                 walk += f.get("block_s2", f["block"]) if stage == 2 else f["block"]
+            elif f["kind"] == "stack":
+                # The saw and boards beside the low corner (st1): no placing on them, there
+                # from stage 1 so nothing the player stands there is landed on at the mending
+                # (Richard, after the staged shop's first run).
+                place += f["block"]
             elif f["kind"] == "puddle":
                 cx, cy = f["center"]
                 w, h = f.get("size_s2", f["size"]) if stage == 2 else f["size"]

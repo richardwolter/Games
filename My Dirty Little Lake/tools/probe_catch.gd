@@ -30,6 +30,16 @@ func _ready() -> void:
 	for key in [&"net_width", &"net_hold", &"net_strength", &"net_range", &"reel"]:
 		var track: UpgradeTrack = _main.get(&"_upgrades")[key]
 		_main.set(StringName(String(key) + "_level"), track.level_cap)
+	# PROBE_LEVELS="net_strength=1,net_range=4" sets those tracks and leaves every other net
+	# track at 0: an early net rather than a maxed one (2026-10-29, Richard: casts after the
+	# first Strength came home light).
+	var levels := OS.get_environment("PROBE_LEVELS")
+	if levels != "":
+		for key in [&"net_width", &"net_hold", &"net_strength", &"net_range", &"reel"]:
+			_main.set(StringName(String(key) + "_level"), 0)
+		for pair in levels.split(","):
+			var kv := pair.split("=")
+			_main.set(StringName(kv[0] + "_level"), int(kv[1]))
 	_main.call(&"_push_net_numbers")
 	var thin := float(OS.get_environment("PROBE_THIN")) if OS.get_environment("PROBE_THIN") != "" else 0.0
 	if thin > 0.0:
@@ -64,6 +74,8 @@ func _w(line: String) -> void:
 ## Tiles the open mouth touches whose top is liftable, and how many pieces they hold in all.
 func _count_under(at: Vector2) -> Dictionary:
 	var tops: Array[int] = _net._reach(at, _net.open_extent(), _net.strength())
+	var everything: Array[int] = _net._reach(at, _net.open_extent(), 99)
+	var heavy_tops := everything.size() - tops.size()
 	var all_pieces := 0
 	var liftable_deep := 0
 	for index in tops:
@@ -71,7 +83,7 @@ func _count_under(at: Vector2) -> Dictionary:
 		for k in (_grid.stacks[index] as Array).size():
 			if _grid.defs[_grid.stacks[index][k]].tier <= _net.strength():
 				liftable_deep += 1
-	return {"tiles": tops.size(), "pieces": all_pieces, "liftable": liftable_deep}
+	return {"tiles": tops.size(), "pieces": all_pieces, "liftable": liftable_deep, "heavy_tops": heavy_tops}
 
 
 ## PROBE_PILE=1: the whole lake emptied but for a square of tiles `half` either side of the
@@ -123,6 +135,15 @@ func _process(_delta: float) -> void:
 		_landed_at = _net.catch.size()
 
 
+var _homes: Array[int] = []
+
+
 func _on_landed(cargo: PackedInt32Array) -> void:
-	_w("cast %2d  under: %3d tiles %4d pieces %4d liftable  landing took %3d  home %3d / %d" % [
-		_cast, _under["tiles"], _under["pieces"], _under["liftable"], _landed_at, cargo.size(), _net.hold])
+	_homes.append(cargo.size())
+	var avg := 0.0
+	for n in _homes:
+		avg += float(n)
+	avg /= float(_homes.size())
+	_w("cast %2d  under: %3d tiles %4d pieces %4d liftable %3d tops too heavy  landing took %3d  home %3d / %d  (mean %.1f)" % [
+		_cast, _under["tiles"], _under["pieces"], _under["liftable"], _under["heavy_tops"], _landed_at,
+		cargo.size(), _net.hold, avg])

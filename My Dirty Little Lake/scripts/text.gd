@@ -1060,3 +1060,18 @@ static var BANK_YES: String:
 
 static var BANK_NOT_YET: String:
 	get: return TranslationServer.translate(&"BANK_NOT_YET")
+
+static var SHOP_LOCKED_BUYS: String:
+	get: return TranslationServer.translate(&"SHOP_LOCKED_BUYS")
+
+static var SHOP_LOCKED_BUY_ONE: String:
+	get: return TranslationServer.translate(&"SHOP_LOCKED_BUY_ONE")
+
+static var TOUR_SHOP_LOCKED: String:
+	get: return TranslationServer.translate(&"TOUR_SHOP_LOCKED")
+
+static var FIRST_BUY_PAD: String:
+	get: return TranslationServer.translate(&"FIRST_BUY_PAD")
+
+static var CUE_BOOST: String:
+	get: return TranslationServer.translate(&"CUE_BOOST")

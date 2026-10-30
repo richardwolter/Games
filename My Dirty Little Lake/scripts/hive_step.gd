@@ -347,6 +347,25 @@ func pad_move(delta: float) -> void:
 	Pad.move_cursor(aim_stick(), delta)
 
 
+## How hard the tool is pressed, 0..1: on the pad RT's own travel (A held is a full press), with
+## the mouse a held button is a full press (2026-10-28, Richard: the knife and the lever should
+## answer how far R2 goes down).
+static func press_strength() -> float:
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return 1.0
+	if not Pad.is_pad():
+		return 0.0
+	if Input.is_action_pressed(&"interact"):
+		return 1.0
+	return Input.get_action_strength(&"cast")
+
+
+## The pad's motors for this frame of work: refreshed every frame the tool works, so they stop
+## a moment after it does.
+static func feel(weak: float, strong: float) -> void:
+	Pad.rumble(weak, strong, 0.12)
+
+
 ## The aiming stick: the right one, else the left.
 static func aim_stick() -> Vector2:
 	var stick := Input.get_vector(&"aim_left", &"aim_right", &"aim_up", &"aim_down")

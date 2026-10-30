@@ -97,6 +97,16 @@ func _watch(who: String, c: Dictionary, wild: Wildlife) -> void:
 		var prev_step: Vector2 = was["step"]
 		if step.length() > 0.01 and prev_step.length() > 0.01 and step.dot(prev_step) < 0.0:
 			_bump(role, "step reversed")
+		# Running on the spot: a walking picture that goes nowhere; sliding: a resting one that
+		# moves (2026-10-29, Richard: "still bugging in place").
+		if moving and step.length() < 0.05:
+			_bump(role, "walking on the spot")
+		if moving and frame.contains("walk") and float(c.get("still_t", 0.0)) > 0.1:
+			_bump(role, "frozen mid-stride over 0.1 s")
+		if not moving and step.length() > 0.3:
+			_bump(role, "sliding at rest")
+		if step.length() > 0.01 and step.length() < 0.25 and moving:
+			_bump(role, "creeping under a quarter px a frame")
 		if bool(was["moving"]) != moving:
 			if _frames - int(was["moving_at"]) < 30:
 				_bump(role, "move/rest flip within 0.5 s")

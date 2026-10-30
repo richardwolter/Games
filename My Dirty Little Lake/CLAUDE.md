@@ -2140,6 +2140,161 @@ ribbon titles are carved.
   tone per board, none green, the inks, the max face and badge, the rows' `maxed`, the coin
   sheet's nine frames and the carve.
 
+### The Staged Shop (2026-10-25, `/grill-me` with Richard; merged 2026-10-30)
+**Tried in a separate copy first** (`Documents/MDLL Staged Shop Test`, branch
+`mdll-staged-shop`, its own save folder, no Steam id) over four runs, then merged into the
+game on 2026-10-30 (Richard: "it feels good"). Off a Chinese demo review ("the idle and
+hands-on balance isn't right") and Richard's worry that new players read slow boats as a slow
+idle game. **Supersedes** "unlock pacing out of scope" (The Arrival, 2026-09-19).
+- **The boards open one at a time** (`Lake.SHOP_STAGES`): BOATS from the start, NET at 3
+  levels bought, DOGS at 15, LUCK at 25 in all (Richard, after his first run: 29 and 51 came
+  too late). Counted off the levels owned
+  (`buys_to_open`, `track_open`), so nothing is saved; a board already bought from is open
+  whatever the count, so a run saved before the stages keeps what it had. **Full game only**: the demo and every borrowed lake open all four
+  (`Lake.force_stages` for probes and tests).
+- **Gates from the sim** (`docs/progression/build_shop.py --gates`, `staged_gates.py`): the
+  focused bot opens them at 0.5 / 4.0 / 5.2 min, the buy-anything bot at 0.5 / 3.2 / 6.2
+  (first fitted to 3 / 26 / 22 more: 5.9 and 9.8).
+  **NET waits only 3 buys, not ~3 minutes, by evidence**: past the third boat level a level-0
+  net cannot fill even one hull, so every further boat level earns nothing, and since a ferry
+  sails only full, a bigger hold sits longer at the dock. **Known, accepted for the trial**:
+  Strength comes at 3.9 min (was 7.2), the focused clear drops to 47.5 min (under the 48-68
+  band), and the box builds sooner. Richard judges in play.
+- **Left to right in the order they open** (`ShopSkin.BOARDS` boat / net / dog / luck): the
+  purse under BOATS, the pricing plate under NET and DOGS, the cross on LUCK. **The demo takes
+  the new order too** if this merges.
+- **A shut board stays drawn, boarded over** (`ShopSkin.shut`, `_draw_shut`, `_draw_lock`):
+  frame and title kept, the face planked (`SHUT_PLANK`, nailed ends), a padlock and a paper
+  slip, "Buy N more upgrades to unlock" (`SHOP_LOCKED_BUYS`, `SHOP_LOCKED_BUY_ONE`). Its rows
+  register nothing, so nothing on it buys, hovers or takes the pad. **It comes open on the
+  purchase that opens it** (`_watch_stages`, `unseal`): the planks fall away over
+  `UNSEAL_TIME`, the padlock and slip first, its head sparkles. **They fall on a child that
+  clips to the board** (`_covers`, `_cover_of`; Richard, after his first run: they slid down
+  over the purse and the plate), so they vanish behind the frame's foot, and being a later
+  child they stay over the head picture until they have fallen past it. A level is only ever
+  bought with the shop up, so the Upgrades button's pulse is not needed for it.
+- **The tour is split per board** (`ShopSkin.TOUR_STAGES`, `tour_cards`, `Lake._shop_tours`
+  saved as `shop_tours`, absent reads as all seen when `shop_tour` was done): BOATS with a card
+  on the shut boards (`TOUR_SHOP_LOCKED`) and the pricing plate on the first visit; each later
+  board's own card(s) the moment it opens. "Skip" ends them all. The forced first upgrade picks
+  a boat row (Capacity), as before.
+- **Strings**: three new keys, machine drafts in seven languages, unreviewed.
+- **Fixed off the same run, outside the shop** (2026-10-25, `/grill-me` with Richard):
+  - **The house tour's last card ends on a walk** (`Lake._decor_room_from`,
+    `DECOR_ROOM_MOVED` 0.35 cells): the "press E" card and its dimming go for good once the
+    player walks from where they stood when it came up.
+  - **A find's name follows the language** (`Lake._rename_finds` on `Prefs.language_changed`,
+    and `Trophy` asking `Sheets.title_of` as it draws): the find card said "Record Player" in
+    PT-BR, the name cached at load before the language was picked on the menu.
+  - **The house mending has a sound** (`ShedRoom.MEND_CUES`, `Sfx.room_mend`): the furniture's
+    small thud as hammer taps (pitched 1.32-1.48), its big thud as boards laid, the find's
+    chime at the end, laid in time with each stage-up. Takes the game already has, by
+    Richard's call; levels and timings first guesses.
+  - **The house's card comes first and off the floor** (`ShedRoom.mend_card`, `MEND_WAIT`
+    1.5 s, set by `Lake._set_shed`; `CueCard.inside`, `ShedRoom.wall_box`): the first mending
+    holds on its first frame, the old room, while the card stands over the back wall with no
+    arrow, then plays with its sound; the card stays up. With the card seen, it plays at once.
+  - **The saw and boards are there from stage 1** (`st1` stages [1, 2] in
+    `art_source/house_inside/layout.json`, drawn by `floor.build(1)`, no longer dropped in by
+    `_up_12`; `build_house_inside.py`'s `blocks` puts a `stack` in `place`): they landed under
+    whatever the player had stood there. No placing on them in stages 1 and 2; walkers cross.
+    Re-baked (`build_house_inside.py`, then `--half`); only the stage-1 sets, `u12`, `u1h` and
+    `house.json` changed.
+- **Round 3, off Richard's second run, on a DualSense** (2026-10-28, `/grill-me`):
+  - **A board's card waits for its planks and takes no click at once** (`ShopSkin.tour_wait`,
+    `tour_up`, `TOUR_GRACE` 0.6 s, a setter on `tour`; `Lake._start_stage_tour(wait)`): the
+    card came up on the purchase that opened the board and the next buy click or ✕ dismissed
+    it unread. His save had all four stages marked done.
+  - **The house on the pad**: while the decoration tour's plank card is up the shelf opens
+    itself once a visit with the wash plank picked (`ShedRoom.focus_wash`,
+    `Lake._decor_shelf_opened`); while the pad's shelf is up `switch_near` does nothing, so ✕
+    on the plank no longer took the door he stood at.
+  - **The upgrades card names the pad's button** (`FIRST_BUY_PAD`, the △/Y glyph).
+  - **The lake's buttons wear their pad buttons in pad mode** (`PlankButton.pad_action`, the
+    gear and the camera; `HudSkin._draw`, the decorate and upgrades buttons), on their top-left
+    corners.
+  - **The hive's catch draws the pad's pointer** (`HiveStepCatch._draw_pad_pointer`, the
+    game's wooden arrow at the stick's spot).
+  - **The knife and the lever follow RT's travel and are felt** (`HiveStep.press_strength`,
+    `feel`, `Pad.rumble`): a light squeeze creeps the knife, a full one is the old glide; the
+    lever turns as far as RT goes down; the motors hum as the blade cuts (the heavy one as it
+    strains) and as honey pours. **Supersedes "rumble out of scope"** (The PlayStation Pad).
+    Godot 4.7 has no DualSense trigger resistance; a native plugin would be the way, after
+    launch. Strengths are first guesses.
+  - **The boats' boost after a tamed tornado** (`Lake.BOOST_TIME` 60 s, `BOOST_SAIL` 2.5,
+    `BOOST_LOAD` 2, `_boost_step`; `Boat.boost_left`, `BoostIcon`, `_draw_boost`): sailing
+    2.5 times as fast and loading twice as fast for a minute, about 90 s of sailing for a
+    30-60 s hold. A spinning whole-pixel tornado over every hull, blinking in its last
+    `BOOST_BLINK` 5 s. The first time, `CUE_BOOST` at the ferry bar (theme `boost`). Untamed,
+    settled by a save or the menu, or the demo's finale: nothing. Not saved.
+  - **The ending**: a "Back to lake" door left of "Back to menu" in the full game
+    (`Farewell.stay_door`, the demo's `DEMO_BACK_LAKE`), and the reel's bubble shut and unseen
+    from its first frame (it flashed whole before the words).
+  - Two new strings (`FIRST_BUY_PAD`, `CUE_BOOST`), machine drafts.
+- **Round 4, off Richard's third run** (2026-10-29):
+  - **A luck hint goes to the front** (`Lake._owe_hint`, `_cast_in_air`): the lucky card
+    queued behind the meter's, the ferries' or the pigeon's and came up casts later. Now a
+    lucky or double card goes before any other owed, a card already up that is not about luck
+    steps aside and comes back after it, and a luck card that could not come up while its
+    cast was out is dropped unseen, for the next lucky cast to owe again.
+  - **The smoked swarm no longer comes back for a second** (`HiveStepSmoke._band_left`): the
+    crowd on the landing board, sent in when the last band was smoked, was counted back on
+    the beard while it waited out its stagger, and the whole beard's pictures drew again.
+  - **The credits song rolls on** (`MusicStation._rolling`, `rolling()`, `_end_left`,
+    `_end_clock`): Back to lake or Back to menu lets Habibs play to its own end, the
+    playlist coming back under its last `FADE`; it no longer fades out with the words.
+  - **A piece in the hands blocks the room's use key** (`ShedRoom.switch_near`, and no key
+    chip, `_draw_interact_prompt`): the pad's ✕ while placing put him out of the door.
+  - **The mending shines** (`MendShine`, `ShedRoom._shine_cue`, `SHINE_STARS`,
+    `SHINE_LOOSE`): gold four-point stars of whole art pixels pop over the holes, broken
+    boards and puddles being mended with each tap (3) and board (7) of the mending's sound,
+    and on the chime a burst (40) over the room with a warm wash (`WASH` 0.22 over 1 s).
+  - **Honey pays where it can be seen** (`Lake.HONEY_COINS_MOST` 8, `HONEY_COIN_GAP` 0.07,
+    `CoinFly.rise`, `RISE_*`): a honey coin a piece, up to eight a sweep leaving one after
+    another (`fly`'s `delay`), and the sweep's pay written "+$N" in the honey's ink rising
+    over the catch. It was one coin a sweep.
+  - **The gutter's honey runs quicker** (`HiveStepUncap.RUN_BASE` 85, `RUN_DEEP` 20, were
+    50 and 12; `DRAIN_WAIT` 4.5, was 6.7; `DRY_SHARE` 0.1, was 0.06).
+  - **A duck's feet paddle back** (`Wildlife.stroke_at`, `DUCK_STROKE` 1.6 a second swimming,
+    `DUCK_STROKE_IDLE` 0.5, `STROKE_PUSH` 0.85): each foot sweeps back away from the way the
+    duck swims a whole art pixel at a time and snaps forward, the two half a cycle apart. It
+    toggled both feet left and right on a beat whichever way the duck went.
+  - **Capybaras: no more vibrating on the spot** (`tools/probe_capy.tscn`, which counts
+    "walking on the spot", "sliding at rest" and "frozen mid-stride" now). Four rules:
+    - **The follower never steps straight back** (`CAPY_REVERSE_AFTER` 0.3 s, `last_step`):
+      steered round a fox or its lead the step came back reversed every few frames; it now
+      stands instead and only steps the other way after standing 0.3 s. Bank follower in one
+      run: facing flips 237 to 0, reversed steps 250 to 5.
+    - **The follower keeps the turn it took** (`turn`, `straight_t`, `CAPY_TURN_BACK` 1.5 s):
+      its place was tried in a fixed order every frame and swung between two turns at the edge
+      of another animal's room; it takes the straight place back only once that has been
+      clear 1.5 s.
+    - **Held still, it stands in its idle picture** (`still_t`, `move_t`, `stood`,
+      `CAPY_STILL_SHOW` 0.1 s, `CAPY_MOVE_SHOW` 0.15 s): the walk's frames step with ground
+      covered, so a held capybara stood frozen mid-stride; and it walks in its walk picture
+      again only after 0.15 s of moving, so stop-and-go does not swap the two pictures.
+    - **Further apart**: `CAPY_GAP` 42, `CAPY_KEEP` 36, `CAPY_MATE_KEEP` 30, `CAPY_KEEP_OFF`
+      68, `CAPY_SIDE_SWAP` 16, `CAPY_CATCH_UP` 46 (were 36 / 30 / 26 / 56 / 14 / 40). 46 was
+      tried and made the island's follower step back and forth more on the small lawn.
+    The probe's numbers swing a lot run to run (where the foxes and the frogs happen to be),
+    so read several runs before tuning by it.
+  - **The early catch, measured, not changed** (`tools/probe_catch.gd`'s new `PROBE_LEVELS`
+    and `heavy_tops`; Richard asked if the distribution is right): Strength 1, Range 4,
+    Width 2, Catch 1 (15), Reel 2, 42 casts in reach round the island. A fresh lake brings
+    home 11.3 of 15 on average, full on 20 casts, under 8 on 11; a lake 35% thinned at random
+    8.8, full on 6. The mouth at Width 2 covers 3.7 tiles; the ring round the island is 3-4
+    deep; a heavy piece on top stops the dig on 1.5 of those tiles a cast. Levers, none
+    pulled: `RING_SLOTS`, Width's early price, the depth tiers past the ring.
+- **Out of scope, by decision**: the nonstop caster outrunning the boats, any price or curve,
+  the demo, hiding rows within a board.
+- **The merge kept main's own `project.godot` name and user dir and `steam_appid.txt`**; the
+  branch keeps the test copy's, so the copy stays apart from the real save. The letter's
+  Upgrades stills were re-shot on the merge. **The store's shop shot is still owed.**
+- `test_lake`'s `_check_staged_shop` guards the gates, the shut rows, the affordable count, the
+  first upgrade, the tour per stage, the unseal, Skip, the demo and the save rule. Probe:
+  `tools/shot_staged_shop.tscn` (desktop build, own save) saves
+  `tools/last_staged_{boats,locked,legend,unseal,net,open}.png`.
+
 ### The Shelf Centred and the Tray in Plates (2026-10-09, `/grill-me` with Richard)
 - **The Decorate column is 250 wide** (`ShedRoom.LIST_WIDTH`, was 210): the house and the
   column are centred as one block, so the house moves left by half of it. The Deck check

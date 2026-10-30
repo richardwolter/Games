@@ -236,6 +236,11 @@ const SHOVE_CLEAR := 10.0
 
 var speed: float = 4.2
 var capacity: int = 6
+## The boost after a tamed tornado (2026-10-28, `Lake.BOOST_*`): its seconds left, set by the
+## lake each frame. While it runs a little tornado spins over the hull, blinking in its last
+## `Lake.BOOST_BLINK` seconds. The speed and the volley are the lake's to push.
+var boost_left: float = 0.0
+var _boost_icon: BoostIcon
 ## What Fast Sell has bought: the multiple on the gap between two pieces of this hull's
 ## volleys, at both ends of the run — loading out of the island crate and landing the hold in
 ## a yard's box. 1.0 is an untrained ferry, so a Boat with no lake behind it throws exactly
@@ -357,6 +362,12 @@ var _collar: HullCollar
 func _ready() -> void:
 	# Pixel art at a whole number of world pixels per art pixel: filtered, its edges smear.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_boost_icon = BoostIcon.new()
+	_boost_icon.name = &"BoostIcon"
+	_boost_icon.boat = self
+	_boost_icon.z_index = 2
+	_boost_icon.visible = false
+	add_child(_boost_icon)
 	# Seeded, like the lake itself: a run that can be replayed is a run that can be tuned.
 	_rng.seed = rng_seed
 	tile_pos = dock
@@ -538,6 +549,7 @@ func _place() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_drive_boost_icon()
 	if _trip_total > 0.0:
 		_trip_age += delta
 
@@ -1069,6 +1081,59 @@ static func _swell(x: float, t: float) -> float:
 ## one coming towards it shows its bow, and no amount of rotating a single sprite produces
 ## the second from the first. The sheet is sixteen turns of one drawn boat, and this picks
 ## the frame.
+## Over the masthead, in world px under the anchor; and the funnel's rows, widest first, in
+## whole art pixels (`BOOST_CELL` world px each).
+const BOOST_ABOVE := 132.0
+const BOOST_CELL := 3.0
+const BOOST_ROWS := [9, 8, 7, 6, 5, 4, 3, 2]
+const BOOST_FPS := 8.0
+const BOOST_BODY := Color(0.88, 0.9, 0.93)
+const BOOST_SHADE := Color(0.62, 0.66, 0.72)
+const BOOST_INK := Color(0.11, 0.09, 0.1)
+
+
+func _drive_boost_icon() -> void:
+	if _boost_icon == null:
+		return
+	var on := boost_left > 0.0
+	if on and boost_left < Lake.BOOST_BLINK:
+		on = fmod(boost_left, 0.5) > 0.2
+	_boost_icon.visible = on
+	if on:
+		_boost_icon.queue_redraw()
+
+
+## The little tornado: rows of whole art pixels narrowing down to a point, each row swung
+## sideways by a stepped wave so it spins, a dark ring round the lot.
+func _draw_boost(on: CanvasItem) -> void:
+	var tick := floorf(_time * BOOST_FPS)
+	var c := BOOST_CELL
+	var top := -BOOST_ABOVE - float(BOOST_ROWS.size()) * c
+	for pass_ink in [true, false]:
+		for r in BOOST_ROWS.size():
+			var w := float(int(BOOST_ROWS[r]))
+			var swing := roundf(sin(tick * 0.9 + float(r) * 0.8) * 1.2)
+			var x := (-w * 0.5 + swing) * c
+			var y := top + float(r) * c
+			var row := Rect2(Vector2(x, y).round(), Vector2(w * c, c))
+			if pass_ink:
+				on.draw_rect(row.grow(c), BOOST_INK, true)
+			else:
+				on.draw_rect(row, BOOST_BODY, true)
+				var band := int(fposmod(tick + float(r), 3.0))
+				on.draw_rect(Rect2(row.position + Vector2(float(band) * c * 2.0, 0.0), Vector2(c * 2.0, c)), BOOST_SHADE, true)
+
+
+class BoostIcon:
+	extends Node2D
+
+	var boat: Boat
+
+	func _draw() -> void:
+		if boat != null:
+			boat._draw_boost(self)
+
+
 func _draw() -> void:
 	_painted = hash([
 		state, cargo.size(), (_screen_heading() * 64.0).round(), _sun_key()

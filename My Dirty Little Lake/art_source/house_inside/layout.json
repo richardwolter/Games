@@ -1596,6 +1596,7 @@
    "id": "st1",
    "kind": "stack",
    "stages": [
+    1,
     2
    ],
    "rect": [
